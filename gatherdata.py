@@ -14,13 +14,13 @@ def download_and_save() -> dict:
     '''
     with requests.get("https://fftcg.square-enix-games.com/en/get-cards") as url:
         data = url.json()
-        for c in data['cards']:
+        for c in data["cards"]:
             extra = []
-            for v in c['images']['thumbs']:
-                for lang in ('_de', '_es', '_fr', '_it'):
-                    extra.append(v.replace('_eg.jpg', f'{lang}.jpg').replace('_eg_', f'{lang}_'))
+            for v in c["images"]["thumbs"]:
+                for lang in ("_de", "_es", "_fr", "_it"):
+                    extra.append(v.replace("_eg.jpg", f"{lang}.jpg").replace("_eg_", f"{lang}_"))
 
-            c['images']['thumbs'] += extra
+            c["images"]["thumbs"] += extra
 
         with open("cards.json", "w+") as fp:
             json.dump(data, fp, indent=4)
@@ -34,7 +34,7 @@ def download_and_save() -> dict:
 
 
 async def download_image(img_url, prefix='.\\img') -> str:
-    """
+    '''
     Download image and return on-disk destination.
 
     Args:
@@ -44,7 +44,7 @@ async def download_image(img_url, prefix='.\\img') -> str:
 
     Returns:
         str: the on-disk filepath of downloaded image
-    """
+    '''
     fname = img_url.split("/")[-1]
     dst = f"{prefix}\\{fname}"
     if os.path.exists(dst):
@@ -58,9 +58,9 @@ async def download_image(img_url, prefix='.\\img') -> str:
 
 
 async def main() -> None:
-    """
+    '''
     Download FFTCG API data and download any missing card images
-    """
+    '''
     data = download_and_save()
 
     img_urls = []
@@ -75,7 +75,7 @@ async def main() -> None:
     for card in data["cards"]:
         thumb_urls += card["images"]["thumbs"]
 
-    images = asyncio.gather(*[download_image(thumb_url, '.\\thumb') for thumb_url in thumb_urls])
+    images = asyncio.gather(*[download_image(thumb_url, ".\\thumb") for thumb_url in thumb_urls])
     await images
     print(images)
 
