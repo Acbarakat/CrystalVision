@@ -40,7 +40,7 @@ async def download_image(img_url, prefix='.\\img') -> str:
     Args:
         img_url (str): The URL of the image
         prefix (str): The location the image will downloaded to
-            (default is'.\\img')
+            (default is '.\\img')
 
     Returns:
         str: the on-disk filepath of downloaded image
