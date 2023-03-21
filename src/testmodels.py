@@ -25,7 +25,7 @@ import keras
 from gatherdata import DATA_DIR
 
 
-CATEGORIES = ("Name_EN", "Element", "Type_EN", "Cost", "Power")
+CATEGORIES = ("Element", "Type_EN", "Cost", "Power")
 
 IMAGES = [
 	'https://sakura-pink.jp/img-items/1-ff-2022-12-10-1-7.jpg',  # JP - Lenna
@@ -37,6 +37,7 @@ IMAGES = [
 	'https://d1rw89lz12ur5s.cloudfront.net/photo/bigncollectibles/file/1407913/5.jpg?1518673189', # F Nono
 	'https://crystal-cdn4.crystalcommerce.com/photos/6476018/7-089foil.jpg', # F Coeurl
 	'https://crystal-cdn2.crystalcommerce.com/photos/6479730/7-098foil.jpg', # F Flanbord
+	'https://i.ebayimg.com/images/g/A7EAAOSwQ0JhgY90/s-l500.jpg', # F Shantotto Backup
 	# 'https://pbs.twimg.com/media/FhOOgabagAEbuya.jpg'
 	# 'http://fftcg.cdn.sewest.net/images/cards/full/B-015_eg.jpg'
 	# 'https://pbs.twimg.com/media/FgrQ-fTaYAIkguF.jpg'
@@ -58,6 +59,7 @@ DF = pd.DataFrame(
 		("4-066R", "Nono", "\u98a8", "Backup", "3", ""),
 		("7-089C", "Coeurl", "\u96f7", "Monster", "2", ""),
 		("7-098R", "Flanborg", "\u96f7", "Monster", "2", "7000"),
+		("1-107L", "Shantotto", "\u571f", "Backup", "7", "")
 	]
 )
 
@@ -71,12 +73,14 @@ def main() -> None:
 
 		model = keras.models.load_model(model_path)
 
-		DF[f"predict_{category}"] = [labels[np.argmax(y)] for y in model.predict(IMAGES)]
+		x = model.predict(IMAGES)
+		DF[f"predict_{category}"] = [labels[np.argmax(y)] for y in x]
 
 		comp = DF[category] == DF[f"predict_{category}"]
 		comp = comp.value_counts(normalize=True)
 
-		print(f"{category} accuracy: {comp}")
+		print(f"{category} accuracy: {comp[True] * 100}%%")
+		# print(x)
 
 	print(DF)
 
