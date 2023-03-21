@@ -49,7 +49,8 @@ def make_model(train_ds: tf.data.Dataset,
                image_shape: tuple,
                label_count: int,
                model_type: str="resnet",
-               epochs: int=25,
+               epochs: int=30,
+               seed: typing.Any=None,
                model_name: str="fftcg_model") -> None:
     '''
     Create and save model
@@ -62,7 +63,9 @@ def make_model(train_ds: tf.data.Dataset,
         model_type (str): String describing the type of `model`
             (default is `resnet`)
         epochs (int): The maximum number of training iterations
-            (default is `25`)
+            (default is `30`)
+        seed (Any): Optional random seed for shuffling, transformations,
+            and dropouts.
         model_name (str): The name of the model
             (default is `fftcg_model`)
     '''
@@ -71,21 +74,70 @@ def make_model(train_ds: tf.data.Dataset,
     if model_type == "custom":
         # TODO: A well crafted custom per attribute is required
         model = models.Sequential(name="custom", layers=[
-            layers.Conv2D(16, kernel_size=(3, 3), activation='relu', input_shape=image_shape),
-            layers.BatchNormalization(),
-            layers.MaxPooling2D(),
-            layers.Conv2D(32, kernel_size=(3, 3), activation='relu'),
-            layers.BatchNormalization(),
+            layers.Conv2D(64, kernel_size=(3, 3), activation='relu', input_shape=image_shape),
+            # layers.BatchNormalization(),
             layers.MaxPooling2D(),
             layers.Conv2D(64, kernel_size=(3, 3), activation='relu'),
-            layers.BatchNormalization(),
+            # layers.BatchNormalization(),
+            layers.MaxPooling2D(),
+            layers.Conv2D(128, kernel_size=(3, 3), activation='relu'),
+            # layers.BatchNormalization(),
             layers.MaxPooling2D(),
             layers.Flatten(),
-            layers.Dense(1024, activation='relu'),
-            layers.Dense(100, activation='relu'),
+            layers.Dense(2 ** 8, activation='relu'),
+            layers.Dense(2 ** 6, activation='relu'),
             layers.Dense(label_count, activation="softmax")
         ])
         optimizer = tf.keras.optimizers.RMSprop()
+        # optimizer = tf.keras.optimizers.SGD(learning_rate=0.01, nesterov=True)
+    elif model_type == "power":
+        # TODO: A well crafted custom per attribute is required
+        model = models.Sequential(name="power", layers=[
+            layers.Conv2D(32, kernel_size=(3, 3), activation='relu', input_shape=image_shape),
+            layers.MaxPooling2D(),
+            layers.Conv2D(64, kernel_size=(3, 3), activation='relu'),
+            layers.MaxPooling2D(),
+            layers.Conv2D(128, kernel_size=(3, 3), activation='relu'),
+            layers.MaxPooling2D(),
+            layers.Flatten(),
+            layers.Dense(2 ** 8, activation='relu'),
+            # layers.Dropout(0.2, seed=seed),
+            layers.Dense(2 ** 6, activation='relu'),
+            # layers.Dropout(0.2),
+            layers.Dense(label_count, activation="softmax")
+        ])
+        optimizer = tf.keras.optimizers.RMSprop()
+    elif model_type == "element":
+        model = models.Sequential(name="element", layers=[
+            layers.Conv2D(32, kernel_size=(3, 3), activation='relu', input_shape=image_shape),
+            layers.MaxPooling2D(),
+            layers.Conv2D(64, kernel_size=(3, 3), activation='relu'),
+            layers.MaxPooling2D(),
+            layers.Conv2D(128, kernel_size=(3, 3), activation='relu'),
+            layers.Flatten(),
+            layers.Dense(2 ** 8, activation='relu'),
+            # layers.Dropout(0.2),
+            layers.Dense(2 ** 6, activation='relu'),
+            # layers.Dropout(0.2),
+            layers.Dense(label_count, activation="softmax")
+        ])
+        optimizer = tf.keras.optimizers.RMSprop()
+    elif model_type == "type_en":
+        model = models.Sequential(name="type_en", layers=[
+            layers.Conv2D(32, kernel_size=(3, 3), activation='relu', input_shape=image_shape),
+            layers.MaxPooling2D(),
+            layers.Conv2D(64, kernel_size=(3, 3), activation='relu'),
+            layers.MaxPooling2D(),
+            layers.Conv2D(128, kernel_size=(3, 3), activation='relu'),
+            layers.MaxPooling2D(),
+            layers.Flatten(),
+            layers.Dense(2 ** 10, activation='relu'),
+            # layers.Dropout(0.2, seed=seed),
+            layers.Dense(2 ** 8, activation='relu'),
+            # layers.Dropout(0.2, seed=seed),
+            layers.Dense(label_count, activation="softmax")
+        ])
+        optimizer = tf.keras.optimizers.SGD(learning_rate=0.01, nesterov=True)
     elif model_type == "resnet":
         model = applications.ResNet50V2(weights=None, input_shape=image_shape, classes=label_count)
         optimizer = tf.keras.optimizers.SGD(learning_rate=0.001, momentum=0.9, nesterov=True)
@@ -96,10 +148,16 @@ def make_model(train_ds: tf.data.Dataset,
                   loss=tf.keras.losses.CategoricalCrossentropy(),
                   metrics=[tf.keras.metrics.CategoricalAccuracy()])
     # print(model.summary())
+    print(model.name)
 
     callbacks = [
-        tf.keras.callbacks.EarlyStopping(monitor='categorical_accuracy', min_delta=0.001, patience=2),
-        tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=2)
+        # tf.keras.callbacks.EarlyStopping(monitor='loss', patience=3),
+        # tf.keras.callbacks.EarlyStopping(monitor='categorical_accuracy', min_delta=0.0010, patience=3),
+        # tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=3),
+        tf.keras.callbacks.EarlyStopping(monitor='val_categorical_accuracy',
+                                         min_delta=0.0025,
+                                         patience=4,
+                                         restore_best_weights=True),
     ]
 
     model.fit(train_ds,
@@ -164,14 +222,16 @@ def generate(df: pd.DataFrame,
     '''
     codes, uniques = df[key].factorize()
 
-    X_train, X_test, y_train, y_test = train_test_split(df[image_key], codes, test_size=0.3, stratify=df[stratify])
+    X_train, X_test, y_train, y_test = train_test_split(df[image_key],
+                                                        codes,
+                                                        test_size=0.33,
+                                                        random_state=seed,
+                                                        stratify=df[stratify])
 
-    if model_type == "custom":
-        preprocess_layer = layers.Rescaling(1. / 255)
-    elif model_type == "resnet":
+    if model_type == "resnet":
         preprocess_layer = applications.resnet_v2.preprocess_input
     else:
-        raise RuntimeError(f"model_type '{model_type}' is not supported")
+        preprocess_layer = layers.Rescaling(1. / 255)
 
     training_dataset = paths_and_labels_to_dataset(
         image_paths=X_train.tolist(),
@@ -192,7 +252,10 @@ def generate(df: pd.DataFrame,
     else:
         if shuffle:
             training_dataset = training_dataset.shuffle(buffer_size=1024, seed=seed)
-    training_dataset = training_dataset.map(lambda x, y: (preprocess_layer(x), y))
+    
+    training_dataset = training_dataset.map(tf.autograph.experimental.do_not_convert(lambda x, y: (preprocess_layer(x), y)))
+    flipped_training_dataset= training_dataset.map(lambda x, y: (tf.image.flip_up_down(x), y))
+    training_dataset = training_dataset.concatenate(flipped_training_dataset)
 
     training_dataset.class_names = uniques.tolist()
     training_dataset.file_paths = X_train.tolist()
@@ -219,6 +282,8 @@ def generate(df: pd.DataFrame,
         if shuffle:
             testing_dataset = testing_dataset.shuffle(buffer_size=1024, seed=seed)
     testing_dataset = testing_dataset.map(lambda x, y: (preprocess_layer(x), y))
+    flipped_testing_dataset = testing_dataset.map(lambda x, y: (tf.image.flip_up_down(x), y))
+    testing_dataset = testing_dataset.concatenate(flipped_testing_dataset)
 
     testing_dataset.class_names = uniques.tolist()
     testing_dataset.file_paths = X_test.tolist()
@@ -234,6 +299,7 @@ def generate(df: pd.DataFrame,
 
     make_model(training_dataset,
                testing_dataset,
+               seed=seed,
                model_type=model_type,
                model_name=f"{key}_model",
                image_shape=(image_size[0], image_size[1], 3),
@@ -278,7 +344,10 @@ def main(image: str="thumbs",
     df = df.query("~Element.str.contains('_')")
 
     # Ignore non-English cards
-    # df = df.query(f"~{image}.str.contains('_fr') and ~{image}.str.contains('_es') and ~{image}.str.contains('_it') and ~{image}.str.contains('_de')")
+    df = df.query(f"~{image}.str.contains('_fr')")  # French
+    # df = df.query(f"~{image}.str.contains('_es')")  # Spanish
+    df = df.query(f"~{image}.str.contains('_it')")  # Italian
+    df = df.query(f"~{image}.str.contains('_de')")  # German
 
     # WA: Bad Download/Image from server
     df = df.query(f"{image} not in ('8-080C_es.jpg', '11-138S_fr.jpg', '12-049H_fr_Premium.jpg', '13-106H_de.jpg')")
@@ -291,11 +360,11 @@ def main(image: str="thumbs",
         df[image] = os.path.abspath(os.path.join(DATA_DIR, "thumb")) + os.sep + df[image]
 
     model_mapping = (
-        ("Name_EN", ["Name_EN", "Element", "Type_EN"], "resnet"),
-        ("Element", ["Element", "Type_EN"], default_model_type),
-        ("Type_EN", ["Element", "Type_EN"], default_model_type),
-        ("Cost", ["Cost", "Element"], default_model_type),
-        ("Power", ["Power", "Type_EN", "Element"], default_model_type),
+        # ("Name_EN", ["Name_EN", "Element", "Type_EN"], "resnet"),
+        ("Element", ["Element", "Type_EN"], "element"),
+        ("Type_EN", ["Type_EN", "Element"], "type_en"),
+        ("Cost", ["Cost", "Element"], "custom"),
+        ("Power", ["Power", "Type_EN", "Element"], "power"),
     )
 
     for key, stratify, model_type in model_mapping:
@@ -310,4 +379,4 @@ def main(image: str="thumbs",
 
 if __name__ == '__main__':
     with tf.device('/GPU:0'):
-        main()
+        main(seed=23)
