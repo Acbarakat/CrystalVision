@@ -130,6 +130,7 @@ dmypy.json
 
 # CrystalVision
 data/
+src/data/
 img/
 thumb/
 frozen_models/
