@@ -25,7 +25,7 @@ import keras
 from gatherdata import DATA_DIR
 
 
-CATEGORIES = ("Name", "Element", "Type_EN", "Cost", "Power")
+CATEGORIES = ("Name_EN", "Element", "Type_EN", "Cost", "Power")
 
 IMAGES = [
 	'https://sakura-pink.jp/img-items/1-ff-2022-12-10-1-7.jpg',  # JP - Lenna
@@ -47,7 +47,7 @@ IMAGES = [imread(image) for image in IMAGES]
 IMAGES = np.array([tf.image.resize(image, (250, 179)) for image in IMAGES])
 
 DF = pd.DataFrame(
-	columns=["Code", "Name", "Element", "Type_EN", "Cost", "Power"],
+	columns=["Code", "Name_EN", "Element", "Type_EN", "Cost", "Power"],
 	data=[
 		("18-100L", "Lenna", "\u6c34", "Forward", "3", "7000"),
 		("1-044R", "Sephiroth", "\u6c37", "Forward", "5", "7000"),
