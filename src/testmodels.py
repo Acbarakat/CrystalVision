@@ -13,6 +13,7 @@ Todo:
     * Find more varied data, such as off-center or card with background
 
 """
+import os
 import json
 
 import pandas as pd
@@ -20,6 +21,8 @@ import tensorflow as tf
 import numpy as np
 from skimage.io import imread
 import keras
+
+from gatherdata import DATA_DIR
 
 
 CATEGORIES = ("Name", "Element", "Type_EN", "Cost", "Power")
@@ -61,9 +64,9 @@ DF = pd.DataFrame(
 
 def main() -> None:
 	for category in CATEGORIES:
-		model_path = f'.\\data\\model\\{category}_model'
+		model_path = os.path.join(DATA_DIR, "model", f"{category}_model")
 
-		with open(f"{model_path}\\category.json") as fp:
+		with open(os.path.join(model_path, "category.json")) as fp:
 			labels = json.load(fp)
 
 		model = keras.models.load_model(model_path)
