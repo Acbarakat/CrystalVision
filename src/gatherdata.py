@@ -2,8 +2,13 @@
 """
 Gather card API data and download images
 
+Attributes:
+    DATA_DIR (str): The root data folder
+    CARD_API_FILEPATH (str): Save card API data as JSON
+
 Todo:
     * Download JP image data
+    * Archive all image data
 
 """
 import asyncio
@@ -11,6 +16,10 @@ import json
 import os
 
 import requests
+
+
+DATA_DIR = os.path.join(".", "data")
+CARD_API_FILEPATH = os.path.join(DATA_DIR, "cards.json")
 
 
 def download_and_save() -> dict:
@@ -30,7 +39,10 @@ def download_and_save() -> dict:
 
             c["images"]["thumbs"] += extra
 
-        with open("cards.json", "w+") as fp:
+        if not os.path.exists(DATA_DIR):
+            os.makedirs(DATA_DIR)
+
+        with open(CARD_API_FILEPATH, "w+") as fp:
             json.dump(data, fp, indent=4)
 
     # TODO: Get data from JP
@@ -41,25 +53,26 @@ def download_and_save() -> dict:
     return data
 
 
-async def download_image(img_url, prefix='.\\img') -> str:
+async def download_image(img_url, subfolder='img') -> str:
     '''
     Download image and return on-disk destination.
 
     Args:
         img_url (str): The URL of the image
-        prefix (str): The location the image will downloaded to
-            (default is '.\\img')
+        subfolder (str): The subfolder location the image 
+            will downloaded into
+            (default is 'img')
 
     Returns:
         str: the on-disk filepath of downloaded image
     '''
     fname = img_url.split("/")[-1]
-    dst = f"{prefix}\\{fname}"
+    dst = os.path.join(DATA_DIR, subfolder, fname)
     if os.path.exists(dst):
         return dst
 
     with requests.get(img_url, allow_redirects=True) as url:
-        with open(f"{prefix}\\{fname}", "wb+") as fp:
+        with open(dst, "wb+") as fp:
             fp.write(url.content)
 
     return dst
@@ -83,7 +96,7 @@ async def main() -> None:
     for card in data["cards"]:
         thumb_urls += card["images"]["thumbs"]
 
-    images = asyncio.gather(*[download_image(thumb_url, ".\\thumb") for thumb_url in thumb_urls])
+    images = asyncio.gather(*[download_image(thumb_url, "thumb") for thumb_url in thumb_urls])
     await images
     print(images)
 
