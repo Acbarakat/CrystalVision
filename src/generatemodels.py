@@ -1,3 +1,11 @@
+# -*- coding: utf-8 -*-
+"""
+Generate various models
+
+Todo:
+    * Find more varied data, such as off-center or card with background
+
+"""
 import os
 import json
 import typing
@@ -10,12 +18,14 @@ from sklearn.model_selection import train_test_split
 from keras.utils import image_utils
 from keras.utils.image_dataset import paths_and_labels_to_dataset
 
+from gatherdata import CARD_API_FILEPATH, DATA_DIR
+
 
 def make_database() -> pd.DataFrame:
     '''
     Load card data and clean up any issue found in the API
     '''
-    with open("cards.json") as fp:
+    with open(CARD_API_FILEPATH) as fp:
         data = json.load(fp)["cards"]
 
     df = pd.DataFrame(data)
@@ -32,6 +42,7 @@ def make_database() -> pd.DataFrame:
     df = df.query("Rarity != 'B'")  
 
     return df
+
 
 def make_model(train_ds: tf.data.Dataset,
                validation_ds: tf.data.Dataset,
@@ -77,7 +88,7 @@ def make_model(train_ds: tf.data.Dataset,
         optimizer = tf.keras.optimizers.RMSprop()
     elif model_type == "resnet":
         model = applications.ResNet50V2(weights=None, input_shape=image_shape, classes=label_count)
-        optimizer = tf.keras.optimizers.SGD(lr=0.001, momentum=0.9, nesterov=True)
+        optimizer = tf.keras.optimizers.SGD(learning_rate=0.001, momentum=0.9, nesterov=True)
     else:
         raise RuntimeError(f"model_type '{model_type}' is not supported")
 
@@ -96,7 +107,7 @@ def make_model(train_ds: tf.data.Dataset,
               validation_data=validation_ds,
               callbacks=callbacks)
     
-    model.save(f".\\data\\model\\{model_name}")
+    model.save(os.path.join(DATA_DIR, "model", model_name))
 
 
 def generate(df: pd.DataFrame,
@@ -214,7 +225,11 @@ def generate(df: pd.DataFrame,
     testing_dataset.element_spec[0]._name = 'test'
     # print(testing_dataset)
 
-    with open(f".\\data\\model\\{key}_model\\category.json", "w+") as fp:
+    KEY_MODEL_PATH = os.path.join(DATA_DIR, "model", f"{key}_model")
+    if not os.path.exists(KEY_MODEL_PATH + os.sep):
+        os.makedirs(KEY_MODEL_PATH + os.sep)
+
+    with open(os.path.join(KEY_MODEL_PATH, "category.json"), "w+") as fp:
         json.dump(uniques.to_list(), fp)
 
     make_model(training_dataset,
@@ -228,7 +243,7 @@ def generate(df: pd.DataFrame,
 def main(image: str="thumbs",
          seed: typing.Any=None,
          interpolation: str="bilinear",
-         model_type: str="resnet") -> None:
+         default_model_type: str="resnet") -> None:
     '''
     Create and save all models based on card data
 
@@ -241,7 +256,7 @@ def main(image: str="thumbs",
             Supports `bilinear`, `nearest`, `bicubic`, `area`,
             `lanczos3`, `lanczos5`, `gaussian`, `mitchellcubic`.
             (default is `bilinear`)
-        model_type (str): String describing the type of `model`. Options are:
+        default_model_type (str): String describing the type of `model`. Options are:
           - 'custom': Custom model, using RMSprop optimizer, and 1/255 scale preprocessor.
           - 'resnet' ResNet50V2, using SGD optimizer, and ResnetV2 preprocessor.
           (default is `resnet`)
@@ -269,19 +284,21 @@ def main(image: str="thumbs",
     df = df.query(f"{image} not in ('8-080C_es.jpg', '11-138S_fr.jpg', '12-049H_fr_Premium.jpg', '13-106H_de.jpg')")
 
     # Source image folder
+    df = df.copy()  # WA: for pandas modification on slice
     if image == "images":
-        df[image] = os.path.abspath(".\\img") + os.sep + df[image]
+        df[image] = os.path.abspath(os.path.join(DATA_DIR, "img")) + os.sep + df[image]
     else:
-        df[image] = os.path.abspath(".\\thumb") + os.sep + df[image]
+        df[image] = os.path.abspath(os.path.join(DATA_DIR, "thumb")) + os.sep + df[image]
 
     model_mapping = (
-        ("Element", ["Element", "Type_EN"]),
-        ("Type_EN", ["Element", "Type_EN"]),
-        ("Cost", ["Cost", "Element"]),
-        ("Power", ["Power", "Type_EN", "Element"]),
+        ("Name_EN", ["Name_EN", "Element", "Type_EN"], "resnet"),
+        ("Element", ["Element", "Type_EN"], default_model_type),
+        ("Type_EN", ["Element", "Type_EN"], default_model_type),
+        ("Cost", ["Cost", "Element"], default_model_type),
+        ("Power", ["Power", "Type_EN", "Element"], default_model_type),
     )
 
-    for key, stratify in model_mapping:
+    for key, stratify, model_type in model_mapping:
         generate(df,
                  key,
                  image,
