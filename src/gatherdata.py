@@ -1,3 +1,11 @@
+# -*- coding: utf-8 -*-
+"""
+Gather card API data and download images
+
+Todo:
+    * Download JP image data
+
+"""
 import asyncio
 import json
 import os
