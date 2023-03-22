@@ -58,7 +58,6 @@ def freeze_model(model_path, model_name, frozen_path=None):
     for i in reversed(range(len(graph_def.node))):
         if graph_def.node[i].op in ('Const', 'NoOp'):
             del graph_def.node[i]
-    graph_def.library.Clear()
 
     tf.io.write_graph(graph_def, logdir=frozen_path, name=f"{model_name}.pbtxt", as_text=True)
 
