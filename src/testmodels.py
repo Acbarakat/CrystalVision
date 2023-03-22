@@ -38,13 +38,21 @@ IMAGES = [
 	'https://crystal-cdn4.crystalcommerce.com/photos/6476018/7-089foil.jpg', # F Coeurl
 	'https://crystal-cdn2.crystalcommerce.com/photos/6479730/7-098foil.jpg', # F Flanbord
 	'https://i.ebayimg.com/images/g/A7EAAOSwQ0JhgY90/s-l500.jpg', # F Shantotto Backup
+	'https://cdn.shopify.com/s/files/1/1715/6019/products/e1d86d4e-7a92-48e7-ab55-73f16c2787e1_600x.png', # F Ark
+	'https://i.ebayimg.com/images/g/WWAAAOSweGNhHgtE/s-l500.jpg', # F Chaos
+	'https://cdn.shopify.com/s/files/1/1715/6019/products/Materia-13-103L-OpusXIII-Foil_500x.png', # F Materia
+	'https://52f4e29a8321344e30ae-0f55c9129972ac85d6b1f4e703468e6b.ssl.cf2.rackcdn.com/products/pictures/1167486.jpg', # F Aleoidai
+	'https://52f4e29a8321344e30ae-0f55c9129972ac85d6b1f4e703468e6b.ssl.cf2.rackcdn.com/products/pictures/1661117.jpg', # F Man in Black
+	'https://52f4e29a8321344e30ae-0f55c9129972ac85d6b1f4e703468e6b.ssl.cf2.rackcdn.com/products/pictures/1146230.jpg', # F Cactuar
+	'https://superelf-cards.de/storage/images/image?remote=https%3A%2F%2Fsuperelf-cards.de%2FWebRoot%2FStore6%2FShops%2FShop052035%2F5F3A%2F7ABF%2FF0F3%2F877E%2F41BF%2FAC14%2F500D%2F36D8%2F6-074F.jpg', # F German Cactuar
 	# 'https://pbs.twimg.com/media/FhOOgabagAEbuya.jpg'
 	# 'http://fftcg.cdn.sewest.net/images/cards/full/B-015_eg.jpg'
 	# 'https://pbs.twimg.com/media/FgrQ-fTaYAIkguF.jpg'
 	# 'https://crystalcommerce-assets.s3.amazonaws.com/photos/6548938/large/11-136s-fl-eg.jpg?1581219705'
 	# 'https://product-images.tcgplayer.com/211239.jpg'
+	# 'https://cdn.shopify.com/s/files/1/1715/6019/products/Akstar_Foil_600x.png',
 ]
-IMAGES = [imread(image) for image in IMAGES]
+IMAGES = [imread(image)[:,:,:3] for image in IMAGES]  # Drop Alpha channels
 IMAGES = np.array([tf.image.resize(image, (250, 179)) for image in IMAGES])
 
 DF = pd.DataFrame(
@@ -59,7 +67,14 @@ DF = pd.DataFrame(
 		("4-066R", "Nono", "\u98a8", "Backup", "3", ""),
 		("7-089C", "Coeurl", "\u96f7", "Monster", "2", ""),
 		("7-098R", "Flanborg", "\u96f7", "Monster", "2", "7000"),
-		("1-107L", "Shantotto", "\u571f", "Backup", "7", "")
+		("1-107L", "Shantotto", "\u571f", "Backup", "7", ""),
+		("8-135H", "Ark", "\u95c7", "Summon", "10", ""),
+		("1-184H", "Chaos", "\u95c7", "Backup", "2", ""),
+		("13-103L", "Materia", "\u5149", "Forward", "1", "2000"),
+		("5-025H", "Aleoidai", "\u6c37", "Monster", "4", ""),
+		("11-093H", "Man in Black", "\u96f7", "Forward", "5", "9000"),
+		("4-058C", "Cactuar", "\u98a8", "Monster", "1", ""),
+		("6-074C", "Cactuar", "\u571f", "Summon", "4", ""),
 	]
 )
 
@@ -74,14 +89,15 @@ def main() -> None:
 		model = keras.models.load_model(model_path)
 
 		x = model.predict(IMAGES)
-		DF[f"predict_{category}"] = [labels[np.argmax(y)] for y in x]
+		DF[f"{category}_yhat"] = [labels[np.argmax(y)] for y in x]
 
-		comp = DF[category] == DF[f"predict_{category}"]
+		comp = DF[category] == DF[f"{category}_yhat"]
 		comp = comp.value_counts(normalize=True)
 
 		print(f"{category} accuracy: {comp[True] * 100}%%")
 		# print(x)
 
+	DF.sort_index(axis=1, inplace=True)
 	print(DF)
 
 
