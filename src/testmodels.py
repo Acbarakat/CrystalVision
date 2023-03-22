@@ -129,6 +129,7 @@ def main() -> None:
 		print(xf)
 
 	DF.sort_index(axis=1, inplace=True)
+	print(DF)
 
 
 if __name__ == '__main__':
