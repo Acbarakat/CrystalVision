@@ -130,20 +130,15 @@ def make_model(train_ds: tf.data.Dataset,
         model = models.Sequential(name="type_en", layers=[
             layers.Conv2D(32, kernel_size=(3, 3), activation='relu', input_shape=image_shape),
             layers.MaxPooling2D(),
-            layers.Conv2D(32, kernel_size=(3, 3), activation='relu', input_shape=image_shape),
-            layers.MaxPooling2D(),
             layers.Conv2D(64, kernel_size=(3, 3), activation='relu'),
             layers.MaxPooling2D(),
             layers.Conv2D(128, kernel_size=(3, 3), activation='relu'),
-            layers.MaxPooling2D(),
             layers.Flatten(),
-            layers.Dense(2 ** 10, activation='relu'),
-            # layers.Dropout(0.2, seed=seed),
             layers.Dense(2 ** 8, activation='relu'),
             # layers.Dropout(0.2, seed=seed),
             layers.Dense(label_count, activation="softmax")
         ])
-        optimizer = tf.keras.optimizers.SGD(learning_rate=0.01, nesterov=True)
+        optimizer = tf.keras.optimizers.SGD(learning_rate=0.01, momentum=0.9, nesterov=True)
     elif model_type == "resnet":
         model = applications.ResNet50V2(weights=None, input_shape=image_shape, classes=label_count)
         optimizer = tf.keras.optimizers.SGD(learning_rate=0.001, momentum=0.9, nesterov=True)
@@ -367,10 +362,10 @@ def main(image: str="thumbs",
 
     model_mapping = (
         # ("Name_EN", ["Name_EN", "Element", "Type_EN"], "resnet"),
-        ("Element", ["Element", "Type_EN"], "element"),
+        # ("Element", ["Element", "Type_EN"], "element"),
         ("Type_EN", ["Type_EN", "Element"], "type_en"),
-        ("Cost", ["Cost", "Element"], "custom"),
-        ("Power", ["Power", "Type_EN", "Element"], "power"),
+        # ("Cost", ["Cost", "Element"], "custom"),
+        # ("Power", ["Power", "Type_EN", "Element"], "power"),
     )
 
     for key, stratify, model_type in model_mapping:
