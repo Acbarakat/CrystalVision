@@ -5,10 +5,7 @@ import pandas as pd
 import cv2 as cv
 from skimage import io
 
-from freezegraph import CATEGORIES, DATA_DIR
-
-
-FROZEN_DIR = os.path.join(DATA_DIR, "frozen")
+from freezegraph import CATEGORIES, DATA_DIR, FROZEN_DIR
 
 
 def main() -> None:

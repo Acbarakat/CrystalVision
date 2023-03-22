@@ -2,6 +2,9 @@
 """
 Create frozen graphs to be used by OpenCV
 
+Attributes:
+    FROZEN_DIR (tuple): Directory of frozen model(s)
+
 Todo:
     * Find more varied data, such as off-center or card with background
 
@@ -13,6 +16,8 @@ from tensorflow import keras
 from tensorflow.python.framework.convert_to_constants import convert_variables_to_constants_v2
 
 from testmodels import CATEGORIES, DATA_DIR
+
+FROZEN_DIR = os.path.join(DATA_DIR, "frozen")
 
 
 def freeze_model(model_path, model_name, frozen_path=None):
