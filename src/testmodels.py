@@ -97,15 +97,17 @@ def load_image(url: str) -> np.ndarray:
 
 	dst = os.path.join(dst, img_fname)
 	if os.path.exists(dst):
-		return imread(dst)
+		return imread(dst)[:,:,:3]
 
 	data = imread(url)
 	Image.fromarray(data).save(dst)
 
-	return data
+	return data[:,:,:3]
 
-IMAGES = [load_image(image)[:,:,:3] for image in IMAGES]  # Drop Alpha channels
+
+IMAGES = [load_image(image) for image in IMAGES]  # Drop Alpha channels
 IMAGES = np.array([tf.image.resize(image, (250, 179)) for image in IMAGES])
+
 
 def main() -> None:
 	for category in CATEGORIES:
