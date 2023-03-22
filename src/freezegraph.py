@@ -29,9 +29,10 @@ def freeze_model(model_path, model_name, frozen_path=None):
         frozen_path = os.path.join(DATA_DIR, "frozen")
 
     model = keras.models.load_model(os.path.join(model_path, model_name))
+    infer = model.signatures['serving_default']
 
     # Convert Keras model to ConcreteFunction
-    full_model = tf.function(lambda x: model(x))
+    full_model = tf.function(infer)
     full_model = full_model.get_concrete_function(
         tf.TensorSpec(model.inputs[0].shape, model.inputs[0].dtype)
     )
