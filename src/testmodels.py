@@ -46,6 +46,9 @@ IMAGES = [
 	'https://52f4e29a8321344e30ae-0f55c9129972ac85d6b1f4e703468e6b.ssl.cf2.rackcdn.com/products/pictures/1661117.jpg', # F Man in Black
 	'https://52f4e29a8321344e30ae-0f55c9129972ac85d6b1f4e703468e6b.ssl.cf2.rackcdn.com/products/pictures/1146230.jpg', # F Cactuar
 	'https://superelf-cards.de/storage/images/image?remote=https%3A%2F%2Fsuperelf-cards.de%2FWebRoot%2FStore6%2FShops%2FShop052035%2F5F3A%2F7ABF%2FF0F3%2F877E%2F41BF%2FAC14%2F500D%2F36D8%2F6-074F.jpg', # F German Cactuar
+	'https://i.ebayimg.com/images/g/e60AAOSwerdand5v/s-l500.jpg', # Foil Kain on a big black background
+	'http://cdn.shopify.com/s/files/1/1715/6019/products/AsheFoil_1024x.jpg', # Foil Ashe
+	'https://cdn.shopify.com/s/files/1/0988/3294/products/fftcg_fftcgpr0264037hfoil_1_1024x1024.jpg', # Foil JP Serah Promo
 	# 'https://pbs.twimg.com/media/FhOOgabagAEbuya.jpg'
 	# 'http://fftcg.cdn.sewest.net/images/cards/full/B-015_eg.jpg'
 	# 'https://pbs.twimg.com/media/FgrQ-fTaYAIkguF.jpg'
@@ -74,6 +77,9 @@ DF = pd.DataFrame(
 		("11-093H", "Man in Black", "\u96f7", "Forward", "5", "9000"),
 		("4-058C", "Cactuar", "\u98a8", "Monster", "1", ""),
 		("6-074C", "Cactuar", "\u571f", "Summon", "4", ""),
+		("2-103H", "Kain", "\u96f7", "Forward", "3", "5000"),
+		("12-037L", "Ashe", "\u98a8", "Forward", "2", "5000"),
+		("PR-026", "Serah", "\u6c37", "Forward", "2", "5000"),
 	]
 )
 
