@@ -21,6 +21,7 @@ import tensorflow as tf
 import numpy as np
 from skimage.io import imread
 import keras
+from PIL import Image
 
 from gatherdata import DATA_DIR
 
@@ -34,7 +35,7 @@ IMAGES = [
 	'https://www.legendarywolfgames.com/wp-content/uploads/2020/03/FFTCG-PR072.jpg',  # Premium - Chelinka
 	'http://img.over-blog-kiwi.com/2/21/23/79/20181209/ob_78f42c_y-shtola.jpg',  # FA F Chinese - Yshtola
 	'https://i.ebayimg.com/images/g/YuAAAOSwZxNjfXJn/s-l1600.jpg', # F Ifrit
-	'https://d1rw89lz12ur5s.cloudfront.net/photo/bigncollectibles/file/1407913/5.jpg?1518673189', # F Nono
+	'https://d1rw89lz12ur5s.cloudfront.net/photo/bigncollectibles/file/1407913/5.jpg', # F Nono
 	'https://crystal-cdn4.crystalcommerce.com/photos/6476018/7-089foil.jpg', # F Coeurl
 	'https://crystal-cdn2.crystalcommerce.com/photos/6479730/7-098foil.jpg', # F Flanbord
 	'https://i.ebayimg.com/images/g/A7EAAOSwQ0JhgY90/s-l500.jpg', # F Shantotto Backup
@@ -52,8 +53,6 @@ IMAGES = [
 	# 'https://product-images.tcgplayer.com/211239.jpg'
 	# 'https://cdn.shopify.com/s/files/1/1715/6019/products/Akstar_Foil_600x.png',
 ]
-IMAGES = [imread(image)[:,:,:3] for image in IMAGES]  # Drop Alpha channels
-IMAGES = np.array([tf.image.resize(image, (250, 179)) for image in IMAGES])
 
 DF = pd.DataFrame(
 	columns=["Code", "Name_EN", "Element", "Type_EN", "Cost", "Power"],
@@ -78,6 +77,35 @@ DF = pd.DataFrame(
 	]
 )
 
+
+def load_image(url: str) -> np.ndarray:
+	'''
+	Load image (and cache it)
+
+    Args:
+        url (str): The image URL
+	
+	Returns:
+		Image as ndarray
+	'''
+	img_fname = url.split("/")[-1]
+	img_fname = img_fname.split("%2F")[-1]
+
+	dst = os.path.join(DATA_DIR, "test")
+	if not os.path.exists(dst):
+		os.makedirs(dst)
+
+	dst = os.path.join(dst, img_fname)
+	if os.path.exists(dst):
+		return imread(dst)
+
+	data = imread(url)
+	Image.fromarray(data).save(dst)
+
+	return data
+
+IMAGES = [load_image(image)[:,:,:3] for image in IMAGES]  # Drop Alpha channels
+IMAGES = np.array([tf.image.resize(image, (250, 179)) for image in IMAGES])
 
 def main() -> None:
 	for category in CATEGORIES:

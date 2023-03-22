@@ -3,3 +3,4 @@ tensorflow==2.9.0
 keras==2.9.0
 sklearn==1.2.1
 pandas
+Pillow
