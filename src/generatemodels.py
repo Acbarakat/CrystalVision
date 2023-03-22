@@ -83,6 +83,8 @@ def make_model(train_ds: tf.data.Dataset,
             layers.Conv2D(128, kernel_size=(3, 3), activation='relu'),
             # layers.BatchNormalization(),
             layers.MaxPooling2D(),
+            layers.Conv2D(128, kernel_size=(3, 3), activation='relu'),
+            layers.MaxPooling2D(),
             layers.Flatten(),
             layers.Dense(2 ** 8, activation='relu'),
             layers.Dense(2 ** 6, activation='relu'),
@@ -110,8 +112,10 @@ def make_model(train_ds: tf.data.Dataset,
     elif model_type == "element":
         model = models.Sequential(name="element", layers=[
             layers.Conv2D(32, kernel_size=(3, 3), activation='relu', input_shape=image_shape),
-            layers.MaxPooling2D(),
+            layers.AveragePooling2D(),
             layers.Conv2D(64, kernel_size=(3, 3), activation='relu'),
+            layers.MaxPooling2D(),
+            layers.Conv2D(128, kernel_size=(3, 3), activation='relu'),
             layers.MaxPooling2D(),
             layers.Conv2D(128, kernel_size=(3, 3), activation='relu'),
             layers.Flatten(),
@@ -124,6 +128,8 @@ def make_model(train_ds: tf.data.Dataset,
         optimizer = tf.keras.optimizers.RMSprop()
     elif model_type == "type_en":
         model = models.Sequential(name="type_en", layers=[
+            layers.Conv2D(32, kernel_size=(3, 3), activation='relu', input_shape=image_shape),
+            layers.MaxPooling2D(),
             layers.Conv2D(32, kernel_size=(3, 3), activation='relu', input_shape=image_shape),
             layers.MaxPooling2D(),
             layers.Conv2D(64, kernel_size=(3, 3), activation='relu'),
@@ -362,9 +368,9 @@ def main(image: str="thumbs",
     model_mapping = (
         # ("Name_EN", ["Name_EN", "Element", "Type_EN"], "resnet"),
         ("Element", ["Element", "Type_EN"], "element"),
-        ("Type_EN", ["Type_EN", "Element"], "type_en"),
-        ("Cost", ["Cost", "Element"], "custom"),
-        ("Power", ["Power", "Type_EN", "Element"], "power"),
+        #("Type_EN", ["Type_EN", "Element"], "type_en"),
+        #("Cost", ["Cost", "Element"], "custom"),
+        #("Power", ["Power", "Type_EN", "Element"], "power"),
     )
 
     for key, stratify, model_type in model_mapping:
