@@ -50,7 +50,7 @@ def freeze_model(model_path, model_name, frozen_path=None):
     tf.io.write_graph(frozen_func.graph, logdir=frozen_path, name=f"{model_name}.pb", as_text=False)
 
     pb_file = os.path.join(frozen_path, f"{model_name}.pb")
-    graph_def = tf.compat.v1.GraphDef()
+    graph_def = tf.Graph().as_graph_def()
 
     with tf.io.gfile.GFile(pb_file, 'rb') as f:
         graph_def.ParseFromString(f.read())
@@ -60,7 +60,7 @@ def freeze_model(model_path, model_name, frozen_path=None):
             del graph_def.node[i]
     graph_def.library.Clear()
 
-    tf.compat.v1.train.write_graph(graph_def, logdir=frozen_path, name=f"{model_name}.pbtxt", as_text=True)
+    tf.io.write_graph(graph_def, logdir=frozen_path, name=f"{model_name}.pbtxt", as_text=True)
 
 
 def main() -> None:
