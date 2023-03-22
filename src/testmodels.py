@@ -119,16 +119,16 @@ def main() -> None:
 		model = keras.models.load_model(model_path)
 
 		x = model.predict(IMAGES)
+		xf = pd.DataFrame(x, columns=labels)
 		DF[f"{category}_yhat"] = [labels[np.argmax(y)] for y in x]
 
 		comp = DF[category] == DF[f"{category}_yhat"]
 		comp = comp.value_counts(normalize=True)
 
 		print(f"{category} accuracy: {comp[True] * 100}%%")
-		# print(x)
+		print(xf)
 
 	DF.sort_index(axis=1, inplace=True)
-	print(DF)
 
 
 if __name__ == '__main__':
