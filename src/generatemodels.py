@@ -380,10 +380,10 @@ def main(image: str="thumbs",
 
     model_mapping = (
         # ("Name_EN", ["Name_EN", "Element", "Type_EN"], "resnet"),
-        # ("Element", ["Element", "Type_EN"], "element"),
-        # ("Type_EN", ["Type_EN", "Element"], "type_en"),
+        ("Element", ["Element", "Type_EN"], "element"),
+        ("Type_EN", ["Type_EN", "Element"], "type_en"),
         ("Cost", ["Cost", "Element"], "cost"),
-        # ("Power", ["Power", "Type_EN", "Element"], "power"),
+        ("Power", ["Power", "Type_EN", "Element"], "power"),
     )
 
     for key, stratify, model_type in model_mapping:
