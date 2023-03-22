@@ -24,6 +24,9 @@ from gatherdata import CARD_API_FILEPATH, DATA_DIR
 def make_database() -> pd.DataFrame:
     '''
     Load card data and clean up any issue found in the API
+
+    Returns:
+        Card API dataframe
     '''
     with open(CARD_API_FILEPATH) as fp:
         data = json.load(fp)["cards"]
@@ -92,8 +95,23 @@ def make_model(train_ds: tf.data.Dataset,
         ])
         optimizer = tf.keras.optimizers.RMSprop()
         # optimizer = tf.keras.optimizers.SGD(learning_rate=0.01, nesterov=True)
+    elif model_type == "cost":
+        model = models.Sequential(name="cost", layers=[
+            layers.Conv2D(32, kernel_size=(3, 3), activation='relu', input_shape=image_shape),
+            layers.MaxPooling2D(),
+            layers.Conv2D(64, kernel_size=(3, 3), activation='relu'),
+            # layers.MaxPooling2D(),
+            layers.Conv2D(128, kernel_size=(3, 3), activation='relu'),
+            # layers.MaxPooling2D(),
+            # layers.Conv2D(128, kernel_size=(3, 3), activation='relu'),
+            # layers.MaxPooling2D(),
+            layers.Flatten(),
+            layers.Dense(2 ** 5, activation='relu'),
+            layers.Dense(label_count, activation="softmax")
+        ])
+        # optimizer = tf.keras.optimizers.SGD(learning_rate=0.01, momentum=0.9)
+        optimizer = tf.keras.optimizers.RMSprop(centered=True)
     elif model_type == "power":
-        # TODO: A well crafted custom per attribute is required
         model = models.Sequential(name="power", layers=[
             layers.Conv2D(32, kernel_size=(3, 3), activation='relu', input_shape=image_shape),
             layers.MaxPooling2D(),
@@ -363,8 +381,8 @@ def main(image: str="thumbs",
     model_mapping = (
         # ("Name_EN", ["Name_EN", "Element", "Type_EN"], "resnet"),
         # ("Element", ["Element", "Type_EN"], "element"),
-        ("Type_EN", ["Type_EN", "Element"], "type_en"),
-        # ("Cost", ["Cost", "Element"], "custom"),
+        # ("Type_EN", ["Type_EN", "Element"], "type_en"),
+        ("Cost", ["Cost", "Element"], "cost"),
         # ("Power", ["Power", "Type_EN", "Element"], "power"),
     )
 
