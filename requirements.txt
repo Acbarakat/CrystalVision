@@ -1,6 +1,10 @@
-opencv-contrib-python=4.6.0.66
-tensorflow==2.9.0
-keras==2.9.0
-sklearn==1.2.1
+opencv-contrib-python
+# Anything above 2.10 is not supported on the GPU on Windows Native
+tensorflow<2.11
+# keras
+sklearn
+scikit-image
 pandas
 Pillow
+scikeras[tensorflow]
+mlxtend

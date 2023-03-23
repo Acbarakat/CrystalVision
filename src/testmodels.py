@@ -3,25 +3,27 @@
 Test models against real-world (internet data)
 
 Attributes:
-    CATEGORIES (tuple): A tuple of the types of ``models`` trained
+	CATEGORIES (tuple): A tuple of the types of ``models`` trained
 	IMAGES (np.ndarray): A list or URIs converted to loaded and resized
 		image data
 	DF (pd.DataFrame): A dataframe full of accurate card data which
 		we will compare model predictions against
 
 Todo:
-    * Find more varied data, such as off-center or card with background
+	* Find more varied data, such as off-center or card with background
 
 """
 import os
 import json
+import glob
 
 import pandas as pd
 import tensorflow as tf
 import numpy as np
 from skimage.io import imread
-import keras
 from PIL import Image
+from sklearn.preprocessing import LabelEncoder
+from mlxtend.classifier import EnsembleVoteClassifier
 
 from gatherdata import DATA_DIR
 
@@ -29,11 +31,11 @@ from gatherdata import DATA_DIR
 CATEGORIES = ("Element", "Type_EN", "Cost", "Power", "Ex_Burst")
 
 IMAGES = [
-	'https://sakura-pink.jp/img-items/1-ff-2022-12-10-1-7.jpg',  # JP - Lenna
-	'https://52f4e29a8321344e30ae-0f55c9129972ac85d6b1f4e703468e6b.ssl.cf2.rackcdn.com/products/pictures/1107073.jpg',  # Foil - Seph
-	'https://assets-prd.ignimgs.com/2022/10/26/18-050l-2-eg-1666822378783.jpg',  # Premium - Yuffie FA
+	'https://sakura-pink.jp/img-items/1-ff-2022-12-10-1-7.jpg',	 # JP - Lenna
+	'https://52f4e29a8321344e30ae-0f55c9129972ac85d6b1f4e703468e6b.ssl.cf2.rackcdn.com/products/pictures/1107073.jpg',	# Foil - Seph
+	'https://assets-prd.ignimgs.com/2022/10/26/18-050l-2-eg-1666822378783.jpg',	 # Premium - Yuffie FA
 	'https://www.legendarywolfgames.com/wp-content/uploads/2020/03/FFTCG-PR072.jpg',  # Premium - Chelinka
-	'http://img.over-blog-kiwi.com/2/21/23/79/20181209/ob_78f42c_y-shtola.jpg',  # FA F Chinese - Yshtola
+	'http://img.over-blog-kiwi.com/2/21/23/79/20181209/ob_78f42c_y-shtola.jpg',	 # FA F Chinese - Yshtola
 	'https://i.ebayimg.com/images/g/YuAAAOSwZxNjfXJn/s-l1600.jpg', # F Ifrit
 	'https://d1rw89lz12ur5s.cloudfront.net/photo/bigncollectibles/file/1407913/5.jpg', # F Nono
 	'https://crystal-cdn4.crystalcommerce.com/photos/6476018/7-089foil.jpg', # F Coeurl
@@ -104,13 +106,66 @@ DF = pd.DataFrame(
 )
 
 
+class MyEnsembleVoteClassifier(EnsembleVoteClassifier):
+	def __init__(self, clfs, voting="hard", weights=None, verbose=0, use_clones=True, fit_base_estimators=True):
+		super().__init__(clfs, voting, weights, verbose, use_clones, fit_base_estimators)
+		self.clfs_ = clfs
+
+	def _predict(self, X):
+		"""Collect results from clf.predict calls."""
+
+		if not self.fit_base_estimators:
+			return np.asarray([clf(X) for clf in self.clfs_]).T
+		else:
+			return np.asarray(
+				[self.le_.transform(clf(X)) for clf in self.clfs_]
+			).T
+
+	def predict(self, X, dtype='int64'):
+		"""Predict class labels for X.
+
+		Parameters
+		----------
+		X : {array-like, sparse matrix}, shape = [n_samples, n_features]
+			Training vectors, where n_samples is the number of samples and
+			n_features is the number of features.
+
+		Returns
+		----------
+		maj : array-like, shape = [n_samples]
+			Predicted class labels.
+
+		"""
+		if self.voting == "soft":
+			maj = np.argmax(self.predict_proba(X), axis=1)
+
+		else:  # 'hard' voting
+			predictions = self._predict(X).astype(dtype)[0]
+			print(predictions)
+
+			maj = np.apply_along_axis(
+				lambda x: np.argmax(np.bincount(x, weights=self.weights)),
+				axis=1,
+				arr=predictions,
+			)
+
+		if self.fit_base_estimators:
+			maj = self.le_.inverse_transform(maj)
+
+		return maj
+
+	# TODO: Save ensemble in keras format
+	def save_model():
+		raise NotImplementedError()
+
+
 def load_image(url: str,
-	       	   img_fname: str='') -> np.ndarray:
+			   img_fname: str='') -> np.ndarray:
 	'''
 	Load image (and cache it)
 
-    Args:
-        url (str): The image URL
+	Args:
+		url (str): The image URL
 		img_fname (str): The file name we will save to
 			(default will be derived from url)
 	
@@ -138,7 +193,7 @@ def load_image(url: str,
 	return data[:,:,:3]
 
 
-IMAGES = [load_image(image, f"{idx}.jpg") for idx, image in enumerate(IMAGES)]  # Drop Alpha channels
+IMAGES = [load_image(image, f"{idx}.jpg") for idx, image in enumerate(IMAGES)]	# Drop Alpha channels
 IMAGES = np.array([tf.image.resize(image, (250, 179)) for image in IMAGES])
 
 
@@ -149,9 +204,14 @@ def main() -> None:
 		with open(os.path.join(model_path, "category.json")) as fp:
 			labels = json.load(fp)
 
-		model = keras.models.load_model(model_path)
+		if category == "Ex_Burst":
+			models = [tf.keras.models.load_model(model_path) for model_path in glob.iglob(model_path + "*")]
+			voting = MyEnsembleVoteClassifier(models, fit_base_estimators=False) #, weights=[0, 1, 0, 0, 0])
+			x = voting.predict(IMAGES)
+		else:
+			model = tf.keras.models.load_model(model_path)
+			x = model(IMAGES, training=False)
 
-		x = model(IMAGES, training=False)
 		if len(labels) > 2:
 			# xf = pd.DataFrame(x, columns=labels)
 			DF[f"{category}_yhat"] = [labels[np.argmax(y)] for y in x]

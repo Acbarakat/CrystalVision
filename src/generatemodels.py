@@ -96,7 +96,7 @@ def make_model(train_ds: tf.data.Dataset,
             layers.Dense(2 ** 6, activation='relu'),
             layers.Dense(label_count, activation="softmax")
         ])
-        optimizer = tf.keras.optimizers.RMSprop()
+        optimizers = [tf.keras.optimizers.RMSprop()]
         # optimizer = tf.keras.optimizers.SGD(learning_rate=0.01, nesterov=True)
     elif model_type == "burst":
         model = models.Sequential(name="burst", layers=[
@@ -113,9 +113,13 @@ def make_model(train_ds: tf.data.Dataset,
             layers.Dense(2 ** 6, activation='relu'),
             layers.Dense(1, activation="sigmoid")
         ])
-        # TODO: Ensemble model w/ and w/o amsgrad, rsmprop
-        # optimizer = tf.keras.optimizers.Adam(amsgrad=False)
-        optimizer = tf.keras.optimizers.RMSprop(centered=True)
+        optimizers = [
+            tf.keras.optimizers.RMSprop(centered=True),
+            tf.keras.optimizers.RMSprop(centered=False),
+            tf.keras.optimizers.Adam(amsgrad=True),
+            tf.keras.optimizers.Adam(amsgrad=False),
+            tf.keras.optimizers.Nadam(),
+        ]
         loss = tf.keras.losses.BinaryCrossentropy()
         metrics = [tf.keras.metrics.BinaryAccuracy(name='val_accuracy')]
     elif model_type == "cost":
@@ -133,7 +137,7 @@ def make_model(train_ds: tf.data.Dataset,
             layers.Dense(label_count, activation="softmax")
         ])
         # optimizer = tf.keras.optimizers.SGD(learning_rate=0.01, momentum=0.9)
-        optimizer = tf.keras.optimizers.RMSprop(centered=True)
+        optimizers = [tf.keras.optimizers.RMSprop(centered=True)]
     elif model_type == "power":
         model = models.Sequential(name="power", layers=[
             layers.Conv2D(32, kernel_size=(3, 3), activation='relu', input_shape=image_shape),
@@ -149,7 +153,7 @@ def make_model(train_ds: tf.data.Dataset,
             # layers.Dropout(0.2),
             layers.Dense(label_count, activation="softmax")
         ])
-        optimizer = tf.keras.optimizers.RMSprop()
+        optimizers = [tf.keras.optimizers.RMSprop()]
     elif model_type == "element":
         model = models.Sequential(name="element", layers=[
             layers.Conv2D(32, kernel_size=(3, 3), activation='relu', input_shape=image_shape),
@@ -166,7 +170,7 @@ def make_model(train_ds: tf.data.Dataset,
             # layers.Dropout(0.2),
             layers.Dense(label_count, activation="softmax")
         ])
-        optimizer = tf.keras.optimizers.RMSprop()
+        optimizers = [tf.keras.optimizers.RMSprop()]
     elif model_type == "type_en":
         model = models.Sequential(name="type_en", layers=[
             layers.Conv2D(32, kernel_size=(3, 3), activation='relu', input_shape=image_shape),
@@ -179,18 +183,12 @@ def make_model(train_ds: tf.data.Dataset,
             # layers.Dropout(0.2, seed=seed),
             layers.Dense(label_count, activation="softmax")
         ])
-        optimizer = tf.keras.optimizers.SGD(learning_rate=0.01, momentum=0.9, nesterov=True)
+        optimizers = [tf.keras.optimizers.SGD(learning_rate=0.01, momentum=0.9, nesterov=True)]
     elif model_type == "resnet":
         model = applications.ResNet50V2(weights=None, input_shape=image_shape, classes=label_count)
-        optimizer = tf.keras.optimizers.SGD(learning_rate=0.001, momentum=0.9, nesterov=True)
+        optimizers = [tf.keras.optimizers.SGD(learning_rate=0.001, momentum=0.9, nesterov=True)]
     else:
         raise RuntimeError(f"model_type '{model_type}' is not supported")
-
-    model.compile(optimizer=optimizer,
-                  loss=loss,
-                  metrics=metrics)
-    # print(model.summary())
-    print(model.name)
 
     callbacks = [
         # tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=3),
@@ -200,12 +198,25 @@ def make_model(train_ds: tf.data.Dataset,
                                          restore_best_weights=True),
     ]
 
-    model.fit(train_ds,
-              epochs=epochs,
-              validation_data=validation_ds,
-              callbacks=callbacks)
-    
-    model.save(os.path.join(DATA_DIR, "model", model_name))
+    base_name = model.name
+    for idx, optimizer in enumerate(optimizers):
+        model.compile(optimizer=optimizer,
+                      loss=loss,
+                      metrics=metrics)
+        # print(model.summary())
+        if idx > 0:
+            model._name = f"{base_name}_{idx + 1}"
+        print(model.name)
+
+        model.fit(train_ds,
+                epochs=epochs,
+                validation_data=validation_ds,
+                callbacks=callbacks)
+
+        if idx > 0:
+            model.save(os.path.join(DATA_DIR, "model", f"{model_name}_{idx + 1}"))
+        else:
+            model.save(os.path.join(DATA_DIR, "model", model_name))
 
 
 def generate(df: pd.DataFrame,
