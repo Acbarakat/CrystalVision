@@ -10,7 +10,7 @@
 
 # CrystalVision
 
-This is a machine learning project aimed at classifying Final Fantasy Trading Card Game cards based on their attributes, such as card name, element, rarity, and abilities. The goal is to create a model that can accurately predict the card's unique identifier ("Code") given its features.
+This is a machine learning project aimed at classifying Final Fantasy Trading Card Game cards based on their attributes -- such as card name, element, rarity, and abilities. The goal is to create a model that can accurately predict the card's unique identifier ("Code") given its features.
 
 ## Dataset
 
@@ -22,7 +22,18 @@ The approach used for this project is supervised learning, specifically classifi
 
 ## Dependencies
 
-This project is implemented usingPython 3.X. All libraries used are included in the `requirements.txt`. You can execute the following to update your dependencies
+![python-shield]
+
+This project is implemented using Python 3.X. 
+
+![tf-shield]
+![keras-shield]
+![np-shield]
+![pd-shield]
+![skl-shield]
+![sci-shield]
+
+All libraries used are included in the `requirements.txt`. You can execute the following to update your dependencies
 
 ```
 $ pip install -r requirements.txt
@@ -74,3 +85,11 @@ This project demonstrates the feasibility of using machine learning to classify 
 [license-url]: https://github.com/Acbarakat/CrystalVision/blob/master/LICENSE.txt
 [linkedin-shield]: https://img.shields.io/badge/-LinkedIn-black.svg?style=for-the-badge&logo=linkedin&colorB=555
 [linkedin-url]: https://www.linkedin.com/in/allonte-barakat/
+[python-shield]: https://img.shields.io/badge/Python-FFD43B?style=for-the-badge&logo=python&logoColor=blue
+[tf-shield]: https://img.shields.io/badge/TensorFlow-FF6F00?style=for-the-badge&logo=tensorflow&logoColor=white
+[keras-shield]: https://img.shields.io/badge/Keras-FF0000?style=for-the-badge&logo=keras&logoColor=white
+[np-shield]: https://img.shields.io/badge/Numpy-777BB4?style=for-the-badge&logo=numpy&logoColor=white
+[pd-shield]: https://img.shields.io/badge/Pandas-2C2D72?style=for-the-badge&logo=pandas&logoColor=white
+[skl-shield]: https://img.shields.io/badge/scikit_learn-F7931E?style=for-the-badge&logo=scikit-learn&logoColor=white
+[sci-shield]: https://img.shields.io/badge/SciPy-654FF0?style=for-the-badge&logo=SciPy&logoColor=whit
+
