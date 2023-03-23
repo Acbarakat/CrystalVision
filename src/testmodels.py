@@ -141,7 +141,6 @@ class MyEnsembleVoteClassifier(EnsembleVoteClassifier):
 
 		else:  # 'hard' voting
 			predictions = self._predict(X).astype(dtype)[0]
-			print(predictions)
 
 			maj = np.apply_along_axis(
 				lambda x: np.argmax(np.bincount(x, weights=self.weights)),
