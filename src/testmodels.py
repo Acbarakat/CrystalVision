@@ -111,7 +111,7 @@ class MyEnsembleVoteClassifier(EnsembleVoteClassifier):
 		super().__init__(clfs, voting, weights, verbose, use_clones, fit_base_estimators)
 		self.clfs_ = clfs
 
-	def _predict(self, X):
+	def _predict(self, X: np.ndarray) -> None:
 		"""Collect results from clf.predict calls."""
 
 		if not self.fit_base_estimators:
@@ -121,7 +121,7 @@ class MyEnsembleVoteClassifier(EnsembleVoteClassifier):
 				[self.le_.transform(clf(X)) for clf in self.clfs_]
 			).T
 
-	def predict(self, X, dtype='int64'):
+	def predict(self, X: np.ndarray, dtype: str='int64') -> np.ndarray:
 		"""Predict class labels for X.
 
 		Parameters
