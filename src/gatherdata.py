@@ -46,7 +46,6 @@ def download_and_save() -> dict:
 
             c["images"][d] += extra
 
-
     if not os.path.exists(DATA_DIR):
         os.makedirs(DATA_DIR)
 
