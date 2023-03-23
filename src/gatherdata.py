@@ -8,6 +8,7 @@ Attributes:
 
 Todo:
     * Archive all image data
+    * Fill data with missing Opus XVII Starter cards
 
 """
 import asyncio
@@ -123,33 +124,50 @@ async def main() -> None:
     print(images)
 
     df = pd.read_table("http://www.square-enix-shop.com/jp/ff-tcg/card/data/list_card.txt", header=None)
-    df.rename({0: "Code", 1: "Element", 2: "Name", 7: "image"}, axis=1, inplace=True) #, "Element", "Name", "Opus", "Category_1", "Category_2", "6", "img", "8", "9", "10", "11"], inplace=True)
-    # print(df['image'])
+    df.rename({0: "Code", 1: "Element", 2: "Name", 7: "image"}, axis=1, inplace=True)
+
+    # Special case flip
+    df.replace({"Code": "PR-051/11-083R"}, {"Code": "11-083R/PR-051"}, inplace=True)
+    df.replace({"Code": "PR-055/11-062R"}, {"Code": "11-062R/PR-055"}, inplace=True)
+
+    cleared_codes = []
     images = []
     for d in data["cards"]:
         # Ignore Boss Deck, Crystal Cards
         if d["Code"].startswith("B-") or d["Code"].startswith("C-"):
             continue
-        rows = df.query(f"Code == '{d['Code']}'")
-        if rows.empty:
+
+        rows = df.query(f"Code == '{d['Code']}' or (Code.str.endswith('/{d['Code']}') and Code.str.startswith('PR'))")
+        if rows.empty and d["Code"] not in cleared_codes:
             raise Exception(f"Can't find '{d['Code']}'")
+        cleared_codes.append(d["Code"])
+        df.query(f"Code != '{d['Code']}'", inplace=True)
+        df.query(f"~(Code.str.endswith('/{d['Code']}') and Code.str.startswith('PR'))", inplace=True)
+
         for idx, row in rows.iterrows():
             img_loc = row['image']
             if "_FL" in img_loc:
                 fname = f"{d['Code'].split('/')[0]}_FL_jp.jpg"
+            elif img_loc.startswith("pr/"):
+                fname = f"{d['Code'].split('/')[0]}_PR_jp.jpg"
             else:
                 fname = f"{d['Code'].split('/')[0]}_jp.jpg"
+
             d["images"]["thumbs"].append(f"http://www.square-enix-shop.com/jp/ff-tcg/card/cimg/thumb/{fname}")
             images.append(download_image(f"http://www.square-enix-shop.com/jp/ff-tcg/card/cimg/thumb/{img_loc}",
                                         "thumb",
                                         fname,
                                         resize=(179, 250),
                                         crop=(0, 0, 143, 200)))
+
             d["images"]["full"].append(f"http://www.square-enix-shop.com/jp/ff-tcg/card/cimg/large/{fname}")
             images.append(download_image(f"http://www.square-enix-shop.com/jp/ff-tcg/card/cimg/large/{img_loc}",
                                         "img",
                                         fname,
                                         resize=(429, 600)))
+
+    # Remainder of Cards
+    print(df)
 
     with open(CARD_API_FILEPATH, "w+") as fp:
         json.dump(data, fp, indent=4)

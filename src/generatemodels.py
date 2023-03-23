@@ -356,6 +356,9 @@ def main(image: str="thumbs",
     # Ignore Full Art Cards
     df = df.query(f"~{image}.str.contains('_FL') and ~{image}.str.contains('_2_')")
 
+    # Ignore Promo Cards
+    df = df.query(f"~{image}.str.contains('_PR')")
+
     # Ignore
     df = df.query(f"~{image}.str.contains('_premium')")
 
