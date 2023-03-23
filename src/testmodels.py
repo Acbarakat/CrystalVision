@@ -26,7 +26,7 @@ from PIL import Image
 from gatherdata import DATA_DIR
 
 
-CATEGORIES = ("Element", "Type_EN", "Cost", "Power")
+CATEGORIES = ("Element", "Type_EN", "Cost", "Power", "Ex_Burst")
 
 IMAGES = [
 	'https://sakura-pink.jp/img-items/1-ff-2022-12-10-1-7.jpg',  # JP - Lenna
@@ -49,6 +49,16 @@ IMAGES = [
 	'https://i.ebayimg.com/images/g/e60AAOSwerdand5v/s-l500.jpg', # Foil Kain on a big black background
 	'http://cdn.shopify.com/s/files/1/1715/6019/products/AsheFoil_1024x.jpg', # Foil Ashe
 	'https://cdn.shopify.com/s/files/1/0988/3294/products/fftcg_fftcgpr0264037hfoil_1_1024x1024.jpg', # Foil JP Serah Promo
+	'https://i.ebayimg.com/images/g/rhQAAOSwEFxh5UsR/s-l500.jpg', # Foil light Cloud EX
+	'https://crystal-cdn2.crystalcommerce.com/photos/6479590/7-045foil.jpg', # Foil Alexander EX
+	'https://crystal-cdn2.crystalcommerce.com/photos/6479652/7-031foil.jpg', # Foil Shiva EX
+	'https://cdn.shopify.com/s/files/1/1715/6019/products/CidofClanGullyEX-17-094CFoil_500x.png', # Foil Cid of Clan Gully EX
+	'https://52f4e29a8321344e30ae-0f55c9129972ac85d6b1f4e703468e6b.ssl.cf2.rackcdn.com/products/pictures/1114146.jpg', # F Merlwyb EX
+	'https://52f4e29a8321344e30ae-0f55c9129972ac85d6b1f4e703468e6b.ssl.cf2.rackcdn.com/products/pictures/1167552.jpg', # F Star Subyl Ex
+	'https://cdn.shopify.com/s/files/1/1715/6019/products/AsheEXFullArt_Foil_500x.png', # F Full Art Ashe EX
+	'https://i.ebayimg.com/images/g/fnMAAOSwaHdhcz6-/s-l500.jpg', # F JP Laguna
+	'https://cdn.shopify.com/s/files/1/1715/6019/products/EwenEX-17-080RFoil_600x.png', # F Ewen
+	'https://52f4e29a8321344e30ae-0f55c9129972ac85d6b1f4e703468e6b.ssl.cf2.rackcdn.com/products/pictures/1612601.jpg', # F Terra EX
 	# 'https://pbs.twimg.com/media/FhOOgabagAEbuya.jpg'
 	# 'http://fftcg.cdn.sewest.net/images/cards/full/B-015_eg.jpg'
 	# 'https://pbs.twimg.com/media/FgrQ-fTaYAIkguF.jpg'
@@ -58,44 +68,58 @@ IMAGES = [
 ]
 
 DF = pd.DataFrame(
-	columns=["Code", "Name_EN", "Element", "Type_EN", "Cost", "Power"],
+	columns=["Code", "Name_EN", "Element", "Type_EN", "Cost", "Power", "Ex_Burst"],
 	data=[
-		("18-100L", "Lenna", "\u6c34", "Forward", "3", "7000"),
-		("1-044R", "Sephiroth", "\u6c37", "Forward", "5", "7000"),
-		("18-050L", "Yuffie", "\u98a8", "Forward", "5", "9000"),
-		("7-054L", "Chelinka", "\u98a8", "Forward", "3", "7000"),
-		("5-068L", "Yshtola", "\u98a8", "Forward", "3", "7000"),
-		("1-004C", "Ifrit", "\u706b", "Summon", "1", ""),
-		("4-066R", "Nono", "\u98a8", "Backup", "3", ""),
-		("7-089C", "Coeurl", "\u96f7", "Monster", "2", ""),
-		("7-098R", "Flanborg", "\u96f7", "Monster", "2", "7000"),
-		("1-107L", "Shantotto", "\u571f", "Backup", "7", ""),
-		("8-135H", "Ark", "\u95c7", "Summon", "10", ""),
-		("1-184H", "Chaos", "\u95c7", "Backup", "2", ""),
-		("13-103L", "Materia", "\u5149", "Forward", "1", "2000"),
-		("5-025H", "Aleoidai", "\u6c37", "Monster", "4", ""),
-		("11-093H", "Man in Black", "\u96f7", "Forward", "5", "9000"),
-		("4-058C", "Cactuar", "\u98a8", "Monster", "1", ""),
-		("6-074C", "Cactuar", "\u571f", "Summon", "4", ""),
-		("2-103H", "Kain", "\u96f7", "Forward", "3", "5000"),
-		("12-037L", "Ashe", "\u98a8", "Forward", "2", "5000"),
-		("PR-026", "Serah", "\u6c37", "Forward", "2", "5000"),
+		("18-100L", "Lenna", "\u6c34", "Forward", "3", "7000", 0),
+		("1-044R", "Sephiroth", "\u6c37", "Forward", "5", "7000", 0),
+		("18-050L", "Yuffie", "\u98a8", "Forward", "5", "9000", 0),
+		("7-054L", "Chelinka", "\u98a8", "Forward", "3", "7000", 0),
+		("5-068L", "Yshtola", "\u98a8", "Forward", "3", "7000", 0),
+		("1-004C", "Ifrit", "\u706b", "Summon", "1", "", 1),
+		("4-066R", "Nono", "\u98a8", "Backup", "3", "", 0),
+		("7-089C", "Coeurl", "\u96f7", "Monster", "2", "", 0),
+		("7-098R", "Flanborg", "\u96f7", "Monster", "2", "7000", 0),
+		("1-107L", "Shantotto", "\u571f", "Backup", "7", "", 0),
+		("8-135H", "Ark", "\u95c7", "Summon", "10", "", 0),
+		("1-184H", "Chaos", "\u95c7", "Backup", "2", "", 0),
+		("13-103L", "Materia", "\u5149", "Forward", "1", "2000", 0),
+		("5-025H", "Aleoidai", "\u6c37", "Monster", "4", "", 0),
+		("11-093H", "Man in Black", "\u96f7", "Forward", "5", "9000", 0),
+		("4-058C", "Cactuar", "\u98a8", "Monster", "1", "", 0),
+		("6-074C", "Cactuar", "\u571f", "Summon", "4", "", 0),
+		("2-103H", "Kain", "\u96f7", "Forward", "3", "5000", 0),
+		("12-037L", "Ashe", "\u98a8", "Forward", "2", "5000", 0),
+		("PR-026", "Serah", "\u6c37", "Forward", "2", "5000", 0),
+		("4-145H", "Cloud", "\u5149", "Forward", "3", "7000", 1),
+		("7-045C", "Alexander", "\u98a8", "Summon", "2", "", 1),
+		("7-031C", "Shiva", "\u6c37", "Summon", "3", "", 1),
+		("17-094C", "Cid of Clan Gully", "\u96f7", "Backup", "4", "", 1),
+		("2-137H", "Merlwyb", "\u6c34", "Backup", "4", "", 1),
+		("5-091H", "Star Sibyl", "\u571f", "Backup", "5", "", 1),
+		("18-086H", "Ashe", "\u6c34", "Forward", "6", "9000", 1),
+		("1-059R", "Laguna", "\u6c37", "Forward", "4", "7000", 1),
+		("17-080R", "Ewen", "\u571f", "Forward", "1", "3000", 1),
+		("10-132S", "Terra", "\u706b", "Forward", "4", "5000", 1),
 	]
 )
 
 
-def load_image(url: str) -> np.ndarray:
+def load_image(url: str,
+	       	   img_fname: str='') -> np.ndarray:
 	'''
 	Load image (and cache it)
 
     Args:
         url (str): The image URL
+		img_fname (str): The file name we will save to
+			(default will be derived from url)
 	
 	Returns:
 		Image as ndarray
 	'''
-	img_fname = url.split("/")[-1]
-	img_fname = img_fname.split("%2F")[-1]
+	if not img_fname:
+		img_fname = url.split("/")[-1]
+		img_fname = img_fname.split("%2F")[-1]
 
 	dst = os.path.join(DATA_DIR, "test")
 	if not os.path.exists(dst):
@@ -106,12 +130,15 @@ def load_image(url: str) -> np.ndarray:
 		return imread(dst)[:,:,:3]
 
 	data = imread(url)
-	Image.fromarray(data).save(dst)
+	if img_fname.endswith(".jpg"):
+		Image.fromarray(data).convert("RGB").save(dst)
+	else:
+		Image.fromarray(data).save(dst)
 
 	return data[:,:,:3]
 
 
-IMAGES = [load_image(image) for image in IMAGES]  # Drop Alpha channels
+IMAGES = [load_image(image, f"{idx}.jpg") for idx, image in enumerate(IMAGES)]  # Drop Alpha channels
 IMAGES = np.array([tf.image.resize(image, (250, 179)) for image in IMAGES])
 
 
@@ -124,15 +151,19 @@ def main() -> None:
 
 		model = keras.models.load_model(model_path)
 
-		x = model.predict(IMAGES)
-		xf = pd.DataFrame(x, columns=labels)
-		DF[f"{category}_yhat"] = [labels[np.argmax(y)] for y in x]
+		x = model(IMAGES, training=False)
+		if len(labels) > 2:
+			# xf = pd.DataFrame(x, columns=labels)
+			DF[f"{category}_yhat"] = [labels[np.argmax(y)] for y in x]
+		else:
+			DF[f"{category}_yhat"] = x
+			DF[f"{category}_yhat"] = DF[f"{category}_yhat"].astype('UInt8')
 
 		comp = DF[category] == DF[f"{category}_yhat"]
 		comp = comp.value_counts(normalize=True)
 
 		print(f"{category} accuracy: {comp[True] * 100}%%")
-		print(xf)
+		# print(xf)
 
 	DF.sort_index(axis=1, inplace=True)
 	print(DF)

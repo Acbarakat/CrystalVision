@@ -74,6 +74,9 @@ def make_model(train_ds: tf.data.Dataset,
     '''
     tf.keras.backend.clear_session()
 
+    loss = tf.keras.losses.CategoricalCrossentropy()
+    metrics = [tf.keras.metrics.CategoricalAccuracy(name='val_accuracy')]
+
     if model_type == "custom":
         # TODO: A well crafted custom per attribute is required
         model = models.Sequential(name="custom", layers=[
@@ -95,6 +98,24 @@ def make_model(train_ds: tf.data.Dataset,
         ])
         optimizer = tf.keras.optimizers.RMSprop()
         # optimizer = tf.keras.optimizers.SGD(learning_rate=0.01, nesterov=True)
+    elif model_type == "burst":
+        model = models.Sequential(name="burst", layers=[
+            layers.Conv2D(32, kernel_size=(3, 3), activation='relu', input_shape=image_shape),
+            layers.MaxPooling2D(),
+            layers.Conv2D(64, kernel_size=(3, 3), activation='relu'),
+            layers.MaxPooling2D(),
+            layers.Conv2D(128, kernel_size=(3, 3), activation='relu'),
+            layers.MaxPooling2D(),
+            layers.Conv2D(128, kernel_size=(3, 3), activation='relu'),
+            layers.MaxPooling2D(),
+            layers.Flatten(),
+            layers.Dense(2 ** 8, activation='relu'),
+            layers.Dense(2 ** 6, activation='relu'),
+            layers.Dense(1, activation="sigmoid")
+        ])
+        optimizer = tf.keras.optimizers.Adam(amsgrad=True)
+        loss = tf.keras.losses.BinaryCrossentropy()
+        metrics = [tf.keras.metrics.BinaryAccuracy(name='val_accuracy')]
     elif model_type == "cost":
         model = models.Sequential(name="cost", layers=[
             layers.Conv2D(32, kernel_size=(3, 3), activation='relu', input_shape=image_shape),
@@ -164,16 +185,14 @@ def make_model(train_ds: tf.data.Dataset,
         raise RuntimeError(f"model_type '{model_type}' is not supported")
 
     model.compile(optimizer=optimizer,
-                  loss=tf.keras.losses.CategoricalCrossentropy(),
-                  metrics=[tf.keras.metrics.CategoricalAccuracy()])
+                  loss=loss,
+                  metrics=metrics)
     # print(model.summary())
     print(model.name)
 
     callbacks = [
-        # tf.keras.callbacks.EarlyStopping(monitor='loss', patience=3),
-        # tf.keras.callbacks.EarlyStopping(monitor='categorical_accuracy', min_delta=0.0010, patience=3),
         # tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=3),
-        tf.keras.callbacks.EarlyStopping(monitor='val_categorical_accuracy',
+        tf.keras.callbacks.EarlyStopping(monitor='val_accuracy',
                                          min_delta=0.0025,
                                          patience=4,
                                          restore_best_weights=True),
@@ -384,19 +403,21 @@ def main(image: str="thumbs",
         df[image] = os.path.abspath(os.path.join(DATA_DIR, "thumb")) + os.sep + df[image]
 
     model_mapping = (
-        # ("Name_EN", ["Name_EN", "Element", "Type_EN"], "resnet"),
-        ("Element", ["Element", "Type_EN"], "element"),
-        ("Type_EN", ["Type_EN", "Element"], "type_en"),
-        ("Cost", ["Cost", "Element"], "cost"),
-        ("Power", ["Power", "Type_EN", "Element"], "power"),
+        # ("Name_EN", ["Name_EN", "Element", "Type_EN"], "resnet", "categorical"),
+        # ("Element", ["Element", "Type_EN"], "element", "categorical"),
+        # ("Type_EN", ["Type_EN", "Element"], "type_en", "categorical"),
+        # ("Cost", ["Cost", "Element"], "cost", "categorical"),
+        # ("Power", ["Power", "Type_EN", "Element"], "power", "categorical"),
+        ("Ex_Burst", ["Ex_Burst", "Element", "Type_EN"], "burst", "binary"),
     )
 
-    for key, stratify, model_type in model_mapping:
+    for key, stratify, model_type, label_mode in model_mapping:
         generate(df,
                  key,
                  image,
                  stratify,
                  model_type,
+                 label_mode=label_mode,
                  seed=seed,
                  interpolation=interpolation)
 
