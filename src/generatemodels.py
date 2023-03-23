@@ -113,7 +113,9 @@ def make_model(train_ds: tf.data.Dataset,
             layers.Dense(2 ** 6, activation='relu'),
             layers.Dense(1, activation="sigmoid")
         ])
-        optimizer = tf.keras.optimizers.Adam(amsgrad=True)
+        # TODO: Ensemble model w/ and w/o amsgrad, rsmprop
+        # optimizer = tf.keras.optimizers.Adam(amsgrad=False)
+        optimizer = tf.keras.optimizers.RMSprop(centered=True)
         loss = tf.keras.losses.BinaryCrossentropy()
         metrics = [tf.keras.metrics.BinaryAccuracy(name='val_accuracy')]
     elif model_type == "cost":

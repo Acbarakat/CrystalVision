@@ -156,7 +156,7 @@ def main() -> None:
 			# xf = pd.DataFrame(x, columns=labels)
 			DF[f"{category}_yhat"] = [labels[np.argmax(y)] for y in x]
 		else:
-			DF[f"{category}_yhat"] = x
+			DF[f"{category}_yhat"] = np.round(x)
 			DF[f"{category}_yhat"] = DF[f"{category}_yhat"].astype('UInt8')
 
 		comp = DF[category] == DF[f"{category}_yhat"]
