@@ -82,7 +82,7 @@ This project demonstrates the feasibility of using machine learning to classify 
 [issues-shield]: https://img.shields.io/github/issues/Acbarakat/CrystalVision.svg?style=for-the-badge
 [issues-url]: https://github.com/Acbarakat/CrystalVision/issues
 [license-shield]: https://img.shields.io/github/license/Acbarakat/CrystalVision.svg?style=for-the-badge
-[license-url]: https://github.com/Acbarakat/CrystalVision/blob/master/LICENSE.txt
+[license-url]: https://github.com/Acbarakat/CrystalVision/blob/master/LICENSE.MD
 [linkedin-shield]: https://img.shields.io/badge/-LinkedIn-black.svg?style=for-the-badge&logo=linkedin&colorB=555
 [linkedin-url]: https://www.linkedin.com/in/allonte-barakat/
 [python-shield]: https://img.shields.io/badge/Python-FFD43B?style=for-the-badge&logo=python&logoColor=blue
@@ -92,4 +92,3 @@ This project demonstrates the feasibility of using machine learning to classify 
 [pd-shield]: https://img.shields.io/badge/Pandas-2C2D72?style=for-the-badge&logo=pandas&logoColor=white
 [skl-shield]: https://img.shields.io/badge/scikit_learn-F7931E?style=for-the-badge&logo=scikit-learn&logoColor=white
 [sci-shield]: https://img.shields.io/badge/SciPy-654FF0?style=for-the-badge&logo=SciPy&logoColor=whit
-
