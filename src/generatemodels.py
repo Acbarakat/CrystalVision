@@ -362,11 +362,13 @@ def main(image: str="thumbs",
     # Ignore multi-element cards
     df = df.query("~Element.str.contains('_')")
 
-    # Ignore non-English cards
+    # Ignore by langyage
+    # df = df.query(f"~{image}.str.contains('_eg')")  # English
     df = df.query(f"~{image}.str.contains('_fr')")  # French
     # df = df.query(f"~{image}.str.contains('_es')")  # Spanish
     df = df.query(f"~{image}.str.contains('_it')")  # Italian
     df = df.query(f"~{image}.str.contains('_de')")  # German
+    df = df.query(f"~{image}.str.contains('_jp')")  # Japanese
 
     # WA: Bad Download/Image from server
     df = df.query(f"{image} not in ('8-080C_es.jpg', '11-138S_fr.jpg', '12-049H_fr_Premium.jpg', '13-106H_de.jpg')")
