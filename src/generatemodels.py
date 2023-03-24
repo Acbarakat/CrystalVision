@@ -417,10 +417,10 @@ def main(image: str="thumbs",
 
     model_mapping = (
         # ("Name_EN", ["Name_EN", "Element", "Type_EN"], "resnet", "categorical"),
-        # ("Element", ["Element", "Type_EN"], "element", "categorical"),
-        # ("Type_EN", ["Type_EN", "Element"], "type_en", "categorical"),
-        # ("Cost", ["Cost", "Element"], "cost", "categorical"),
-        # ("Power", ["Power", "Type_EN", "Element"], "power", "categorical"),
+        ("Element", ["Element", "Type_EN"], "element", "categorical"),
+        ("Type_EN", ["Type_EN", "Element"], "type_en", "categorical"),
+        ("Cost", ["Cost", "Element"], "cost", "categorical"),
+        ("Power", ["Power", "Type_EN", "Element"], "power", "categorical"),
         ("Ex_Burst", ["Ex_Burst", "Element", "Type_EN"], "burst", "binary"),
     )
 
