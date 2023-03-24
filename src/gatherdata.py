@@ -38,7 +38,13 @@ def download_and_save() -> dict:
     with requests.get("https://fftcg.square-enix-games.com/en/get-cards") as url:
         data = url.json()
 
-    for c in data["cards"]:
+    codes = set()
+    duplicates = []
+    for idx, c in enumerate(data["cards"]):
+        if c["Code"] in codes:
+            duplicates.append((idx, c["Code"]))
+        else:
+            codes.add(c["Code"])
         for d in ("thumbs", "full"):
             extra = []
             for v in c["images"][d]:
@@ -46,6 +52,11 @@ def download_and_save() -> dict:
                     extra.append(v.replace("_eg.jpg", f"{lang}.jpg").replace("_eg_", f"{lang}_"))
 
             c["images"][d] += extra
+
+    if duplicates:
+        for d, code in duplicates[::-1]:
+            print(f"Found duplicate: {code}")
+            del data["cards"][d]
 
     if not os.path.exists(DATA_DIR):
         os.makedirs(DATA_DIR)
@@ -88,6 +99,10 @@ async def download_image(img_url: str,
     p = ImageFile.Parser()
     with requests.get(img_url, allow_redirects=True) as url:
         p.feed(url.content)
+
+        if url.status_code == 404:
+            print(f"Failed to download {img_url}")
+            return
 
     # Convert to jpg
     img = p.close().convert('RGB')

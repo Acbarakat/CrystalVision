@@ -394,9 +394,6 @@ def main(image: str="thumbs",
     # Ignore
     df = df.query(f"~{image}.str.contains('_premium')")
 
-    # Ignore multi-element cards
-    df = df.query("~Element.str.contains('_')")
-
     # Ignore by language
     # df = df.query(f"~{image}.str.contains('_eg')")  # English
     df = df.query(f"~{image}.str.contains('_fr')")  # French
