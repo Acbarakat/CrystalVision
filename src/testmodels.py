@@ -241,8 +241,8 @@ def test_models() -> pd.DataFrame:
 		if category == "Ex_Burst":
 			models = [tf.keras.models.load_model(model_path) for model_path in glob.iglob(model_path + "*")]
 			voting = MyEnsembleVoteClassifier(models, fit_base_estimators=False) #, weights=[0, 1, 0, 0, 0])
-			print(f"{category} transforms")
-			print(voting.transform(IMAGES))
+			# print(f"{category} transforms")
+			# print(voting.transform(IMAGES))
 			x = voting.predict(IMAGES)
 		else:
 			model = tf.keras.models.load_model(model_path)
