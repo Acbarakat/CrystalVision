@@ -25,6 +25,7 @@ from PIL import Image
 from mlxtend.classifier import EnsembleVoteClassifier
 
 from gatherdata import DATA_DIR
+from generatemodels import make_database
 
 
 CATEGORIES = ("Element", "Type_EN", "Cost", "Power", "Ex_Burst")
@@ -60,47 +61,67 @@ IMAGES = [
 	'https://i.ebayimg.com/images/g/fnMAAOSwaHdhcz6-/s-l500.jpg', # F JP Laguna
 	'https://cdn.shopify.com/s/files/1/1715/6019/products/EwenEX-17-080RFoil_600x.png', # F Ewen
 	'https://52f4e29a8321344e30ae-0f55c9129972ac85d6b1f4e703468e6b.ssl.cf2.rackcdn.com/products/pictures/1612601.jpg', # F Terra EX
-	# 'https://pbs.twimg.com/media/FhOOgabagAEbuya.jpg'
-	# 'http://fftcg.cdn.sewest.net/images/cards/full/B-015_eg.jpg'
-	# 'https://pbs.twimg.com/media/FgrQ-fTaYAIkguF.jpg'
-	# 'https://crystalcommerce-assets.s3.amazonaws.com/photos/6548938/large/11-136s-fl-eg.jpg?1581219705'
-	# 'https://product-images.tcgplayer.com/211239.jpg'
-	# 'https://cdn.shopify.com/s/files/1/1715/6019/products/Akstar_Foil_600x.png',
+	'https://cdn.shopify.com/s/files/1/1715/6019/products/Akstar_Foil_600x.png',
+	'https://cdn.shopify.com/s/files/1/1715/6019/products/SephirothFoil_1024x.jpg',
+	'https://i.ebayimg.com/images/g/rTkAAOSw7wljo1MD/s-l500.jpg',
+	'https://cdn.shopify.com/s/files/1/1715/6019/products/ShantottoFoil_1024x.jpg',
+	'https://cdn.shopify.com/s/files/1/1715/6019/products/Y_shtolaFoil_1024x.jpg',
+	'https://cdn.shopify.com/s/files/1/1715/6019/products/Firion_Foil_500x.png',
+	'https://cdn.shopify.com/s/files/1/1715/6019/products/Arciela_Foil_500x.png',
+	'https://cdn.shopify.com/s/files/1/1715/6019/products/Relm-19-127L-From-Nightmares-Foil_500x.png',
+	'https://cdn.shopify.com/s/files/1/1715/6019/products/Prishe-19-111L-From-Nightmares-Foil_500x.png',
+	'https://cdn.shopify.com/s/files/1/1715/6019/products/SononEX_Foil_500x.png',
+	'https://cdn.shopify.com/s/files/1/1715/6019/products/Golbez-13-115L-OpusXIII-Foil_500x.png',
+	'https://cdn.shopify.com/s/files/1/1715/6019/products/NoctisEX_Foil_500x.png',
+	'https://cdn.shopify.com/s/files/1/1715/6019/products/Vaan-EX-19-107C-From-Nightmares-Foil_500x.png',
 ]
 
 IMAGE_DF = pd.DataFrame(
-	columns=["Code", "Name_EN", "Element", "Type_EN", "Cost", "Power", "Ex_Burst"],
+	columns=["Code", "Full_Art", "Foil"],
 	data=[
-		("18-100L", "Lenna", "\u6c34", "Forward", "3", "7000", 0),
-		("1-044R", "Sephiroth", "\u6c37", "Forward", "5", "7000", 0),
-		("18-050L", "Yuffie", "\u98a8", "Forward", "5", "9000", 0),
-		("7-054L", "Chelinka", "\u98a8", "Forward", "3", "7000", 0),
-		("5-068L", "Yshtola", "\u98a8", "Forward", "3", "7000", 0),
-		("1-004C", "Ifrit", "\u706b", "Summon", "1", "", 1),
-		("4-066R", "Nono", "\u98a8", "Backup", "3", "", 0),
-		("7-089C", "Coeurl", "\u96f7", "Monster", "2", "", 0),
-		("7-098R", "Flanborg", "\u96f7", "Monster", "2", "7000", 0),
-		("1-107L", "Shantotto", "\u571f", "Backup", "7", "", 0),
-		("8-135H", "Ark", "\u95c7", "Summon", "10", "", 0),
-		("1-184H", "Chaos", "\u95c7", "Backup", "2", "", 0),
-		("13-103L", "Materia", "\u5149", "Forward", "1", "2000", 0),
-		("5-025H", "Aleoidai", "\u6c37", "Monster", "4", "", 0),
-		("11-093H", "Man in Black", "\u96f7", "Forward", "5", "9000", 0),
-		("4-058C", "Cactuar", "\u98a8", "Monster", "1", "", 0),
-		("6-074C", "Cactuar", "\u571f", "Summon", "4", "", 0),
-		("2-103H", "Kain", "\u96f7", "Forward", "3", "5000", 0),
-		("12-037L", "Ashe", "\u98a8", "Forward", "2", "5000", 0),
-		("PR-026", "Serah", "\u6c37", "Forward", "2", "5000", 0),
-		("4-145H", "Cloud", "\u5149", "Forward", "3", "7000", 1),
-		("7-045C", "Alexander", "\u98a8", "Summon", "2", "", 1),
-		("7-031C", "Shiva", "\u6c37", "Summon", "3", "", 1),
-		("17-094C", "Cid of Clan Gully", "\u96f7", "Backup", "4", "", 1),
-		("2-137H", "Merlwyb", "\u6c34", "Backup", "4", "", 1),
-		("5-091H", "Star Sibyl", "\u571f", "Backup", "5", "", 1),
-		("18-086H", "Ashe", "\u6c34", "Forward", "6", "9000", 1),
-		("1-059R", "Laguna", "\u6c37", "Forward", "4", "7000", 1),
-		("17-080R", "Ewen", "\u571f", "Forward", "1", "3000", 1),
-		("10-132S", "Terra", "\u706b", "Forward", "4", "5000", 1),
+		("18-100L", 0, 0),
+		("1-044R", 0, 1),
+		("18-050L", 1, 0),
+		("7-054L", 1, 0),
+		("5-068L", 1, 1),
+		("1-004C", 0, 1),
+		("4-066R", 0, 1),
+		("7-089C", 0, 1),
+		("7-098R", 0, 1),
+		("1-107L", 0, 1),
+		("8-135H", 0, 1),
+		("1-184H", 0, 1),
+		("13-103L", 0, 1),
+		("5-025H", 0, 1),
+		("11-093H", 0, 1),
+		("4-058C", 0, 1),
+		("6-074C", 0, 1),
+		("2-103H", 0, 1),
+		("12-037L", 0, 1),
+		("4-037H", 0, 1),  # PR-026/4-037H
+		("4-145H", 0, 1),
+		("7-045C", 0, 1),
+		("7-031C", 0, 1),
+		("17-094C", 0, 1),
+		("2-137H", 0, 1),
+		("5-091H", 0, 1),
+		("18-086H", 1, 1),
+		("1-059R", 0, 1),
+		("17-080R", 0, 1),
+		("10-132S", 0, 1),
+		("18-107L", 0, 1),
+		("14-123C", 0, 1),
+		("18-116L", 0, 1),
+		("12-120C", 0, 1),
+		("12-119L", 0, 1),
+		("18-130L", 0, 1),
+		("18-128H", 0, 1),
+		("19-127L", 0, 1),
+		("19-111L", 0, 1),
+		("18-123L", 0, 1),
+		("13-115L", 0, 1),
+		("18-139S", 0, 1),
+		("19-107C", 0, 1)
 	]
 )
 
@@ -110,7 +131,7 @@ class MyEnsembleVoteClassifier(EnsembleVoteClassifier):
 		super().__init__(clfs, voting, weights, verbose, use_clones, fit_base_estimators)
 		self.clfs_ = clfs
 
-	def _predict(self, X: np.ndarray) -> None:
+	def _predict(self, X: np.ndarray) -> np.ndarray:
 		"""Collect results from clf.predict calls."""
 
 		if not self.fit_base_estimators:
@@ -119,6 +140,9 @@ class MyEnsembleVoteClassifier(EnsembleVoteClassifier):
 			return np.asarray(
 				[self.le_.transform(clf(X)) for clf in self.clfs_]
 			).T
+
+	def transform(self, X: np.ndarray, dtype: str='int64') -> np.ndarray:
+		return self._predict(X).astype(dtype)[0]
 
 	def predict(self, X: np.ndarray, dtype: str='int64') -> np.ndarray:
 		"""Predict class labels for X.
@@ -202,7 +226,11 @@ def test_models() -> pd.DataFrame:
 	Returns:
 		ImageData dataframe with yhat(s)
 	'''
-	df = IMAGE_DF.copy()
+	df = IMAGE_DF.copy().set_index('Code')
+	cols = ["Name_EN", "Element", "Type_EN", "Cost", "Power", "Ex_Burst"]
+	mdf = make_database().set_index('Code')[cols]
+	df = df.merge(mdf, on="Code", how='left', sort=False)
+	df['Ex_Burst'] = df['Ex_Burst'].astype('uint8')
 
 	for category in CATEGORIES:
 		model_path = os.path.join(DATA_DIR, "model", f"{category}_model")
@@ -213,6 +241,8 @@ def test_models() -> pd.DataFrame:
 		if category == "Ex_Burst":
 			models = [tf.keras.models.load_model(model_path) for model_path in glob.iglob(model_path + "*")]
 			voting = MyEnsembleVoteClassifier(models, fit_base_estimators=False) #, weights=[0, 1, 0, 0, 0])
+			# print(f"{category} transforms")
+			# print(voting.transform(IMAGES))
 			x = voting.predict(IMAGES)
 		else:
 			model = tf.keras.models.load_model(model_path)
@@ -229,7 +259,10 @@ def test_models() -> pd.DataFrame:
 
 
 def main() -> None:
-	df = test_models()
+	df = test_models().reset_index()
+
+	# Remove the ones we know wont work without object detection or full art enablement
+	df.drop([2, 3, 4, 5, 17, 26, 27, 32], inplace=True)
 
 	for category in CATEGORIES:
 		comp = df[category] == df[f"{category}_yhat"]
