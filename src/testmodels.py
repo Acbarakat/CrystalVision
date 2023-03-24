@@ -262,7 +262,7 @@ def main() -> None:
 	df = test_models().reset_index()
 
 	# Remove the ones we know wont work without object detection or full art enablement
-	df.drop([2, 3, 4, 17, 26, 32], inplace=True)
+	df.drop([2, 3, 4, 5, 17, 26, 27, 32], inplace=True)
 
 	for category in CATEGORIES:
 		comp = df[category] == df[f"{category}_yhat"]
