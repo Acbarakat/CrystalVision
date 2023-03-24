@@ -16,9 +16,15 @@ This is a machine learning project aimed at classifying Final Fantasy Trading Ca
 
 The dataset used for this project is a collection of Final Fantasy Trading Card Game cards obtained from [Square Enix's official website](https://fftcg.square-enix-games.com/na). The dataset includes card name, element, rarity, type, power, and abilities.
 
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
+
+
 ## Approach
 
 The approach used for this project is supervised learning, specifically classification. The dataset is split into training and testing sets. The model is trained on the training set and evaluated on the testing set. Once a model has finished being fit and saved, it is then tested against real-world hand-pick images from the internet that have unaccounted attributes such as, it is foil, in a different language, or has some border.
+
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
+
 
 ## Dependencies
 
@@ -42,6 +48,7 @@ $ pip install -r requirements.txt
 
 Moreover, the sequential model were originally created with the Nvidia GeForce GTX 980 GPU and Intel Core i7-5960X CPU. Therefore the complexity of the models is further constrained by allowable training time and gpu memory.
 
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
 
 ## Usage
 
@@ -65,10 +72,14 @@ python .\src\testmodels.py
 
 This will test the models against real-world hand-picked data and evaluate our accuracy. Images will be cached (downloaded) and converted to JPEG (removing any alpha channels) into `.\data\test\` 
 
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
+
+
 ## Conclusion
 
 This project demonstrates the feasibility of using machine learning to classify Final Fantasy Trading Card Game cards based on their attributes. Future work could involve expanding the dataset to include more cards and features, exploring other classification algorithms, and (multi)object detection.
 
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
 
 
 <!-- MARKDOWN LINKS & IMAGES -->
