@@ -22,7 +22,6 @@ import tensorflow as tf
 import numpy as np
 from skimage.io import imread
 from PIL import Image
-from sklearn.preprocessing import LabelEncoder
 from mlxtend.classifier import EnsembleVoteClassifier
 
 from gatherdata import DATA_DIR
@@ -69,7 +68,7 @@ IMAGES = [
 	# 'https://cdn.shopify.com/s/files/1/1715/6019/products/Akstar_Foil_600x.png',
 ]
 
-DF = pd.DataFrame(
+IMAGE_DF = pd.DataFrame(
 	columns=["Code", "Name_EN", "Element", "Type_EN", "Cost", "Power", "Ex_Burst"],
 	data=[
 		("18-100L", "Lenna", "\u6c34", "Forward", "3", "7000", 0),
@@ -196,7 +195,15 @@ IMAGES = [load_image(image, f"{idx}.jpg") for idx, image in enumerate(IMAGES)]	#
 IMAGES = np.array([tf.image.resize(image, (250, 179)) for image in IMAGES])
 
 
-def main() -> None:
+def test_models() -> pd.DataFrame:
+	'''
+	Run all models and apply values in the datagrame
+	
+	Returns:
+		ImageData dataframe with yhat(s)
+	'''
+	df = IMAGE_DF.copy()
+
 	for category in CATEGORIES:
 		model_path = os.path.join(DATA_DIR, "model", f"{category}_model")
 
@@ -213,19 +220,26 @@ def main() -> None:
 
 		if len(labels) > 2:
 			# xf = pd.DataFrame(x, columns=labels)
-			DF[f"{category}_yhat"] = [labels[np.argmax(y)] for y in x]
+			df[f"{category}_yhat"] = [labels[np.argmax(y)] for y in x]
 		else:
-			DF[f"{category}_yhat"] = np.round(x)
-			DF[f"{category}_yhat"] = DF[f"{category}_yhat"].astype('UInt8')
+			df[f"{category}_yhat"] = np.round(x)
+			df[f"{category}_yhat"] = df[f"{category}_yhat"].astype('UInt8')
 
-		comp = DF[category] == DF[f"{category}_yhat"]
+	return df
+
+
+def main() -> None:
+	df = test_models()
+
+	for category in CATEGORIES:
+		comp = df[category] == df[f"{category}_yhat"]
 		comp = comp.value_counts(normalize=True)
 
 		print(f"{category} accuracy: {comp[True] * 100}%%")
 		# print(xf)
 
-	DF.sort_index(axis=1, inplace=True)
-	print(DF)
+	df.sort_index(axis=1, inplace=True)
+	print(df)
 
 
 if __name__ == '__main__':

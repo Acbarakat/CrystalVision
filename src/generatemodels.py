@@ -38,12 +38,6 @@ def make_database() -> pd.DataFrame:
     df["Element"] = df["Element"].str.replace("/", "_")
     df["Power"] = df['Power'].str.replace(" ", "").replace("\u2015", "").replace("\uff0d", "")
 
-    # Ignore Crystal Tokens
-    df = df.query("Type_EN != 'Crystal'")
-
-    # Ignore Boss Deck cards
-    df = df.query("Rarity != 'B'")  
-
     return df
 
 
@@ -385,6 +379,12 @@ def main(image: str="thumbs",
     df = make_database().explode(image)
     # df["Class"] = df['thumbs'].apply(lambda x: 'Full Art' if '_fl' in x.lower() else '')
 
+    # Ignore Crystal Tokens
+    df = df.query("Type_EN != 'Crystal'")
+
+    # Ignore Boss Deck cards
+    df = df.query("Rarity != 'B'")  
+
     # Ignore Full Art Cards
     df = df.query(f"~{image}.str.contains('_FL') and ~{image}.str.contains('_2_')")
 
@@ -397,7 +397,7 @@ def main(image: str="thumbs",
     # Ignore multi-element cards
     df = df.query("~Element.str.contains('_')")
 
-    # Ignore by langyage
+    # Ignore by language
     # df = df.query(f"~{image}.str.contains('_eg')")  # English
     df = df.query(f"~{image}.str.contains('_fr')")  # French
     # df = df.query(f"~{image}.str.contains('_es')")  # Spanish
