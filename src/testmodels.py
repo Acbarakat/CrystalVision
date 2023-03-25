@@ -16,6 +16,7 @@ Todo:
 import os
 import json
 import glob
+import typing
 
 import pandas as pd
 import tensorflow as tf
@@ -25,7 +26,8 @@ from PIL import Image
 from mlxtend.classifier import EnsembleVoteClassifier
 from sklearn.metrics import accuracy_score
 from sklearn.preprocessing import normalize
-from keras.layers import Activation
+from keras.models import Model
+from keras.layers import Activation, Input, Layer, Flatten, Permute
 from keras import backend as K
 from keras.utils.generic_utils import get_custom_objects
 
@@ -145,8 +147,8 @@ class MyEnsembleVoteClassifier(EnsembleVoteClassifier):
 		if not self.fit_base_estimators:
 			predictions = np.asarray([clf(X) for clf in self.clfs_]).T
 			if predictions.shape[0] == 1:
-				print(self.activation)
-				return self.activation(predictions[0], **self.activation_kwargs)
+				return self.activation(predictions[0],
+			   						   **self.activation_kwargs)
 
 			predictions = np.array([
 				np.argmax(p, axis=1) for p in predictions.T
@@ -181,6 +183,8 @@ class MyEnsembleVoteClassifier(EnsembleVoteClassifier):
 
 		"""
 		predictions = self.transform(X)
+		if hasattr(predictions, "numpy"):
+			predictions = predictions.numpy()
 		if dtype:
 			predictions = predictions.astype(dtype)
 
@@ -250,7 +254,10 @@ class MyEnsembleVoteClassifier(EnsembleVoteClassifier):
 		score : float
 			Mean accuracy of ``self.predict(X)`` w.r.t. `y`.
 		"""
-		result = self._predict(X).T
+		result = self._predict(X)
+		if hasattr(result, "numpy"):
+			result = result.numpy()
+		result = result.T
 		if dtype:
 			result = result.astype(dtype)
 
@@ -262,9 +269,26 @@ class MyEnsembleVoteClassifier(EnsembleVoteClassifier):
 						 index=[c.name for c in self.clfs_] + ['ensemble'],
 						 name="accuracy")
 
-	# TODO: Save ensemble in keras format
-	def save_model():
-		raise NotImplementedError()
+	def generate_model(self) -> Model:
+		if self.voting == 'soft':
+			raise NotImplementedError("Cannot generate a 'soft' voting model")
+
+		name = self.clfs_[0].name.replace("_1", "_ensemble")
+		model_input = Input(shape=self.clfs_[0].input_shape[1:])
+		yModels = [model(model_input) for model in self.clfs_]
+
+		active = self.activation(yModels, **self.activation_kwargs)
+		if self.clfs_[0].output_shape[1] == 1:
+			flatten = Flatten()(active)
+			outputs = HardVote(vote_weights=self.weights)(flatten)
+		else:
+			raise NotImplementedError("Non-BinaryClassification Models are not supported yet")
+
+		modelEns = Model(inputs=model_input, outputs=outputs, name=name)
+		return modelEns
+
+	def save_model(self, file_path: str) -> None:
+		return self.generate_model().save(file_path)
 
 
 def load_image(url: str,
@@ -305,13 +329,28 @@ IMAGES = [load_image(image, f"{idx}.jpg") for idx, image in enumerate(IMAGES)]	#
 IMAGES = np.array([tf.image.resize(image, (250, 179)) for image in IMAGES])
 
 
-def hard_activation(z: np.ndarray, threshold: float=0.5) -> np.ndarray:
-	z[z >= threshold] = 1
-	z[z < threshold] = 0 
-	return z
+class HardVote(Layer):
+	def __init__(self, trainable=False, name="hard_vote", dtype=None, dynamic=False, vote_weights=None, **kwargs):
+		super().__init__(trainable, name, dtype, dynamic, **kwargs)
+		self.vote_weights = tf.convert_to_tensor(vote_weights) if vote_weights else None
+
+	def call(self, inputs):
+		dtype = inputs[0].dtype
+		inputs = K.transpose(inputs)
+
+		return K.tf.map_fn(
+			lambda z: K.cast(K.argmax(K.tf.math.bincount(z, weights=self.vote_weights)), 'int32'),
+			inputs,
+		)
 
 
-get_custom_objects().update({'hard_activation': Activation(hard_activation, name="hard_activaiton")})
+def hard_activation(z: typing.Any, threshold: float=0.5) -> tf.Tensor:
+	return K.cast(K.greater_equal(z, threshold), tf.dtypes.int32)
+
+
+get_custom_objects().update({
+	'hard_activation': Activation(hard_activation, name="hard_activaiton"),
+})
 
 
 def test_models() -> pd.DataFrame:
@@ -334,14 +373,21 @@ def test_models() -> pd.DataFrame:
 			labels = json.load(fp)
 
 		models = [tf.keras.models.load_model(model_path) for model_path in glob.iglob(model_path + "*")]
+		ensemble_path = os.path.join(DATA_DIR, "model", f"{category}_ensemble")
 		if category == "Ex_Burst":
-			voting = MyEnsembleVoteClassifier(models, weights=[1, 1, 3, 1, 1], activation=hard_activation, activation_kwargs={'threshold': 0.1})
-			# print(voting.transform(IMAGES))
-			print(voting.scores(IMAGES, df[category].apply(lambda x: labels.index(x)), dtype='uint8'))
-			x = voting.predict(IMAGES, 'uint8')
+			if os.path.exists(ensemble_path):
+				model = tf.keras.models.load_model(ensemble_path)
+				x = model(IMAGES)
+			else:
+				voting = MyEnsembleVoteClassifier(models, weights=[1, 1, 3, 1, 1], activation=hard_activation, activation_kwargs={'threshold': 0.1})
+				print(voting.scores(IMAGES, df[category].apply(lambda x: labels.index(x)), dtype='uint8'))
+				x = voting.predict(IMAGES, 'uint8')
+				voting.save_model(ensemble_path)
 		elif category == "Cost":
-			voting = MyEnsembleVoteClassifier(models) # , weights=[1, 0, 0, 0, 0, 0])
+			voting = MyEnsembleVoteClassifier(models)
+			# print(voting.generate_model()(IMAGES))
 			print(voting.scores(IMAGES, df[category].apply(lambda x: labels.index(x))))
+			x = voting.predict(IMAGES)
 			x = [labels[y] for y in voting.predict(IMAGES)]
 		else:
 			x = [labels[np.argmax(y)] for y in models[0](IMAGES, training=False)]
