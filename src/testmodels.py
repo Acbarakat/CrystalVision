@@ -24,6 +24,7 @@ from skimage.io import imread
 from PIL import Image
 from mlxtend.classifier import EnsembleVoteClassifier
 from sklearn.metrics import accuracy_score
+from sklearn.preprocessing import normalize
 
 from gatherdata import DATA_DIR
 from generatemodels import make_database
@@ -144,12 +145,20 @@ class MyEnsembleVoteClassifier(EnsembleVoteClassifier):
 				np.argmax(p, axis=1) for p in predictions.T
 			])
 			return predictions.T
-		else:
-			return np.asarray(
-				[self.le_.transform(clf(X)) for clf in self.clfs_]
-			).T
 
-	def predict(self, X: np.ndarray, dtype: str='int64') -> np.ndarray:
+		return np.asarray(
+			[self.le_.transform(clf(X)) for clf in self.clfs_]
+		).T
+
+	def _predict_probas(self, X) -> np.ndarray:
+		"""Collect results from clf.predict_proba calls."""
+		probas = [clf(X) for clf in self.clfs_]
+		if self.weights:
+			probas = [np.dot(c, w) for c, w in zip(probas, self.weights)]
+		probas = np.sum(probas, axis=0) / len(self.clfs_)
+		return normalize(probas, axis=1, norm='l1')
+
+	def predict(self, X: np.ndarray, dtype: str='') -> np.ndarray:
 		"""Predict class labels for X.
 
 		Parameters
@@ -164,7 +173,9 @@ class MyEnsembleVoteClassifier(EnsembleVoteClassifier):
 			Predicted class labels.
 
 		"""
-		predictions = self.transform(X).astype(dtype)
+		predictions = self.transform(X)
+		if dtype:
+			predictions = predictions.astype(dtype)
 
 		if self.voting == "soft":
 			maj = np.argmax(predictions, axis=1)
@@ -181,7 +192,7 @@ class MyEnsembleVoteClassifier(EnsembleVoteClassifier):
 
 		return maj
 
-	def scores(self, X, y, sample_weight=None) -> pd.Series:
+	def score(self, X, y, sample_weight=None, dtype='') -> float:
 		"""
 		Return the mean accuracy on the given test data and labels.
 
@@ -205,14 +216,44 @@ class MyEnsembleVoteClassifier(EnsembleVoteClassifier):
 		score : float
 			Mean accuracy of ``self.predict(X)`` w.r.t. `y`.
 		"""
+
+		return accuracy_score(y, self.predict(X, dtype=dtype), sample_weight=sample_weight)
+
+	def scores(self, X, y, sample_weight=None, dtype='') -> pd.Series:
+		"""
+		Return the mean accuracy on the given test data and labels.
+
+		In multi-label classification, this is the subset accuracy
+		which is a harsh metric since you require for each sample that
+		each label set be correctly predicted.
+
+		Parameters
+		----------
+		X : array-like of shape (n_samples, n_features)
+			Test samples.
+
+		y : array-like of shape (n_samples,) or (n_samples, n_outputs)
+			True labels for `X`.
+
+		sample_weight : array-like of shape (n_samples,), default=None
+			Sample weights.
+
+		Returns
+		-------
+		score : float
+			Mean accuracy of ``self.predict(X)`` w.r.t. `y`.
+		"""
+		result = self._predict(X).T
+		if dtype:
+			result = result.astype(dtype)
+
 		result = np.array([
-			accuracy_score(y, p, sample_weight=sample_weight) for p in self._predict(X).T
-		] + [self.score(X, y)])
+			accuracy_score(y, p, sample_weight=sample_weight) for p in result
+		] + [self.score(X, y, dtype=dtype)])
 
 		return pd.Series(result,
-		   				 index=[c.name for c in self.clfs_] + ['ensemble'],
-						 name="accuracy",
-						 dtype="float32")
+						 index=[c.name for c in self.clfs_] + ['ensemble'],
+						 name="accuracy")
 
 	# TODO: Save ensemble in keras format
 	def save_model():
@@ -278,11 +319,12 @@ def test_models() -> pd.DataFrame:
 
 		if category == "Ex_Burst":
 			models = [tf.keras.models.load_model(model_path) for model_path in glob.iglob(model_path + "*")]
-			voting = MyEnsembleVoteClassifier(models, fit_base_estimators=False) #, weights=[0, 1, 0, 0, 0])
-			x = [labels[np.argmax(y)] for y in voting.predict(IMAGES)]
+			voting = MyEnsembleVoteClassifier(models, fit_base_estimators=False) #, weights=[0, 1, 1, 1, 1])
+			print(voting.scores(IMAGES, df[category].apply(lambda x: labels.index(x)), dtype='uint8'))
+			x = [labels[np.argmax(y)] for y in voting.predict(IMAGES, 'uint8')]
 		elif category == "Cost":
 			models = [tf.keras.models.load_model(model_path) for model_path in glob.iglob(model_path + "*")]
-			voting = MyEnsembleVoteClassifier(models, voting="hard", fit_base_estimators=False)
+			voting = MyEnsembleVoteClassifier(models, voting="soft", fit_base_estimators=False) # , weights=[1, 0, 0, 0, 0, 0])
 			print(voting.scores(IMAGES, df[category].apply(lambda x: labels.index(x))))
 			x = [labels[y] for y in voting.predict(IMAGES)]
 		else:
