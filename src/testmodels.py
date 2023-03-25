@@ -129,9 +129,10 @@ IMAGE_DF = pd.DataFrame(
 
 
 class MyEnsembleVoteClassifier(EnsembleVoteClassifier):
-	def __init__(self, clfs, voting="hard", weights=None, verbose=0, use_clones=True, fit_base_estimators=True):
+	def __init__(self, clfs, voting="hard", weights=None, verbose=0, use_clones=True, fit_base_estimators=False, filter_func=None):
 		super().__init__(clfs, voting, weights, verbose, use_clones, fit_base_estimators)
 		self.clfs_ = clfs
+		self.filter_func = filter_func
 
 	def _predict(self, X: np.ndarray) -> np.ndarray:
 		"""Collect results from clf.predict calls."""
@@ -139,6 +140,8 @@ class MyEnsembleVoteClassifier(EnsembleVoteClassifier):
 		if not self.fit_base_estimators:
 			predictions = np.asarray([clf(X) for clf in self.clfs_]).T
 			if predictions.shape[0] == 1:
+				if self.filter_func:
+					return self.filter_func(predictions[0])
 				return predictions[0]
 
 			predictions = np.array([
@@ -298,6 +301,11 @@ IMAGES = [load_image(image, f"{idx}.jpg") for idx, image in enumerate(IMAGES)]	#
 IMAGES = np.array([tf.image.resize(image, (250, 179)) for image in IMAGES])
 
 
+def threshold(z: np.ndarray) -> np.ndarray:
+	z[z > 0.1] = 1.
+	return z
+
+
 def test_models() -> pd.DataFrame:
 	'''
 	Run all models and apply values in the datagrame
@@ -317,19 +325,18 @@ def test_models() -> pd.DataFrame:
 		with open(os.path.join(model_path, "category.json")) as fp:
 			labels = json.load(fp)
 
+		models = [tf.keras.models.load_model(model_path) for model_path in glob.iglob(model_path + "*")]
 		if category == "Ex_Burst":
-			models = [tf.keras.models.load_model(model_path) for model_path in glob.iglob(model_path + "*")]
-			voting = MyEnsembleVoteClassifier(models, voting="hard", fit_base_estimators=False) #, weights=[0, 1, 1, 1, 1])
+			voting = MyEnsembleVoteClassifier(models, weights=[1, 1, 3, 1, 1], filter_func=threshold)
+			# print(voting.transform(IMAGES))
 			print(voting.scores(IMAGES, df[category].apply(lambda x: labels.index(x)), dtype='uint8'))
 			x = voting.predict(IMAGES, 'uint8')
 		elif category == "Cost":
-			models = [tf.keras.models.load_model(model_path) for model_path in glob.iglob(model_path + "*")]
-			voting = MyEnsembleVoteClassifier(models, voting="hard", fit_base_estimators=False) # , weights=[1, 0, 0, 0, 0, 0])
+			voting = MyEnsembleVoteClassifier(models) # , weights=[1, 0, 0, 0, 0, 0])
 			print(voting.scores(IMAGES, df[category].apply(lambda x: labels.index(x))))
 			x = [labels[y] for y in voting.predict(IMAGES)]
 		else:
-			model = tf.keras.models.load_model(model_path)
-			x = [labels[np.argmax(y)] for y in model(IMAGES, training=False)]
+			x = [labels[np.argmax(y)] for y in models[0](IMAGES, training=False)]
 
 		df[f"{category}_yhat"] = x
 		if len(labels) <= 2:
