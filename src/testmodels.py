@@ -25,6 +25,10 @@ from PIL import Image
 from mlxtend.classifier import EnsembleVoteClassifier
 from sklearn.metrics import accuracy_score
 from sklearn.preprocessing import normalize
+from keras.layers import Activation
+from keras import backend as K
+from keras.utils.generic_utils import get_custom_objects
+
 
 from gatherdata import DATA_DIR
 from generatemodels import make_database
@@ -129,10 +133,11 @@ IMAGE_DF = pd.DataFrame(
 
 
 class MyEnsembleVoteClassifier(EnsembleVoteClassifier):
-	def __init__(self, clfs, voting="hard", weights=None, verbose=0, use_clones=True, fit_base_estimators=False, filter_func=None):
+	def __init__(self, clfs, voting="hard", weights=None, verbose=0, use_clones=True, fit_base_estimators=False, activation=None, activation_kwargs={}):
 		super().__init__(clfs, voting, weights, verbose, use_clones, fit_base_estimators)
 		self.clfs_ = clfs
-		self.filter_func = filter_func
+		self.activation = tf.keras.activations.linear if activation is None else activation
+		self.activation_kwargs = activation_kwargs
 
 	def _predict(self, X: np.ndarray) -> np.ndarray:
 		"""Collect results from clf.predict calls."""
@@ -140,14 +145,13 @@ class MyEnsembleVoteClassifier(EnsembleVoteClassifier):
 		if not self.fit_base_estimators:
 			predictions = np.asarray([clf(X) for clf in self.clfs_]).T
 			if predictions.shape[0] == 1:
-				if self.filter_func:
-					return self.filter_func(predictions[0])
-				return predictions[0]
+				print(self.activation)
+				return self.activation(predictions[0], **self.activation_kwargs)
 
 			predictions = np.array([
 				np.argmax(p, axis=1) for p in predictions.T
 			])
-			return predictions.T
+			return self.activation(predictions.T, **self.activation_kwargs)
 
 		return np.asarray(
 			[self.le_.transform(clf(X)) for clf in self.clfs_]
@@ -301,9 +305,13 @@ IMAGES = [load_image(image, f"{idx}.jpg") for idx, image in enumerate(IMAGES)]	#
 IMAGES = np.array([tf.image.resize(image, (250, 179)) for image in IMAGES])
 
 
-def threshold(z: np.ndarray) -> np.ndarray:
-	z[z > 0.1] = 1.
+def hard_activation(z: np.ndarray, threshold: float=0.5) -> np.ndarray:
+	z[z >= threshold] = 1
+	z[z < threshold] = 0 
 	return z
+
+
+get_custom_objects().update({'hard_activation': Activation(hard_activation, name="hard_activaiton")})
 
 
 def test_models() -> pd.DataFrame:
@@ -327,7 +335,7 @@ def test_models() -> pd.DataFrame:
 
 		models = [tf.keras.models.load_model(model_path) for model_path in glob.iglob(model_path + "*")]
 		if category == "Ex_Burst":
-			voting = MyEnsembleVoteClassifier(models, weights=[1, 1, 3, 1, 1], filter_func=threshold)
+			voting = MyEnsembleVoteClassifier(models, weights=[1, 1, 3, 1, 1], activation=hard_activation, activation_kwargs={'threshold': 0.1})
 			# print(voting.transform(IMAGES))
 			print(voting.scores(IMAGES, df[category].apply(lambda x: labels.index(x)), dtype='uint8'))
 			x = voting.predict(IMAGES, 'uint8')
@@ -349,7 +357,7 @@ def main() -> None:
 	df = test_models().reset_index()
 
 	# Remove the ones we know wont work without object detection or full art enablement
-	df.drop([2, 3, 4, 5, 17, 26, 27, 32], inplace=True)
+	df.drop([2, 3, 4, 5, 17, 19, 26, 27, 32], inplace=True)
 
 	for category in CATEGORIES:
 		comp = df[category] == df[f"{category}_yhat"]
