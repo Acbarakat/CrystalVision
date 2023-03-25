@@ -27,7 +27,7 @@ from mlxtend.classifier import EnsembleVoteClassifier
 from sklearn.metrics import accuracy_score
 from sklearn.preprocessing import normalize
 from keras.models import Model
-from keras.layers import Activation, Input, Layer, Flatten, Permute
+from keras.layers import Activation, Input, Layer, Flatten, Maximum
 from keras import backend as K
 from keras.utils.generic_utils import get_custom_objects
 
@@ -161,7 +161,7 @@ class MyEnsembleVoteClassifier(EnsembleVoteClassifier):
 
 	def _predict_probas(self, X) -> np.ndarray:
 		"""Collect results from clf.predict_proba calls."""
-		probas = [clf(X) for clf in self.clfs_]
+		probas = [clf(X, training=False) for clf in self.clfs_]
 		if self.weights:
 			probas = [np.dot(c, w) for c, w in zip(probas, self.weights)]
 		probas = np.sum(probas, axis=0) / len(self.clfs_)
@@ -203,34 +203,7 @@ class MyEnsembleVoteClassifier(EnsembleVoteClassifier):
 
 		return maj
 
-	def score(self, X, y, sample_weight=None, dtype='') -> float:
-		"""
-		Return the mean accuracy on the given test data and labels.
-
-		In multi-label classification, this is the subset accuracy
-		which is a harsh metric since you require for each sample that
-		each label set be correctly predicted.
-
-		Parameters
-		----------
-		X : array-like of shape (n_samples, n_features)
-			Test samples.
-
-		y : array-like of shape (n_samples,) or (n_samples, n_outputs)
-			True labels for `X`.
-
-		sample_weight : array-like of shape (n_samples,), default=None
-			Sample weights.
-
-		Returns
-		-------
-		score : float
-			Mean accuracy of ``self.predict(X)`` w.r.t. `y`.
-		"""
-
-		return accuracy_score(y, self.predict(X, dtype=dtype), sample_weight=sample_weight)
-
-	def scores(self, X, y, sample_weight=None, dtype='') -> pd.Series:
+	def scores(self, X, y, sample_weight=None) -> pd.Series:
 		"""
 		Return the mean accuracy on the given test data and labels.
 
@@ -258,12 +231,10 @@ class MyEnsembleVoteClassifier(EnsembleVoteClassifier):
 		if hasattr(result, "numpy"):
 			result = result.numpy()
 		result = result.T
-		if dtype:
-			result = result.astype(dtype)
 
 		result = np.array([
 			accuracy_score(y, p, sample_weight=sample_weight) for p in result
-		] + [self.score(X, y, dtype=dtype)])
+		] + [self.score(X, y)])
 
 		return pd.Series(result,
 						 index=[c.name for c in self.clfs_] + ['ensemble'],
@@ -275,14 +246,14 @@ class MyEnsembleVoteClassifier(EnsembleVoteClassifier):
 
 		name = self.clfs_[0].name.replace("_1", "_ensemble")
 		model_input = Input(shape=self.clfs_[0].input_shape[1:])
-		yModels = [model(model_input) for model in self.clfs_]
+		yModels = [model(model_input, training=False) for model in self.clfs_]
 
 		active = self.activation(yModels, **self.activation_kwargs)
 		if self.clfs_[0].output_shape[1] == 1:
 			flatten = Flatten()(active)
-			outputs = HardVote(vote_weights=self.weights)(flatten)
+			outputs = HardBinaryVote(vote_weights=self.weights)(flatten)
 		else:
-			raise NotImplementedError("Non-BinaryClassification Models are not supported yet")
+			outputs = HardClassVote(vote_weights=self.weights)(active)
 
 		modelEns = Model(inputs=model_input, outputs=outputs, name=name)
 		return modelEns
@@ -329,19 +300,28 @@ IMAGES = [load_image(image, f"{idx}.jpg") for idx, image in enumerate(IMAGES)]	#
 IMAGES = np.array([tf.image.resize(image, (250, 179)) for image in IMAGES])
 
 
-class HardVote(Layer):
+class HardBinaryVote(Layer):
 	def __init__(self, trainable=False, name="hard_vote", dtype=None, dynamic=False, vote_weights=None, **kwargs):
 		super().__init__(trainable, name, dtype, dynamic, **kwargs)
 		self.vote_weights = tf.convert_to_tensor(vote_weights) if vote_weights else None
 
 	def call(self, inputs):
-		dtype = inputs[0].dtype
 		inputs = K.transpose(inputs)
 
 		return K.tf.map_fn(
 			lambda z: K.cast(K.argmax(K.tf.math.bincount(z, weights=self.vote_weights)), 'int32'),
 			inputs,
 		)
+
+class HardClassVote(HardBinaryVote):
+	def call(self, inputs):
+		inputs = K.transpose(K.cast(K.argmax(inputs), 'int32'))
+
+		return K.tf.map_fn(
+			lambda z: K.cast(K.argmax(K.tf.math.bincount(z, weights=self.vote_weights)), 'int32'),
+			inputs,
+		)
+
 
 
 def hard_activation(z: typing.Any, threshold: float=0.5) -> tf.Tensor:
@@ -373,22 +353,22 @@ def test_models() -> pd.DataFrame:
 			labels = json.load(fp)
 
 		models = [tf.keras.models.load_model(model_path) for model_path in glob.iglob(model_path + "*")]
-		ensemble_path = os.path.join(DATA_DIR, "model", f"{category}_ensemble")
-		if category == "Ex_Burst":
-			if os.path.exists(ensemble_path):
-				model = tf.keras.models.load_model(ensemble_path)
-				x = model(IMAGES)
-			else:
+		# ensemble_path = os.path.join(DATA_DIR, "model", f"{category}_ensemble")
+		if category in ("Ex_Burst", "Cost"):
+			# if os.path.exists(ensemble_path):
+			# 	model = tf.keras.models.load_model(ensemble_path)
+			# 	x = model(IMAGES, training=False)
+			# 	if category != "Ex_Burst":
+			# 		x = [labels[y] for y in x]
+			# else:
+			if category == "Ex_Burst":
 				voting = MyEnsembleVoteClassifier(models, weights=[1, 1, 3, 1, 1], activation=hard_activation, activation_kwargs={'threshold': 0.1})
-				print(voting.scores(IMAGES, df[category].apply(lambda x: labels.index(x)), dtype='uint8'))
 				x = voting.predict(IMAGES, 'uint8')
-				voting.save_model(ensemble_path)
-		elif category == "Cost":
-			voting = MyEnsembleVoteClassifier(models)
-			# print(voting.generate_model()(IMAGES))
+			else:
+				voting = MyEnsembleVoteClassifier(models)
+				x = [labels[y] for y in voting.predict(IMAGES)]
 			print(voting.scores(IMAGES, df[category].apply(lambda x: labels.index(x))))
-			x = voting.predict(IMAGES)
-			x = [labels[y] for y in voting.predict(IMAGES)]
+			# voting.save_model(ensemble_path)
 		else:
 			x = [labels[np.argmax(y)] for y in models[0](IMAGES, training=False)]
 
