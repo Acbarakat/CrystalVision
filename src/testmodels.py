@@ -23,6 +23,7 @@ import numpy as np
 from skimage.io import imread
 from PIL import Image
 from mlxtend.classifier import EnsembleVoteClassifier
+from sklearn.metrics import accuracy_score
 
 from gatherdata import DATA_DIR
 from generatemodels import make_database
@@ -121,7 +122,7 @@ IMAGE_DF = pd.DataFrame(
 		("18-123L", 0, 1),
 		("13-115L", 0, 1),
 		("18-139S", 0, 1),
-		("19-107C", 0, 1)
+		("19-107C", 0, 1),
 	]
 )
 
@@ -135,14 +136,18 @@ class MyEnsembleVoteClassifier(EnsembleVoteClassifier):
 		"""Collect results from clf.predict calls."""
 
 		if not self.fit_base_estimators:
-			return np.asarray([clf(X) for clf in self.clfs_]).T
+			predictions = np.asarray([clf(X) for clf in self.clfs_]).T
+			if predictions.shape[0] == 1:
+				return predictions[0]
+
+			predictions = np.array([
+				np.argmax(p, axis=1) for p in predictions.T
+			])
+			return predictions.T
 		else:
 			return np.asarray(
 				[self.le_.transform(clf(X)) for clf in self.clfs_]
 			).T
-
-	def transform(self, X: np.ndarray, dtype: str='int64') -> np.ndarray:
-		return self._predict(X).astype(dtype)[0]
 
 	def predict(self, X: np.ndarray, dtype: str='int64') -> np.ndarray:
 		"""Predict class labels for X.
@@ -159,12 +164,12 @@ class MyEnsembleVoteClassifier(EnsembleVoteClassifier):
 			Predicted class labels.
 
 		"""
+		predictions = self.transform(X).astype(dtype)
+
 		if self.voting == "soft":
-			maj = np.argmax(self.predict_proba(X), axis=1)
+			maj = np.argmax(predictions, axis=1)
 
 		else:  # 'hard' voting
-			predictions = self._predict(X).astype(dtype)[0]
-
 			maj = np.apply_along_axis(
 				lambda x: np.argmax(np.bincount(x, weights=self.weights)),
 				axis=1,
@@ -175,6 +180,39 @@ class MyEnsembleVoteClassifier(EnsembleVoteClassifier):
 			maj = self.le_.inverse_transform(maj)
 
 		return maj
+
+	def scores(self, X, y, sample_weight=None) -> pd.Series:
+		"""
+		Return the mean accuracy on the given test data and labels.
+
+		In multi-label classification, this is the subset accuracy
+		which is a harsh metric since you require for each sample that
+		each label set be correctly predicted.
+
+		Parameters
+		----------
+		X : array-like of shape (n_samples, n_features)
+			Test samples.
+
+		y : array-like of shape (n_samples,) or (n_samples, n_outputs)
+			True labels for `X`.
+
+		sample_weight : array-like of shape (n_samples,), default=None
+			Sample weights.
+
+		Returns
+		-------
+		score : float
+			Mean accuracy of ``self.predict(X)`` w.r.t. `y`.
+		"""
+		result = np.array([
+			accuracy_score(y, p, sample_weight=sample_weight) for p in self._predict(X).T
+		] + [self.score(X, y)])
+
+		return pd.Series(result,
+		   				 index=[c.name for c in self.clfs_] + ['ensemble'],
+						 name="accuracy",
+						 dtype="float32")
 
 	# TODO: Save ensemble in keras format
 	def save_model():
@@ -241,18 +279,18 @@ def test_models() -> pd.DataFrame:
 		if category == "Ex_Burst":
 			models = [tf.keras.models.load_model(model_path) for model_path in glob.iglob(model_path + "*")]
 			voting = MyEnsembleVoteClassifier(models, fit_base_estimators=False) #, weights=[0, 1, 0, 0, 0])
-			# print(f"{category} transforms")
-			# print(voting.transform(IMAGES))
-			x = voting.predict(IMAGES)
+			x = [labels[np.argmax(y)] for y in voting.predict(IMAGES)]
+		elif category == "Cost":
+			models = [tf.keras.models.load_model(model_path) for model_path in glob.iglob(model_path + "*")]
+			voting = MyEnsembleVoteClassifier(models, voting="hard", fit_base_estimators=False)
+			print(voting.scores(IMAGES, df[category].apply(lambda x: labels.index(x))))
+			x = [labels[y] for y in voting.predict(IMAGES)]
 		else:
 			model = tf.keras.models.load_model(model_path)
-			x = model(IMAGES, training=False)
+			x = [labels[np.argmax(y)] for y in model(IMAGES, training=False)]
 
-		if len(labels) > 2:
-			# xf = pd.DataFrame(x, columns=labels)
-			df[f"{category}_yhat"] = [labels[np.argmax(y)] for y in x]
-		else:
-			df[f"{category}_yhat"] = np.round(x)
+		df[f"{category}_yhat"] = x
+		if len(labels) <= 2:
 			df[f"{category}_yhat"] = df[f"{category}_yhat"].astype('UInt8')
 
 	return df

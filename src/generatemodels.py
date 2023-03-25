@@ -130,8 +130,14 @@ def make_model(train_ds: tf.data.Dataset,
             layers.Dense(2 ** 5, activation='relu'),
             layers.Dense(label_count, activation="softmax")
         ])
-        # optimizer = tf.keras.optimizers.SGD(learning_rate=0.01, momentum=0.9)
-        optimizers = [tf.keras.optimizers.RMSprop(centered=True)]
+        optimizers = [
+            tf.keras.optimizers.RMSprop(centered=True),
+            tf.keras.optimizers.RMSprop(centered=False),
+            tf.keras.optimizers.Adam(amsgrad=True),
+            tf.keras.optimizers.Adam(amsgrad=False),
+            tf.keras.optimizers.Nadam(),
+            tf.keras.optimizers.SGD(learning_rate=0.01, momentum=0.9, nesterov=True),
+        ]
     elif model_type == "power":
         model = models.Sequential(name="power", layers=[
             layers.Conv2D(32, kernel_size=(3, 3), activation='relu', input_shape=image_shape),
@@ -198,8 +204,7 @@ def make_model(train_ds: tf.data.Dataset,
                       loss=loss,
                       metrics=metrics)
         # print(model.summary())
-        if idx > 0:
-            model._name = f"{base_name}_{idx + 1}"
+        model._name = f"{base_name}_{idx + 1}"
         print(model.name)
 
         model.fit(train_ds,
