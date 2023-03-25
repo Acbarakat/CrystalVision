@@ -319,12 +319,12 @@ def test_models() -> pd.DataFrame:
 
 		if category == "Ex_Burst":
 			models = [tf.keras.models.load_model(model_path) for model_path in glob.iglob(model_path + "*")]
-			voting = MyEnsembleVoteClassifier(models, fit_base_estimators=False) #, weights=[0, 1, 1, 1, 1])
+			voting = MyEnsembleVoteClassifier(models, voting="hard", fit_base_estimators=False) #, weights=[0, 1, 1, 1, 1])
 			print(voting.scores(IMAGES, df[category].apply(lambda x: labels.index(x)), dtype='uint8'))
-			x = [labels[np.argmax(y)] for y in voting.predict(IMAGES, 'uint8')]
+			x = voting.predict(IMAGES, 'uint8')
 		elif category == "Cost":
 			models = [tf.keras.models.load_model(model_path) for model_path in glob.iglob(model_path + "*")]
-			voting = MyEnsembleVoteClassifier(models, voting="soft", fit_base_estimators=False) # , weights=[1, 0, 0, 0, 0, 0])
+			voting = MyEnsembleVoteClassifier(models, voting="hard", fit_base_estimators=False) # , weights=[1, 0, 0, 0, 0, 0])
 			print(voting.scores(IMAGES, df[category].apply(lambda x: labels.index(x))))
 			x = [labels[y] for y in voting.predict(IMAGES)]
 		else:
