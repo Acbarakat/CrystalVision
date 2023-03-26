@@ -38,6 +38,9 @@ def download_and_save() -> dict:
     with requests.get("https://fftcg.square-enix-games.com/en/get-cards") as url:
         data = url.json()
 
+    with open(os.path.join(".", "src", "missing_cards.json")) as fp:
+        data["cards"].extend(json.load(fp))
+
     codes = set()
     duplicates = []
     for idx, c in enumerate(data["cards"]):
