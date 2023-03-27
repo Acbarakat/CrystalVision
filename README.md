@@ -8,6 +8,8 @@
 [![MIT License][license-shield]][license-url]
 [![LinkedIn][linkedin-shield]][linkedin-url]
 
+[![Logo][logo]][logo-url]
+
 # CrystalVision
 
 This is a machine learning project aimed at classifying Final Fantasy Trading Card Game cards based on their attributes -- such as card name, element, rarity, and abilities. The goal is to create a model that can accurately predict the card's unique identifier ("Code") given its features.
@@ -102,4 +104,6 @@ This project demonstrates the feasibility of using machine learning to classify 
 [np-shield]: https://img.shields.io/badge/Numpy-777BB4?style=for-the-badge&logo=numpy&logoColor=white
 [pd-shield]: https://img.shields.io/badge/Pandas-2C2D72?style=for-the-badge&logo=pandas&logoColor=white
 [skl-shield]: https://img.shields.io/badge/scikit_learn-F7931E?style=for-the-badge&logo=scikit-learn&logoColor=white
-[sci-shield]: https://img.shields.io/badge/SciPy-654FF0?style=for-the-badge&logo=SciPy&logoColor=whit
+[sci-shield]: https://img.shields.io/badge/SciPy-654FF0?style=for-the-badge&logo=SciPy&logoColor=white
+[logo]: https://repository-images.githubusercontent.com/616501925/3051c914-b18a-42ab-96e1-96d6fb7e2b81
+[logo-url]: https://github.com/Acbarakat/CrystalVision
