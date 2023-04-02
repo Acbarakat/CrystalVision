@@ -8,9 +8,9 @@ Attributes:
 
 Todo:
     * Archive all image data
-    * Fill data with missing Opus XVII Starter cards
     * Fill data with missing Anniversary Only cards
     * Mist Dragon (Full Art) is missing
+    * Add Illustrator data (http://www.square-enix-shop.com/jp/ff-tcg/card/illust_index.html)
 
 """
 import asyncio
