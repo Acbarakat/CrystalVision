@@ -44,10 +44,11 @@ def download_and_save() -> dict:
     codes = set()
     duplicates = []
     for idx, c in enumerate(data["cards"]):
-        if c["Code"] in codes:
-            duplicates.append((idx, c["Code"]))
+        key = "Code" if "Code" in c else "code"
+        if c[key] in codes:
+            duplicates.append((idx, c[key]))
         else:
-            codes.add(c["Code"])
+            codes.add(c[key])
         for d in ("thumbs", "full"):
             extra = []
             for v in c["images"][d]:
