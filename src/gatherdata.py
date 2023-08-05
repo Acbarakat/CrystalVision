@@ -154,38 +154,39 @@ async def main() -> None:
     cleared_codes = []
     images = []
     for d in data["cards"]:
+        key = "Code" if "Code" in d else "code"
         # Ignore Boss Deck, Crystal Cards
-        if d["Code"].startswith("B-") or d["Code"].startswith("C-"):
+        if d[key].startswith("B-") or d[key].startswith("C-"):
             continue
 
-        rows = df.query(f"Code == '{d['Code']}' or (Code.str.endswith('/{d['Code']}') and Code.str.startswith('PR'))")
-        if rows.empty and d["Code"] not in cleared_codes:
-            raise Exception(f"Can't find '{d['Code']}'")
-        cleared_codes.append(d["Code"])
-        df.query(f"Code != '{d['Code']}'", inplace=True)
-        df.query(f"~(Code.str.endswith('/{d['Code']}') and Code.str.startswith('PR'))", inplace=True)
+        rows = df.query(f"Code == '{d[key]}' or (Code.str.endswith('/{d[key]}') and Code.str.startswith('PR'))")
+        if rows.empty and d[key] not in cleared_codes:
+            raise Exception(f"Can't find '{d[key]}'")
+        cleared_codes.append(d[key])
+        df.query(f"Code != '{d[key]}'", inplace=True)
+        df.query(f"~(Code.str.endswith('/{d[key]}') and Code.str.startswith('PR'))", inplace=True)
 
         for idx, row in rows.iterrows():
             img_loc = row['image']
             if "_FL" in img_loc:
-                fname = f"{d['Code'].split('/')[0]}_FL_jp.jpg"
+                fname = f"{d[key].split('/')[0]}_FL_jp.jpg"
             elif img_loc.startswith("pr/"):
-                fname = f"{d['Code'].split('/')[0]}_PR_jp.jpg"
+                fname = f"{d[key].split('/')[0]}_PR_jp.jpg"
             else:
-                fname = f"{d['Code'].split('/')[0]}_jp.jpg"
+                fname = f"{d[key].split('/')[0]}_jp.jpg"
 
             d["images"]["thumbs"].append(f"http://www.square-enix-shop.com/jp/ff-tcg/card/cimg/thumb/{fname}")
             images.append(download_image(f"http://www.square-enix-shop.com/jp/ff-tcg/card/cimg/thumb/{img_loc}",
-                                        "thumb",
-                                        fname,
-                                        resize=(179, 250),
-                                        crop=(0, 0, 143, 200)))
+                                         "thumb",
+                                         fname,
+                                         resize=(179, 250),
+                                         crop=(0, 0, 143, 200)))
 
             d["images"]["full"].append(f"http://www.square-enix-shop.com/jp/ff-tcg/card/cimg/large/{fname}")
             images.append(download_image(f"http://www.square-enix-shop.com/jp/ff-tcg/card/cimg/large/{img_loc}",
-                                        "img",
-                                        fname,
-                                        resize=(429, 600)))
+                                         "img",
+                                         fname,
+                                         resize=(429, 600)))
 
     # Remainder of Cards
     print(df)
