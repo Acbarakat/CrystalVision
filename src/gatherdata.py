@@ -39,7 +39,10 @@ def download_and_save() -> dict:
         data = url.json()
 
     with open(os.path.join(".", "src", "missing_cards.json")) as fp:
-        data["cards"].extend(json.load(fp))
+        missing_cards = json.load(fp)
+        for card in missing_cards:
+            card = {key.lower(): value for key, value in card.items()}
+            data["cards"].append(card)
 
     codes = set()
     duplicates = []
@@ -56,6 +59,7 @@ def download_and_save() -> dict:
                     extra.append(v.replace("_eg.jpg", f"{lang}.jpg").replace("_eg_", f"{lang}_"))
 
             c["images"][d] += extra
+        if "image" in c: del c["image"]
 
     if duplicates:
         for d, code in duplicates[::-1]:
@@ -140,16 +144,27 @@ async def main() -> None:
     for card in data["cards"]:
         thumb_urls += card["images"]["thumbs"]
 
-    images = asyncio.gather(*[download_image(thumb_url, "thumb") for thumb_url in thumb_urls])
+    images = asyncio.gather(*[
+        download_image(thumb_url, "thumb") for thumb_url in thumb_urls
+    ])
     await images
     print(images)
 
     df = pd.read_table("http://www.square-enix-shop.com/jp/ff-tcg/card/data/list_card.txt", header=None)
-    df.rename({0: "Code", 1: "Element", 2: "Name", 7: "image"}, axis=1, inplace=True)
+    df.rename({
+        0: "Code",
+        1: "Element",
+        2: "Name",
+        7: "image"
+    }, axis=1, inplace=True)
 
     # Special case flip
-    df.replace({"Code": "PR-051/11-083R"}, {"Code": "11-083R/PR-051"}, inplace=True)
-    df.replace({"Code": "PR-055/11-062R"}, {"Code": "11-062R/PR-055"}, inplace=True)
+    df.replace({"Code": "PR-051/11-083R"},
+               {"Code": "11-083R/PR-051"},
+               inplace=True)
+    df.replace({"Code": "PR-055/11-062R"},
+               {"Code": "11-062R/PR-055"},
+               inplace=True)
 
     cleared_codes = []
     images = []
@@ -174,6 +189,8 @@ async def main() -> None:
                 fname = f"{d[key].split('/')[0]}_PR_jp.jpg"
             else:
                 fname = f"{d[key].split('/')[0]}_jp.jpg"
+
+            if "image" in d: del d["image"]
 
             d["images"]["thumbs"].append(f"http://www.square-enix-shop.com/jp/ff-tcg/card/cimg/thumb/{fname}")
             images.append(download_image(f"http://www.square-enix-shop.com/jp/ff-tcg/card/cimg/thumb/{img_loc}",

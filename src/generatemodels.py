@@ -34,9 +34,11 @@ def make_database() -> pd.DataFrame:
     df = pd.DataFrame(data)
     df["thumbs"] = df["images"].apply(lambda i: [j.split("/")[-1] for j in i["thumbs"]])
     df["images"] = df["images"].apply(lambda i: [j.split("/")[-1] for j in i["full"]])
-    df["Ex_Burst"] = df["Ex_Burst"].apply(lambda i: i == "\u25cb").astype(bool)
-    df["Element"] = df["Element"].str.replace("/", "_")
-    df["Power"] = df['Power'].str.replace(" ", "").replace("\u2015", "").replace("\uff0d", "")
+    df["ex_burst"] = df["ex_burst"].apply(lambda i: i == "\u25cb" or i == "1").astype(bool)
+    df["multicard"] = df["multicard"].apply(lambda i: i == "\u25cb" or i == "1").astype(bool)
+    df["element"] = df["element"].str.join("_")
+    df["power"] = df["power"].str.replace(" ", "").replace("\u2015", "").replace("\uff0d", "")
+    print(df.columns)
 
     return df
 
@@ -46,7 +48,7 @@ def make_model(train_ds: tf.data.Dataset,
                image_shape: tuple,
                label_count: int,
                model_type: str="resnet",
-               epochs: int=30,
+               epochs: int=100,
                seed: typing.Any=None,
                model_name: str="fftcg_model") -> None:
     '''
@@ -69,12 +71,15 @@ def make_model(train_ds: tf.data.Dataset,
     tf.keras.backend.clear_session()
 
     loss = tf.keras.losses.CategoricalCrossentropy()
-    metrics = [tf.keras.metrics.CategoricalAccuracy(name='val_accuracy')]
+    metrics = [tf.keras.metrics.CategoricalAccuracy(name='card_accuracy')]
 
     if model_type == "custom":
         # TODO: A well crafted custom per attribute is required
         model = models.Sequential(name="custom", layers=[
-            layers.Conv2D(64, kernel_size=(3, 3), activation='relu', input_shape=image_shape),
+            layers.Conv2D(16, kernel_size=(3, 3), activation='relu', input_shape=image_shape),
+            # layers.BatchNormalization(),
+            layers.MaxPooling2D(),
+            layers.Conv2D(32, kernel_size=(3, 3), activation='relu'),
             # layers.BatchNormalization(),
             layers.MaxPooling2D(),
             layers.Conv2D(64, kernel_size=(3, 3), activation='relu'),
@@ -83,15 +88,13 @@ def make_model(train_ds: tf.data.Dataset,
             layers.Conv2D(128, kernel_size=(3, 3), activation='relu'),
             # layers.BatchNormalization(),
             layers.MaxPooling2D(),
-            layers.Conv2D(128, kernel_size=(3, 3), activation='relu'),
-            layers.MaxPooling2D(),
             layers.Flatten(),
             layers.Dense(2 ** 8, activation='relu'),
             layers.Dense(2 ** 6, activation='relu'),
             layers.Dense(label_count, activation="softmax")
         ])
-        optimizers = [tf.keras.optimizers.RMSprop()]
-        # optimizer = tf.keras.optimizers.SGD(learning_rate=0.01, nesterov=True)
+        # optimizers = [tf.keras.optimizers.RMSprop()]
+        optimizers = [tf.keras.optimizers.SGD(learning_rate=0.015, momentum=0.9, nesterov=True)]
     elif model_type == "burst":
         model = models.Sequential(name="burst", layers=[
             layers.Conv2D(32, kernel_size=(3, 3), activation='relu', input_shape=image_shape),
@@ -115,7 +118,7 @@ def make_model(train_ds: tf.data.Dataset,
             tf.keras.optimizers.Nadam(),
         ]
         loss = tf.keras.losses.BinaryCrossentropy()
-        metrics = [tf.keras.metrics.BinaryAccuracy(name='val_accuracy')]
+        metrics = [tf.keras.metrics.BinaryAccuracy(name='val_card_accuracy')]
     elif model_type == "cost":
         model = models.Sequential(name="cost", layers=[
             layers.Conv2D(32, kernel_size=(3, 3), activation='relu', input_shape=image_shape),
@@ -186,13 +189,16 @@ def make_model(train_ds: tf.data.Dataset,
         optimizers = [tf.keras.optimizers.SGD(learning_rate=0.01, momentum=0.9, nesterov=True)]
     elif model_type == "resnet":
         model = applications.ResNet50V2(weights=None, input_shape=image_shape, classes=label_count)
-        optimizers = [tf.keras.optimizers.SGD(learning_rate=0.001, momentum=0.9, nesterov=True)]
+        optimizers = [
+            # tf.keras.optimizers.Adam(),
+            # tf.keras.optimizers.RMSprop(),
+            tf.keras.optimizers.SGD(learning_rate=0.05, momentum=0.9, nesterov=True)
+        ]
     else:
         raise RuntimeError(f"model_type '{model_type}' is not supported")
 
     callbacks = [
-        # tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=3),
-        tf.keras.callbacks.EarlyStopping(monitor='val_accuracy',
+        tf.keras.callbacks.EarlyStopping(monitor='val_card_accuracy',
                                          min_delta=0.0025,
                                          patience=4,
                                          restore_best_weights=True),
@@ -210,7 +216,8 @@ def make_model(train_ds: tf.data.Dataset,
         model.fit(train_ds,
                 epochs=epochs,
                 validation_data=validation_ds,
-                callbacks=callbacks)
+                callbacks=callbacks
+                )
 
         if idx > 0:
             model.save(os.path.join(DATA_DIR, "model", f"{model_name}_{idx + 1}"))
@@ -271,6 +278,7 @@ def generate(df: pd.DataFrame,
             (default is False)
     '''
     codes, uniques = df[key].factorize()
+    print(df.iloc[0])
 
     X_train, X_test, y_train, y_test = train_test_split(df[image_key],
                                                         codes,
@@ -385,30 +393,30 @@ def main(image: str="thumbs",
     # df["Class"] = df['thumbs'].apply(lambda x: 'Full Art' if '_fl' in x.lower() else '')
 
     # Ignore Crystal Tokens
-    df = df.query("Type_EN != 'Crystal'")
+    df.query("type_en != 'Crystal'", inplace=True)
 
     # Ignore Boss Deck cards
-    df = df.query("Rarity != 'B'")  
+    df.query("rarity != 'B'", inplace=True)
 
     # Ignore Full Art Cards
-    df = df.query(f"~{image}.str.contains('_FL') and ~{image}.str.contains('_2_')")
+    df.query(f"~{image}.str.contains('_FL') and ~{image}.str.contains('_2_')", inplace=True)
 
-    # Ignore Promo Cards
-    df = df.query(f"~{image}.str.contains('_PR')")
+    # Ignore Promo Cards, they tend to be Full Art
+    df.query(f"~{image}.str.contains('_PR')", inplace=True)
 
     # Ignore
-    df = df.query(f"~{image}.str.contains('_premium')")
+    df.query(f"~{image}.str.contains('_premium')", inplace=True)
 
     # Ignore by language
     # df = df.query(f"~{image}.str.contains('_eg')")  # English
-    df = df.query(f"~{image}.str.contains('_fr')")  # French
+    # df = df.query(f"~{image}.str.contains('_fr')")  # French
     # df = df.query(f"~{image}.str.contains('_es')")  # Spanish
-    df = df.query(f"~{image}.str.contains('_it')")  # Italian
-    df = df.query(f"~{image}.str.contains('_de')")  # German
-    df = df.query(f"~{image}.str.contains('_jp')")  # Japanese
+    # df = df.query(f"~{image}.str.contains('_it')")  # Italian
+    # df = df.query(f"~{image}.str.contains('_de')")  # German
+    # df = df.query(f"~{image}.str.contains('_jp')")  # Japanese
 
     # WA: Bad Download/Image from server
-    df = df.query(f"{image} not in ('8-080C_es.jpg', '11-138S_fr.jpg', '12-049H_fr_Premium.jpg', '13-106H_de.jpg')")
+    df.query(f"{image} not in ('8-080C_es.jpg', '11-138S_fr.jpg', '12-049H_fr_Premium.jpg', '13-106H_de.jpg')", inplace=True)
 
     # Source image folder
     df = df.copy()  # WA: for pandas modification on slice
@@ -416,14 +424,17 @@ def main(image: str="thumbs",
         df[image] = os.path.abspath(os.path.join(DATA_DIR, "img")) + os.sep + df[image]
     else:
         df[image] = os.path.abspath(os.path.join(DATA_DIR, "thumb")) + os.sep + df[image]
+    # df[df["Multicard"] == "\u25cb"]["Name_EN"] = "Generic"
+    # df[df["Job_EN"] == "Standard Unit"]["Name_EN"] = "Generic"
+    df.query('multicard != True and job_en != "Standard Unit"', inplace=True)
 
     model_mapping = (
-        # ("Name_EN", ["Name_EN", "Element", "Type_EN"], "resnet", "categorical"),
-        ("Element", ["Element", "Type_EN"], "element", "categorical"),
-        ("Type_EN", ["Type_EN", "Element"], "type_en", "categorical"),
-        ("Cost", ["Cost", "Element"], "cost", "categorical"),
-        ("Power", ["Power", "Type_EN", "Element"], "power", "categorical"),
-        ("Ex_Burst", ["Ex_Burst", "Element", "Type_EN"], "burst", "binary"),
+        ("name_en", ["name_en", "element", "type_en"], "custom", "categorical"),
+        ("element", ["element", "type_en"], "element", "categorical"),
+        ("type_en", ["type_en", "element"], "type_en", "categorical"),
+        ("cost", ["cost", "element"], "cost", "categorical"),
+        # ("power", ["power", "type_en", "element"], "power", "categorical"),
+        # ("ex_burst", ["ex_Burst", "element", "type_en"], "burst", "binary"),
     )
 
     for key, stratify, model_type, label_mode in model_mapping:

@@ -261,6 +261,22 @@ class HardClassVote(HardBinaryVote):
 
 @tf.__internal__.dispatch.add_dispatch_support
 def hard_activation(z: Any, threshold: float = 0.5) -> tf.Tensor:
+    """
+    Hard activation function based on a threshold (default is 0.5).
+
+    For example:
+
+    >>> a = tf.constant([-.5, -.1, 0.0, .1, .5], dtype = tf.float32)
+    >>> b = hard_activation(a)
+    >>> b.numpy()
+    array([0., 0.,  0.,  0.,  1.], dtype=float32)
+
+    Args:
+        x: Input tensor.
+
+    Returns:
+        All values either 0 or 1 based on the threshold
+    """
     return K.cast(K.greater_equal(z, threshold), tf.dtypes.int32)
 
 

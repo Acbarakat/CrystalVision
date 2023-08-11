@@ -1,7 +1,7 @@
 [
     {
         "Code": "17-131S",
-        "Element": "\u706b",
+        "Element": ["\u706b"],
         "Rarity": "S",
         "Cost": "3",
         "Power": "7000",
@@ -49,7 +49,7 @@
     },
     {
         "Code": "17-132S",
-        "Element": "\u706b",
+        "Element": ["\u706b"],
         "Rarity": "S",
         "Cost": "5",
         "Power": "9000",
@@ -99,7 +99,7 @@
     },
     {
         "Code": "17-133S",
-        "Element": "\u571f",
+        "Element": ["\u571f"],
         "Rarity": "S",
         "Cost": "2",
         "Power": "5000",
@@ -149,7 +149,7 @@
     },
     {
         "Code": "17-134S",
-        "Element": "\u571f",
+        "Element": ["\u571f"],
         "Rarity": "S",
         "Cost": "4",
         "Power": "8000",
@@ -197,7 +197,7 @@
     },
     {
         "Code": "17-135S",
-        "Element": "\u96f7",
+        "Element": ["\u96f7"],
         "Rarity": "S",
         "Cost": "4",
         "Power": "8000",
@@ -245,7 +245,7 @@
     },
     {
         "Code": "17-136S",
-        "Element": "\u96f7",
+        "Element": ["\u96f7"],
         "Rarity": "S",
         "Cost": "3",
         "Power": "7000",
@@ -295,7 +295,7 @@
     },
     {
         "Code": "17-137S",
-        "Element": "\u6c34",
+        "Element": ["\u6c34"],
         "Rarity": "S",
         "Cost": "3",
         "Power": "5000",
@@ -343,7 +343,7 @@
     },
     {
         "Code": "17-138S",
-        "Element": "\u6c34",
+        "Element": ["\u6c34"],
         "Rarity": "S",
         "Cost": "4",
         "Power": "8000",
@@ -391,7 +391,7 @@
     },
     {
         "Code": "17-139S",
-        "Element": "\u5149",
+        "Element": ["\u5149"],
         "Rarity": "S",
         "Cost": "3",
         "Power": "8000",
@@ -441,7 +441,7 @@
     },
     {
         "Code": "17-140S",
-        "Element": "\u95c7",
+        "Element": ["\u95c7"],
         "Rarity": "S",
         "Cost": "6",
         "Power": "9000",
