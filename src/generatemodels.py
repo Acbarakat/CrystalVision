@@ -8,7 +8,7 @@ Todo:
 """
 import os
 import json
-import typing
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -48,7 +48,7 @@ def make_model(train_ds: tf.data.Dataset,
                label_count: int,
                model_type: str="resnet",
                epochs: int=100,
-               seed: typing.Any=None,
+               seed: Any=None,
                model_name: str="fftcg_model") -> None:
     '''
     Create and save model
@@ -94,6 +94,26 @@ def make_model(train_ds: tf.data.Dataset,
         ])
         # optimizers = [tf.keras.optimizers.RMSprop()]
         optimizers = [tf.keras.optimizers.SGD(learning_rate=0.015, momentum=0.9, nesterov=True)]
+    elif model_type == "name":
+        model = models.Sequential(name="name", layers=[
+            layers.Conv2D(64, kernel_size=(3, 3), activation='relu', input_shape=image_shape),
+            # layers.BatchNormalization(),
+            layers.MaxPooling2D(),
+            layers.Conv2D(64, kernel_size=(3, 3), activation='relu'),
+            # layers.BatchNormalization(),
+            layers.MaxPooling2D(),
+            layers.Conv2D(128, kernel_size=(3, 3), activation='relu'),
+            # layers.BatchNormalization(),
+            layers.MaxPooling2D(),
+            layers.Conv2D(128, kernel_size=(3, 3), activation='relu'),
+            # layers.BatchNormalization(),
+            layers.MaxPooling2D(),
+            layers.Flatten(),
+            layers.Dense(2 ** 8, activation='relu'),
+            layers.Dense(2 ** 6, activation='relu'),
+            layers.Dense(label_count, activation="softmax")
+        ])
+        optimizers = [tf.keras.optimizers.RMSprop()]
     elif model_type == "burst":
         model = models.Sequential(name="burst", layers=[
             layers.Conv2D(32, kernel_size=(3, 3), activation='relu', input_shape=image_shape),
@@ -232,7 +252,7 @@ def generate(df: pd.DataFrame,
              label_mode: str='categorical',
              batch_size: int=32,
              shuffle: bool=True,
-             seed: typing.Any=None,
+             seed: Any=None,
              interpolation: str="bilinear",
              crop_to_aspect_ratio: bool=False) -> None:
     '''
@@ -362,7 +382,7 @@ def generate(df: pd.DataFrame,
 
 
 def main(image: str="thumbs",
-         seed: typing.Any=None,
+         seed: Any=None,
          interpolation: str="bilinear",
          default_model_type: str="resnet") -> None:
     '''
@@ -406,11 +426,11 @@ def main(image: str="thumbs",
 
     # Ignore by language
     # df = df.query(f"~{image}.str.contains('_eg')")  # English
-    # df = df.query(f"~{image}.str.contains('_fr')")  # French
+    df = df.query(f"~{image}.str.contains('_fr')")  # French
     # df = df.query(f"~{image}.str.contains('_es')")  # Spanish
-    # df = df.query(f"~{image}.str.contains('_it')")  # Italian
-    # df = df.query(f"~{image}.str.contains('_de')")  # German
-    # df = df.query(f"~{image}.str.contains('_jp')")  # Japanese
+    df = df.query(f"~{image}.str.contains('_it')")  # Italian
+    df = df.query(f"~{image}.str.contains('_de')")  # German
+    df = df.query(f"~{image}.str.contains('_jp')")  # Japanese
 
     # WA: Bad Download/Image from server
     df.query(f"{image} not in ('8-080C_es.jpg', '11-138S_fr.jpg', '12-049H_fr_Premium.jpg', '13-106H_de.jpg')", inplace=True)
@@ -426,7 +446,7 @@ def main(image: str="thumbs",
     df.query('multicard != True and job_en != "Standard Unit"', inplace=True)
 
     model_mapping = (
-        ("name_en", ["name_en", "element", "type_en"], "custom", "categorical"),
+        ("name_en", ["name_en", "element", "type_en"], "name", "categorical"),
         ("element", ["element", "type_en"], "element", "categorical"),
         ("type_en", ["type_en", "element"], "type_en", "categorical"),
         ("cost", ["cost", "element"], "cost", "categorical"),
