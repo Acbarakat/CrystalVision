@@ -38,7 +38,6 @@ def make_database() -> pd.DataFrame:
     df["multicard"] = df["multicard"].apply(lambda i: i == "\u25cb" or i == "1").astype(bool)
     df["element"] = df["element"].str.join("_")
     df["power"] = df["power"].str.replace(" ", "").replace("\u2015", "").replace("\uff0d", "")
-    print(df.columns)
 
     return df
 
@@ -214,10 +213,9 @@ def make_model(train_ds: tf.data.Dataset,
         print(model.name)
 
         model.fit(train_ds,
-                epochs=epochs,
-                validation_data=validation_ds,
-                callbacks=callbacks
-                )
+                  epochs=epochs,
+                  validation_data=validation_ds,
+                  callbacks=callbacks)
 
         if idx > 0:
             model.save(os.path.join(DATA_DIR, "model", f"{model_name}_{idx + 1}"))
@@ -278,7 +276,6 @@ def generate(df: pd.DataFrame,
             (default is False)
     '''
     codes, uniques = df[key].factorize()
-    print(df.iloc[0])
 
     X_train, X_test, y_train, y_test = train_test_split(df[image_key],
                                                         codes,
@@ -310,9 +307,9 @@ def generate(df: pd.DataFrame,
     else:
         if shuffle:
             training_dataset = training_dataset.shuffle(buffer_size=1024, seed=seed)
-    
+
     training_dataset = training_dataset.map(tf.autograph.experimental.do_not_convert(lambda x, y: (preprocess_layer(x), y)))
-    flipped_training_dataset= training_dataset.map(lambda x, y: (tf.image.flip_up_down(x), y))
+    flipped_training_dataset = training_dataset.map(lambda x, y: (tf.image.flip_up_down(x), y))
     training_dataset = training_dataset.concatenate(flipped_training_dataset)
 
     training_dataset.class_names = uniques.tolist()
