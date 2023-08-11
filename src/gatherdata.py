@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Gather card API data and download images
+Gather card API data and download images.
 
 Attributes:
     DATA_DIR (str): The root data folder
@@ -28,13 +28,12 @@ CARD_API_FILEPATH = os.path.join(DATA_DIR, "cards.json")
 
 
 def download_and_save() -> dict:
-    '''
+    """
     Download and return FFTCG Card data.
 
     Returns:
         dict: a json/dict of FFTCG Card API
-    '''
-
+    """
     with requests.get("https://fftcg.square-enix-games.com/en/get-cards") as url:
         data = url.json()
 
@@ -80,12 +79,12 @@ async def download_image(img_url: str,
                          fname: typing.Any=None,
                          crop: typing.Any=None,
                          resize: typing.Any=None) -> str:
-    '''
+    """
     Download image and return on-disk destination.
 
     Args:
         img_url (str): The URL of the image
-        subfolder (str): The subfolder location the image 
+        subfolder (str): The subfolder location the image
             will downloaded into
             (default is 'img')
         fname (str): The name of the image
@@ -97,7 +96,7 @@ async def download_image(img_url: str,
 
     Returns:
         str: the on-disk filepath of downloaded image
-    '''
+    """
     if fname is None:
         fname = img_url.split("/")[-1]
     dst = os.path.join(DATA_DIR, subfolder, fname)
@@ -127,9 +126,7 @@ async def download_image(img_url: str,
 
 
 async def main() -> None:
-    '''
-    Download FFTCG API data and download any missing card images
-    '''
+    """Download FFTCG API data and download any missing card images."""
     data = download_and_save()
 
     img_urls = []
