@@ -355,7 +355,10 @@ def main() -> None:
     df.drop([2, 3, 4, 5, 17, 19, 26, 27, 32], inplace=True)
 
     for category in CATEGORIES:
-        comp = df[category] == df[f"{category}_yhat"]
+        key = f"{category}_yhat"
+        if key not in df:
+            continue
+        comp = df[category] == df[key]
         comp = comp.value_counts(normalize=True)
         # print(comp)
 
