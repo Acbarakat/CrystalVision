@@ -35,13 +35,15 @@ from gatherdata import DATA_DIR
 from generatemodels import make_database
 
 CATEGORIES: tuple = (
-    "name_en", "element", "type_en", "cost", "power", "ex_burst"
+    "name_en", "element", "type_en", "cost", "power", "ex_burst", "multicard"
 )
 IMAGE_DF: pd.DataFrame = pd.read_json(os.path.join(os.path.dirname(__file__),
                                                    "testmodels.json"))
 
 
 class MyEnsembleVoteClassifier(EnsembleVoteClassifier):
+    """Custom ensemble voting classifier class."""
+
     def __init__(self,
                  clfs,
                  voting: str = "hard",
@@ -51,6 +53,19 @@ class MyEnsembleVoteClassifier(EnsembleVoteClassifier):
                  fit_base_estimators: bool = False,
                  activation: Callable | None = None,
                  activation_kwargs: dict | None = None):
+        """
+        _summary_
+
+        Args:
+            clfs (_type_): _description_
+            voting (str, optional): _description_. Defaults to "hard".
+            weights (Any | None, optional): _description_. Defaults to None.
+            verbose (int, optional): _description_. Defaults to 0.
+            use_clones (bool, optional): _description_. Defaults to True.
+            fit_base_estimators (bool, optional): _description_. Defaults to False.
+            activation (Callable | None, optional): _description_. Defaults to None.
+            activation_kwargs (dict | None, optional): _description_. Defaults to None.
+        """
         super().__init__(clfs,
                          voting,
                          weights,
@@ -227,6 +242,8 @@ IMAGES = np.array([tf.image.resize(image, (250, 179)) for image in IMAGES])
 
 
 class HardBinaryVote(Layer):
+    """Hard Binary Voting Layer."""
+
     def __init__(self,
                  trainable=False,
                  name="hard_vote",
@@ -234,13 +251,30 @@ class HardBinaryVote(Layer):
                  dynamic=False,
                  vote_weights: Any | None = None,
                  **kwargs):
+        """_summary_
+
+        Args:
+            trainable (bool, optional): _description_. Defaults to False.
+            name (str, optional): _description_. Defaults to "hard_vote".
+            dtype (_type_, optional): _description_. Defaults to None.
+            dynamic (bool, optional): _description_. Defaults to False.
+            vote_weights (Any | None, optional): _description_. Defaults to None.
+        """
         super().__init__(trainable, name, dtype, dynamic, **kwargs)
         self.vote_weights = None
         if vote_weights is not None:
             self.vote_weights = tf.convert_to_tensor(vote_weights,
                                                      name="votes")
 
-    def call(self, inputs):
+    def call(self, inputs: Any):
+        """_summary_
+
+        Args:
+            inputs (Any): _description_
+
+        Returns:
+            _type_: _description_
+        """
         inputs = K.transpose(inputs)
 
         return K.tf.map_fn(
@@ -250,7 +284,17 @@ class HardBinaryVote(Layer):
 
 
 class HardClassVote(HardBinaryVote):
-    def call(self, inputs):
+    """Hard Classifer Voting Layer."""
+
+    def call(self, inputs: Any):
+        """_summary_
+
+        Args:
+            inputs (Any): _description_
+
+        Returns:
+            _type_: _description_
+        """
         inputs = K.transpose(K.cast(K.argmax(inputs), 'int32'))
 
         return K.tf.map_fn(
@@ -293,10 +337,19 @@ def test_models() -> pd.DataFrame:
         ImageData dataframe with yhat(s)
     """
     df: pd.DataFrame = IMAGE_DF.copy().set_index('code')
-    cols = ["name_en", "element", "type_en", "cost", "power", "ex_burst"]
+    cols = [
+        "name_en",
+        "element",
+        "type_en",
+        "cost",
+        "power",
+        "ex_burst",
+        "multicard"
+    ]
     mdf: pd.DataFrame = make_database().set_index('code')[cols]
     df = df.merge(mdf, on="code", how='left', sort=False)
     df['ex_burst'] = df['ex_burst'].astype('uint8')
+    df['multicard'] = df['multicard'].astype('uint8')
 
     for category in CATEGORIES:
         model_path = os.path.join(DATA_DIR, "model", f"{category}_model")
@@ -311,14 +364,14 @@ def test_models() -> pd.DataFrame:
             load_model(model_path) for model_path in iglob(model_path + "*")
         ]
         ensemble_path = os.path.join(DATA_DIR, "model", f"{category}_ensemble")
-        if category in ("ex_burst", "cost"):
+        if category in ("ex_burst", "cost", "multicard"):
             # if os.path.exists(ensemble_path):
             #   model = tf.keras.models.load_model(ensemble_path)
             #   x = model(IMAGES, training=False)
             #   if category != "Ex_Burst":
             #       x = [labels[y] for y in x]
             # else:
-            if category == "ex_burst":
+            if category in ("ex_burst", "multicard"):
                 voting = MyEnsembleVoteClassifier(models,
                                                   weights=[1, 1, 3, 1, 1],
                                                   activation=hard_activation,

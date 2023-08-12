@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Generate various models
+Generate various models.
 
 Todo:
     * Find more varied data, such as off-center or card with background
@@ -22,12 +22,12 @@ from gatherdata import CARD_API_FILEPATH, DATA_DIR
 
 
 def make_database() -> pd.DataFrame:
-    '''
-    Load card data and clean up any issue found in the API
+    """
+    Load card data and clean up any issue found in the API.
 
     Returns:
         Card API dataframe
-    '''
+    """
     with open(CARD_API_FILEPATH) as fp:
         data = json.load(fp)["cards"]
 
@@ -46,12 +46,12 @@ def make_model(train_ds: tf.data.Dataset,
                validation_ds: tf.data.Dataset,
                image_shape: tuple,
                label_count: int,
-               model_type: str="resnet",
-               epochs: int=100,
-               seed: Any=None,
-               model_name: str="fftcg_model") -> None:
-    '''
-    Create and save model
+               model_type: str = "resnet",
+               epochs: int = 100,
+               seed: Any = None,
+               model_name: str = "fftcg_model") -> None:
+    """
+    Create and save model.
 
     Args:
         train_ds (tf.data.Dataset): Training data
@@ -66,7 +66,7 @@ def make_model(train_ds: tf.data.Dataset,
             and dropouts.
         model_name (str): The name of the model
             (default is `fftcg_model`)
-    '''
+    """
     tf.keras.backend.clear_session()
 
     loss = tf.keras.losses.CategoricalCrossentropy()
@@ -94,8 +94,8 @@ def make_model(train_ds: tf.data.Dataset,
         ])
         # optimizers = [tf.keras.optimizers.RMSprop()]
         optimizers = [tf.keras.optimizers.SGD(learning_rate=0.015, momentum=0.9, nesterov=True)]
-    elif model_type == "name":
-        model = models.Sequential(name="name", layers=[
+    elif model_type == "name_en":
+        model = models.Sequential(name="name_en", layers=[
             layers.Conv2D(64, kernel_size=(3, 3), activation='relu', input_shape=image_shape),
             # layers.BatchNormalization(),
             layers.MaxPooling2D(),
@@ -114,8 +114,8 @@ def make_model(train_ds: tf.data.Dataset,
             layers.Dense(label_count, activation="softmax")
         ])
         optimizers = [tf.keras.optimizers.RMSprop()]
-    elif model_type == "burst":
-        model = models.Sequential(name="burst", layers=[
+    elif model_type in ("burst", "multicard"):
+        model = models.Sequential(name=model_type, layers=[
             layers.Conv2D(32, kernel_size=(3, 3), activation='relu', input_shape=image_shape),
             layers.MaxPooling2D(),
             layers.Conv2D(64, kernel_size=(3, 3), activation='relu'),
@@ -158,7 +158,9 @@ def make_model(train_ds: tf.data.Dataset,
             tf.keras.optimizers.Adam(amsgrad=True),
             tf.keras.optimizers.Adam(amsgrad=False),
             tf.keras.optimizers.Nadam(),
-            tf.keras.optimizers.SGD(learning_rate=0.01, momentum=0.9, nesterov=True),
+            tf.keras.optimizers.SGD(learning_rate=0.01,
+                                    momentum=0.9,
+                                    nesterov=True),
         ]
     elif model_type == "power":
         model = models.Sequential(name="power", layers=[
@@ -238,25 +240,29 @@ def make_model(train_ds: tf.data.Dataset,
                   callbacks=callbacks)
 
         if idx > 0:
-            model.save(os.path.join(DATA_DIR, "model", f"{model_name}_{idx + 1}"))
+            model.save(os.path.join(DATA_DIR,
+                                    "model",
+                                    f"{model_name}_{idx + 1}"))
         else:
-            model.save(os.path.join(DATA_DIR, "model", model_name))
+            model.save(os.path.join(DATA_DIR,
+                                    "model",
+                                    model_name))
 
 
 def generate(df: pd.DataFrame,
              key: str,
              image_key: str,
              stratify: list,
-             model_type: str="resnet",
-             image_size: tuple=(250, 179),
-             label_mode: str='categorical',
-             batch_size: int=32,
-             shuffle: bool=True,
-             seed: Any=None,
-             interpolation: str="bilinear",
-             crop_to_aspect_ratio: bool=False) -> None:
-    '''
-    Create and save model and catergory data
+             model_type: str = "resnet",
+             image_size: tuple = (250, 179),
+             label_mode: str = 'categorical',
+             batch_size: int = 32,
+             shuffle: bool = True,
+             seed: Any = None,
+             interpolation: str = "bilinear",
+             crop_to_aspect_ratio: bool = False) -> None:
+    """
+    Create and save model and catergory data.
 
     Args:
         df (pd.DataFrame): All card information
@@ -294,7 +300,7 @@ def generate(df: pd.DataFrame,
             largest possible window in the image (of size `image_size`) that matches
             the target aspect ratio.
             (default is False)
-    '''
+    """
     codes, uniques = df[key].factorize()
 
     X_train, X_test, y_train, y_test = train_test_split(df[image_key],
@@ -381,12 +387,12 @@ def generate(df: pd.DataFrame,
                label_count=len(uniques))
 
 
-def main(image: str="thumbs",
-         seed: Any=None,
-         interpolation: str="bilinear",
-         default_model_type: str="resnet") -> None:
-    '''
-    Create and save all models based on card data
+def main(image: str = "thumbs",
+         seed: Any = None,
+         interpolation: str = "bilinear",
+         default_model_type: str = "resnet") -> None:
+    """
+    Create and save all models based on card data.
 
     Args:
         image (str): The column to explode containing lists of image sources.
@@ -401,7 +407,7 @@ def main(image: str="thumbs",
           - 'custom': Custom model, using RMSprop optimizer, and 1/255 scale preprocessor.
           - 'resnet' ResNet50V2, using SGD optimizer, and ResnetV2 preprocessor.
           (default is `resnet`)
-    '''
+    """
     if seed is None:
         seed = np.random.randint(1e6)
     interpolation = image_utils.get_interpolation(interpolation)
@@ -416,7 +422,8 @@ def main(image: str="thumbs",
     df.query("rarity != 'B'", inplace=True)
 
     # Ignore Full Art Cards
-    df.query(f"~{image}.str.contains('_FL') and ~{image}.str.contains('_2_')", inplace=True)
+    df.query(f"~{image}.str.contains('_FL') and ~{image}.str.contains('_2_')",
+             inplace=True)
 
     # Ignore Promo Cards, they tend to be Full Art
     df.query(f"~{image}.str.contains('_PR')", inplace=True)
@@ -430,7 +437,7 @@ def main(image: str="thumbs",
     # df = df.query(f"~{image}.str.contains('_es')")  # Spanish
     df = df.query(f"~{image}.str.contains('_it')")  # Italian
     df = df.query(f"~{image}.str.contains('_de')")  # German
-    df = df.query(f"~{image}.str.contains('_jp')")  # Japanese
+    # df = df.query(f"~{image}.str.contains('_jp')")  # Japanese
 
     # WA: Bad Download/Image from server
     df.query(f"{image} not in ('8-080C_es.jpg', '11-138S_fr.jpg', '12-049H_fr_Premium.jpg', '13-106H_de.jpg')", inplace=True)
@@ -443,15 +450,16 @@ def main(image: str="thumbs",
         df[image] = os.path.abspath(os.path.join(DATA_DIR, "thumb")) + os.sep + df[image]
     # df[df["Multicard"] == "\u25cb"]["Name_EN"] = "Generic"
     # df[df["Job_EN"] == "Standard Unit"]["Name_EN"] = "Generic"
-    df.query('multicard != True and job_en != "Standard Unit"', inplace=True)
+    # df.query('multicard != True and job_en != "Standard Unit"', inplace=True)
 
     model_mapping = (
-        ("name_en", ["name_en", "element", "type_en"], "name", "categorical"),
-        ("element", ["element", "type_en"], "element", "categorical"),
-        ("type_en", ["type_en", "element"], "type_en", "categorical"),
-        ("cost", ["cost", "element"], "cost", "categorical"),
+        # ("name_en", ["name_en", "element", "type_en"], "name_en", "categorical"),
+        # ("element", ["element", "type_en"], "element", "categorical"),
+        # ("type_en", ["type_en", "element"], "type_en", "categorical"),
+        # ("cost", ["cost", "element"], "cost", "categorical"),
         # ("power", ["power", "type_en", "element"], "power", "categorical"),
-        # ("ex_burst", ["ex_Burst", "element", "type_en"], "burst", "binary"),
+        ("ex_burst", ["ex_burst", "element", "type_en"], "burst", "binary"),
+        ("multicard", ["multicard", "element", "type_en"], "multicard", "binary"),
     )
 
     for key, stratify, model_type, label_mode in model_mapping:
