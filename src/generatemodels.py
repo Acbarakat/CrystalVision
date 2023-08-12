@@ -8,7 +8,7 @@ Todo:
 """
 import os
 import json
-from typing import Any
+from typing import Any, Tuple
 
 import numpy as np
 import pandas as pd
@@ -189,7 +189,7 @@ def make_model(train_ds: tf.data.Dataset,
             layers.Conv2D(128, kernel_size=(3, 3), activation='relu'),
             layers.Flatten(),
             layers.Dense(2 ** 8, activation='relu'),
-            # layers.Dropout(0.2),
+            layers.Dropout(0.2),
             layers.Dense(2 ** 6, activation='relu'),
             # layers.Dropout(0.2),
             layers.Dense(label_count, activation="softmax")
@@ -254,7 +254,7 @@ def generate(df: pd.DataFrame,
              image_key: str,
              stratify: list,
              model_type: str = "resnet",
-             image_size: tuple = (250, 179),
+             image_size: Tuple[int, int] = (250, 179),
              label_mode: str = 'categorical',
              batch_size: int = 32,
              shuffle: bool = True,
@@ -454,12 +454,12 @@ def main(image: str = "thumbs",
 
     model_mapping = (
         # ("name_en", ["name_en", "element", "type_en"], "name_en", "categorical"),
-        # ("element", ["element", "type_en"], "element", "categorical"),
+        ("element", ["element", "type_en"], "element", "categorical"),
         # ("type_en", ["type_en", "element"], "type_en", "categorical"),
         # ("cost", ["cost", "element"], "cost", "categorical"),
         # ("power", ["power", "type_en", "element"], "power", "categorical"),
-        ("ex_burst", ["ex_burst", "element", "type_en"], "burst", "binary"),
-        ("multicard", ["multicard", "element", "type_en"], "multicard", "binary"),
+        # ("ex_burst", ["ex_burst", "element", "type_en"], "burst", "binary"),
+        # ("multicard", ["multicard", "element", "type_en"], "multicard", "binary"),
     )
 
     for key, stratify, model_type, label_mode in model_mapping:
