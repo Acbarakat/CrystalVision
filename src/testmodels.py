@@ -35,7 +35,7 @@ from gatherdata import DATA_DIR
 from generatemodels import make_database
 
 CATEGORIES: tuple = (
-    "Name_EN", "Element", "Type_EN", "Cost", "Power", "Ex_Burst"
+    "name_en", "element", "type_en", "cost", "power", "ex_burst"
 )
 IMAGE_DF: pd.DataFrame = pd.read_json(os.path.join(os.path.dirname(__file__),
                                                    "testmodels.json"))
@@ -292,14 +292,17 @@ def test_models() -> pd.DataFrame:
     Returns:
         ImageData dataframe with yhat(s)
     """
-    df: pd.DataFrame = IMAGE_DF.copy().set_index('Code')
-    cols = ["Name_EN", "Element", "Type_EN", "Cost", "Power", "Ex_Burst"]
-    mdf: pd.DataFrame = make_database().set_index('Code')[cols]
-    df = df.merge(mdf, on="Code", how='left', sort=False)
-    df['Ex_Burst'] = df['Ex_Burst'].astype('uint8')
+    df: pd.DataFrame = IMAGE_DF.copy().set_index('code')
+    cols = ["name_en", "element", "type_en", "cost", "power", "ex_burst"]
+    mdf: pd.DataFrame = make_database().set_index('code')[cols]
+    df = df.merge(mdf, on="code", how='left', sort=False)
+    df['ex_burst'] = df['ex_burst'].astype('uint8')
 
     for category in CATEGORIES:
         model_path = os.path.join(DATA_DIR, "model", f"{category}_model")
+        if not os.path.exists(model_path):
+            print(f"Cannot find '{model_path}', skipping")
+            continue
 
         with open(os.path.join(model_path, "category.json")) as fp:
             labels = json.load(fp)
@@ -308,14 +311,14 @@ def test_models() -> pd.DataFrame:
             load_model(model_path) for model_path in iglob(model_path + "*")
         ]
         ensemble_path = os.path.join(DATA_DIR, "model", f"{category}_ensemble")
-        if category in ("Ex_Burst", "Cost"):
+        if category in ("ex_burst", "cost"):
             # if os.path.exists(ensemble_path):
             #   model = tf.keras.models.load_model(ensemble_path)
             #   x = model(IMAGES, training=False)
             #   if category != "Ex_Burst":
             #       x = [labels[y] for y in x]
             # else:
-            if category == "Ex_Burst":
+            if category == "ex_burst":
                 voting = MyEnsembleVoteClassifier(models,
                                                   weights=[1, 1, 3, 1, 1],
                                                   activation=hard_activation,
@@ -343,6 +346,7 @@ def test_models() -> pd.DataFrame:
 
 
 def main() -> None:
+    """Test the various models."""
     df = test_models().reset_index()
 
     # Remove the ones we know wont work without:
@@ -353,8 +357,9 @@ def main() -> None:
     for category in CATEGORIES:
         comp = df[category] == df[f"{category}_yhat"]
         comp = comp.value_counts(normalize=True)
+        # print(comp)
 
-        print(f"{category} accuracy: {comp[True] * 100}%%")
+        print(f"{category} accuracy: {comp.get(True, 0.0) * 100}%%")
         # print(xf)
 
     df.sort_index(axis=1, inplace=True)
