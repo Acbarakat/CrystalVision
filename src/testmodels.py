@@ -236,7 +236,7 @@ def load_image(url: str,
     return data[:, :, :3]
 
 
-IMAGES = IMAGE_DF.pop("URI")
+IMAGES = IMAGE_DF.pop("uri")
 IMAGES = [load_image(image, f"{i}.jpg") for i, image in enumerate(IMAGES)]
 IMAGES = np.array([tf.image.resize(image, (250, 179)) for image in IMAGES])
 
