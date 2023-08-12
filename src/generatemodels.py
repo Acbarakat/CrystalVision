@@ -189,7 +189,7 @@ def make_model(train_ds: tf.data.Dataset,
             layers.Conv2D(128, kernel_size=(3, 3), activation='relu'),
             layers.Flatten(),
             layers.Dense(2 ** 8, activation='relu'),
-            layers.Dropout(0.2),
+            layers.Dropout(0.2, seed=seed),
             layers.Dense(2 ** 6, activation='relu'),
             # layers.Dropout(0.2),
             layers.Dense(label_count, activation="softmax")
