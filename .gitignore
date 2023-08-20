@@ -129,8 +129,7 @@ dmypy.json
 .pyre/
 
 # CrystalVision
-data/
-src/data/
+/data/
 img/
 thumb/
 frozen_models/
