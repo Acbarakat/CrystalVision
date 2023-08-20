@@ -38,7 +38,7 @@ def extendDataset(ds: tf.data.Dataset,
                   seed: int | None = None,
                   name: str | None = None,
                   batch_size: int | None = 32,
-                  shuffle: bool = True,
+                  shuffle: bool = False,
                   reshuffle_each_iteration: bool = True,
                   flip_horizontal: bool = False,
                   flip_vertical: bool = True,
@@ -59,8 +59,7 @@ def extendDataset(ds: tf.data.Dataset,
             If `None`, the data will not be batched
             (default is 32)
         shuffle (bool): Whether to shuffle the data.
-            If set to False, sorts the data in alphanumeric order.
-            (default is True)
+            (default is False)
         reshuffle_each_iteration: Whether the shuffle order should
             be different for each epoch
             (default is True)
@@ -100,11 +99,17 @@ def extendDataset(ds: tf.data.Dataset,
         raise NotImplementedError("flip_horizontal")
 
     if flip_vertical:
-        veritcal_ds = ds.map(
+        vertical_ds = ds.map(
             lambda x, y: (tf.image.flip_up_down(x), y),
             name=f"vertical_{name}"
         )
-        ds = ds.concatenate(veritcal_ds)
+        cardinality = ds.cardinality() * 2
+        # ds = ds.concatenate(veritcal_ds)
+        ds = tf.data.Dataset.from_tensor_slices([ds, vertical_ds]).interleave(
+            lambda x: x,
+            cycle_length=2,
+            num_parallel_calls=tf.data.AUTOTUNE,
+        ).apply(tf.data.experimental.assert_cardinality(cardinality))
 
     ds = ds.cache()
 
@@ -138,6 +143,7 @@ def extendDataset(ds: tf.data.Dataset,
         ds = ds.concatenate(effect)
 
     if shuffle:
+        # buffer_size = batch_size * 2 if batch_size else ds.cardinality()
         ds = ds.shuffle(buffer_size=ds.cardinality(),
                         seed=seed,
                         reshuffle_each_iteration=reshuffle_each_iteration,
