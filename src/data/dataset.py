@@ -42,8 +42,8 @@ def extendDataset(ds: tf.data.Dataset,
                   reshuffle_each_iteration: bool = True,
                   flip_horizontal: bool = False,
                   flip_vertical: bool = True,
-                  brightness: float = 0.2,
-                  contrast: Tuple[float] | None = (0.5, 1.25),
+                  brightness: float = 0.1,
+                  contrast: Tuple[float] | None = (0.80, 1.25),
                   saturation: Tuple[float] | None = (0.65, 1.75),
                   hue: float = 0.025) -> tf.data.Dataset:
     """
@@ -69,10 +69,10 @@ def extendDataset(ds: tf.data.Dataset,
             (default is True)
         brightness (float): A delta randomly picked in the interval
             [-max_delta, max_delta) applied across dataset
-            (default is 0.2)
+            (default is 0.1)
         contast (tuple[flost]): a contrast_factor randomly picked
             in the interval [lower, upper) applied across the dataset
-            (default is (0.5, 1.25))
+            (default is (0.80, 1.25))
         saturation (tuple[flost]):  a saturation_factor randomly picked
             in the interval [lower, upper) applied across the dataset
             (default is (0.65, 1.75))
