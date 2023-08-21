@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+import os
 import json
 from typing import Tuple
 
@@ -7,9 +8,9 @@ import tensorflow as tf
 from keras import layers
 
 try:
-    from __init__ import CARD_API_FILEPATH
-except ModuleNotFoundError:
-    from data import CARD_API_FILEPATH
+    from __init__ import CARD_API_FILEPATH, DATA_DIR
+except (ModuleNotFoundError, ImportError):
+    from data import CARD_API_FILEPATH, DATA_DIR
 
 
 def make_database() -> pd.DataFrame:
@@ -17,7 +18,7 @@ def make_database() -> pd.DataFrame:
     Load card data and clean up any issue found in the API.
 
     Returns:
-        Card API dataframe
+        Card API DataFrame
     """
     with open(CARD_API_FILEPATH) as fp:
         data = json.load(fp)["cards"]
@@ -30,6 +31,70 @@ def make_database() -> pd.DataFrame:
     df["mono"] = df["element"].apply(lambda i: len(i) == 1 if i else True).astype(str)
     df["element"] = df["element"].str.join("_")
     df["power"] = df["power"].str.replace(" ", "").replace("\u2015", "").replace("\uff0d", "")
+
+    return df
+
+
+def imagine_database(image="thumbs") -> pd.DataFrame:
+    """
+    Explode the database based on `image` kwarg.
+
+    - Filter out `Crystal` cards
+    - Filter out `Boss` cards
+    - Filter out Full Art cards
+    - Filter out Promo cards
+    - Filter out some language cards
+
+    Args:
+        image (str): The column to explode containing lists of image sources.
+            (default is `thumbs`)
+
+    Returns:
+        Card API DataFrame
+    """
+    assert image in ("thumbs", "images"), f"'{image}' is not valid"
+    df = make_database().explode(image)
+    # df["Class"] = df['thumbs'].apply(lambda x: 'Full Art' if '_fl' in x.lower() else '')
+
+    # Ignore Crystal Tokens
+    df.query("type_en != 'Crystal'", inplace=True)
+
+    # Ignore Boss Deck cards
+    df.query("rarity != 'B'", inplace=True)
+
+    # Ignore Full Art Cards
+    df.query(f"~{image}.str.contains('_FL') and ~{image}.str.contains('_2_')",
+             inplace=True)
+
+    # Ignore Promo Cards, they tend to be Full Art
+    df.query(f"~{image}.str.contains('_PR')", inplace=True)
+
+    # Ignore
+    df.query(f"~{image}.str.contains('_premium')", inplace=True)
+
+    # Ignore by language
+    # df = df.query(f"~{image}.str.contains('_eg')")  # English
+    df = df.query(f"~{image}.str.contains('_fr')")  # French
+    df = df.query(f"~{image}.str.contains('_es')")  # Spanish
+    df = df.query(f"~{image}.str.contains('_it')")  # Italian
+    df = df.query(f"~{image}.str.contains('_de')")  # German
+    df = df.query(f"~{image}.str.contains('_jp')")  # Japanese
+
+    # WA: Bad Download/Image from server
+    df.query(f"{image} not in ('8-080C_es.jpg', '11-138S_fr.jpg', '12-049H_fr_Premium.jpg', '13-106H_de.jpg')", inplace=True)
+
+    # Source image folder
+    df = df.copy()  # WA: for pandas modification on slice
+    if image == "images":
+        image_dir = os.path.abspath(os.path.join(DATA_DIR, "img"))
+        df.rename({"img": "filename"}, axis=1, inplace=True)
+    else:
+        image_dir = os.path.abspath(os.path.join(DATA_DIR, "thumb"))
+        df.rename({"thumbs": "filename"}, axis=1, inplace=True)
+    df["filename"] = image_dir + os.sep + df["filename"]
+    # df[df["Multicard"] == "\u25cb"]["Name_EN"] = "Generic"
+    # df[df["Job_EN"] == "Standard Unit"]["Name_EN"] = "Generic"
+    # df.query('multicard != True and job_en != "Standard Unit"', inplace=True)
 
     return df
 
