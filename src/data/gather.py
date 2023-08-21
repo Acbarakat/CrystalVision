@@ -24,7 +24,7 @@ from PIL import ImageFile, Image
 
 try:
     from __init__ import MISSING_CARDS_FILEPATH, CARD_API_FILEPATH, DATA_DIR
-except ModuleNotFoundError:
+except (ModuleNotFoundError, ImportError):
     from data import MISSING_CARDS_FILEPATH, CARD_API_FILEPATH, DATA_DIR
 
 
