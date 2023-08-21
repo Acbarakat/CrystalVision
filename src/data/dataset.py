@@ -1,4 +1,15 @@
 # -*- coding: utf-8 -*-
+"""
+Getting and transforming dataframes/datasets.
+
+Attributes:
+    SRC_DIR (str): Where the src folder is
+    MODEL_DIR (str): Where the models are stored
+
+Todo:
+    * N/A
+
+"""
 import os
 import json
 from typing import Tuple
