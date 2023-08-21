@@ -177,12 +177,17 @@ class CardModel(RandomSearchTunerMixin, HyperModel):
                 (defaults is 1)
         """
         self.search(train_ds, test_ds, validation_ds)
-        best_models = self.tuner.get_best_models(num_models=num_models)
-        for idx, bm in enumerate(best_models):
+        best_models, best_hparams = (
+            self.tuner.get_best_models(num_models=num_models),
+            self.tuner.get_best_hyperparameters(num_trials=num_models)
+        )
+        print(self.tuner.results_summary())
+        for idx, (bm, bhp) in enumerate(zip(best_models, best_hparams)):
             # print(bm.summary())
             # print(bm.optimizer.get_config())
-            # test_loss, test_acc = bm.evaluate(test_ds)
-            # print('Test accuracy:', test_acc)
+            print(bm.name, bhp.values)
+            test_loss, test_acc = bm.evaluate(test_ds)
+            print('test_loss:', test_loss, "test_accuracy:", test_acc)
             bm.save(os.path.join(MODEL_DIR,
                                  f"{self.name}_{idx + 1}.h5"))
 
