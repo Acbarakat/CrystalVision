@@ -320,5 +320,47 @@
         "foil": 1,
         "focal": 1,
         "uri": "https://www.cardcaverntradingcards.com/cdn/shop/products/The-Demon-20-007L-Dawn-of-Heroes-Foil_500x.png"
+    },
+    {
+        "code": "19-128L",
+        "full_art": 0,
+        "foil": 1,
+        "focal": 1,
+        "uri": "https://www.cardcaverntradingcards.com/cdn/shop/products/Warrior-of-Light-19-128L-From-Nightmares-Foil_500x.png"
+    },
+    {
+        "code": "18-111L",
+        "full_art": 0,
+        "foil": 1,
+        "focal": 1,
+        "uri": "https://www.cardcaverntradingcards.com/cdn/shop/products/Basch_Foil_500x.png"
+    },
+    {
+        "code": "14-125L",
+        "full_art": 0,
+        "foil": 1,
+        "focal": 1,
+        "uri": "https://www.cardcaverntradingcards.com/cdn/shop/products/VaanFoil_238d78e3-6e13-4fe3-a440-3e33ceefd61c_500x.jpg"
+    },
+    {
+        "code": "12-116L",
+        "full_art": 0,
+        "foil": 1,
+        "focal": 1,
+        "uri": "https://www.cardcaverntradingcards.com/cdn/shop/products/LockeFoil_500x.jpg"
+    },
+    {
+        "code": "13-121R",
+        "full_art": 0,
+        "foil": 1,
+        "focal": 1,
+        "uri": "https://www.cardcaverntradingcards.com/cdn/shop/products/Ramza-13-121R-OpusXIII-Foil_500x.png"
+    },
+    {
+        "code": "13-122H",
+        "full_art": 0,
+        "foil": 1,
+        "focal": 1,
+        "uri": "https://www.cardcaverntradingcards.com/cdn/shop/products/AldoreEmperor-13-122H-OpusXIIIFoil_500x.png"
     }
 ]
