@@ -18,7 +18,7 @@ from functools import cached_property
 import tensorflow as tf
 from keras import callbacks, models, losses, metrics
 from keras_tuner import HyperModel, HyperParameter
-from keras_tuner.tuners import RandomSearch
+from keras_tuner.tuners import RandomSearch, Hyperband, BayesianOptimization
 from keras_tuner.engine.tuner import maybe_distribute
 
 
@@ -79,21 +79,10 @@ class MyRandomSearch(RandomSearch):
         return model
 
 
-class RandomSearchTunerMixin:
-    """RandomSearch Tuner Mixin."""
+class TunerMixin:
+    """Base Tuner Mixin."""
 
-    MAX_TRIALS = 20
     MAX_EXECUTIONS = 1
-
-    @cached_property
-    def tuner(self) -> RandomSearch:
-        """Random search tuner."""
-        return MyRandomSearch(self,
-                              objective="val_accuracy",
-                              max_trials=self.MAX_TRIALS,
-                              executions_per_trial=self.MAX_EXECUTIONS,
-                              directory=MODEL_DIR,
-                              project_name=self.name)
 
     def clear_cache(self) -> None:
         """Delete the hypermodel cache."""
@@ -117,7 +106,50 @@ class RandomSearchTunerMixin:
                           callbacks=self.callbacks)
 
 
-class CardModel(RandomSearchTunerMixin, HyperModel):
+class RandomSearchTunerMixin(TunerMixin):
+    """RandomSearch Tuner Mixin."""
+
+    MAX_TRIALS = 20
+
+    @cached_property
+    def tuner(self) -> RandomSearch:
+        """Random search tuner."""
+        return MyRandomSearch(self,
+                              objective="val_accuracy",
+                              max_trials=self.MAX_TRIALS,
+                              executions_per_trial=self.MAX_EXECUTIONS,
+                              directory=MODEL_DIR,
+                              project_name=self.name)
+
+
+class HyperbandTunerMixin(TunerMixin):
+    """Hyperband Tuner Mixin."""
+
+    @cached_property
+    def tuner(self) -> RandomSearch:
+        """Hyperband search tuner."""
+        return Hyperband(self,
+                         objective="val_accuracy",
+                         executions_per_trial=self.MAX_EXECUTIONS,
+                         directory=MODEL_DIR,
+                         project_name=self.name)
+
+
+class BayesianOptimizationTunerMixin(RandomSearchTunerMixin):
+    """Bayesian Optimization Tuner Mixin."""
+
+    @cached_property
+    def tuner(self) -> RandomSearch:
+        """Bayesian Optimization tuner."""
+        return BayesianOptimization(self,
+                                    objective="val_accuracy",
+                                    max_trials=self.MAX_TRIALS,
+                                    executions_per_trial=self.MAX_EXECUTIONS,
+                                    directory=MODEL_DIR,
+                                    project_name=self.name)
+
+
+class CardModel(HyperModel):
     """Base hypermodel for Cards."""
 
     IMAGE_SHAPE: Tuple[int, int, int] = (250, 179, 3)
@@ -186,8 +218,6 @@ class CardModel(RandomSearchTunerMixin, HyperModel):
             # print(bm.summary())
             # print(bm.optimizer.get_config())
             print(bm.name, bhp.values)
-            test_loss, test_acc = bm.evaluate(test_ds)
-            print('test_loss:', test_loss, "test_accuracy:", test_acc)
             bm.save(os.path.join(MODEL_DIR,
                                  f"{self.name}_{idx + 1}.h5"))
 
@@ -229,7 +259,17 @@ class CardModel(RandomSearchTunerMixin, HyperModel):
 
             If return a float, it should be the `objective` value.
         """
-        return model.fit(train_ds,
-                         epochs=epochs,
-                         steps_per_epoch=len(train_ds),
-                         **kwargs)
+        history = model.fit(train_ds,
+                            epochs=epochs,
+                            steps_per_epoch=len(train_ds),
+                            **kwargs)
+        test_loss, test_acc = model.evaluate(testing_data)
+
+        return {
+            "loss": history.history['loss'][-1],
+            "accuracy": history.history['accuracy'][-1],
+            "val_loss": history.history['val_loss'][-1],
+            "val_accuracy": history.history['val_accuracy'][-1],
+            "test_loss": test_loss,
+            "test_accuracy": test_acc,
+        }
