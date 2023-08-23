@@ -43,7 +43,7 @@ def make_database() -> pd.DataFrame:
     return df
 
 
-def imagine_database(image="thumbs") -> pd.DataFrame:
+def imagine_database(image: str = "thumbs") -> pd.DataFrame:
     """
     Explode the database based on `image` kwarg.
 
