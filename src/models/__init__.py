@@ -11,7 +11,9 @@ Todo:
 
 """
 import os
+import json
 import shutil
+import math
 from typing import Tuple, List, Any
 from functools import cached_property
 
@@ -326,6 +328,10 @@ class CardModel(HyperModel):
             bm.save(os.path.join(MODEL_DIR,
                                  f"{self.name}_{idx + 1}.h5"))
 
+        # Save the labels
+        with open(os.path.join(MODEL_DIR, f"{self.name}.json"), "w+") as fp:
+            json.dump(self.labels.to_list(), fp)
+
     def fit(self,
             hp: HyperParameter,
             model: models.Model,
@@ -364,11 +370,14 @@ class CardModel(HyperModel):
 
             If return a float, it should be the `objective` value.
         """
-        history = model.fit(train_ds,
-                            epochs=epochs,
-                            steps_per_epoch=len(train_ds),
-                            **kwargs)
-        test_loss, test_acc = model.evaluate(testing_data)
+        try:
+            history = model.fit(train_ds,
+                                epochs=epochs,
+                                steps_per_epoch=len(train_ds),
+                                **kwargs)
+            test_loss, test_acc = model.evaluate(testing_data)
+        except tf.errors.ResourceExhaustedError:
+            return -math.inf
 
         return {
             "loss": history.history['loss'][-1],
