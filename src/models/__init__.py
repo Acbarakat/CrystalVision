@@ -145,18 +145,43 @@ class HyperbandTunerMixin(TunerMixin):
                          project_name=self.name)
 
 
+class MyBayesianOptimization(BayesianOptimization):
+    """Random search tuner."""
+
+    def load_model(self, trial):
+        """
+        Load a Model from a given trial.
+
+        For models that report intermediate results to the `Oracle`, generally
+        `load_model` should load the best reported `step` by relying of
+        `trial.best_step`.
+
+        Args:
+            trial: A `Trial` instance, the `Trial` corresponding to the model
+                to load.
+        """
+        model = self._try_build(trial.hyperparameters)
+        # Reload best checkpoint.
+        # Only load weights to avoid loading `custom_objects`.
+        with maybe_distribute(self.distribution_strategy):
+            fname = self._get_checkpoint_fname(trial.trial_id)
+            model.load_weights(fname).expect_partial()
+            model._name += f"_trial{trial.trial_id}"
+        return model
+
+
 class BayesianOptimizationTunerMixin(RandomSearchTunerMixin):
     """Bayesian Optimization Tuner Mixin."""
 
     @cached_property
     def tuner(self) -> RandomSearch:
         """Bayesian Optimization tuner."""
-        return BayesianOptimization(self,
-                                    objective="val_accuracy",
-                                    max_trials=self.MAX_TRIALS,
-                                    executions_per_trial=self.MAX_EXECUTIONS,
-                                    directory=MODEL_DIR,
-                                    project_name=self.name)
+        return MyBayesianOptimization(self,
+                                      objective="val_accuracy",
+                                      max_trials=self.MAX_TRIALS,
+                                      executions_per_trial=self.MAX_EXECUTIONS,
+                                      directory=MODEL_DIR,
+                                      project_name=self.name)
 
 
 class CardModel(HyperModel):
@@ -316,11 +341,11 @@ class CardModel(HyperModel):
                 (defaults is 1)
         """
         self.search(train_ds, test_ds, validation_ds)
+        print(self.tuner.results_summary())
         best_models, best_hparams = (
             self.tuner.get_best_models(num_models=num_models),
             self.tuner.get_best_hyperparameters(num_trials=num_models)
         )
-        print(self.tuner.results_summary())
         for idx, (bm, bhp) in enumerate(zip(best_models, best_hparams)):
             # print(bm.summary())
             # print(bm.optimizer.get_config())
