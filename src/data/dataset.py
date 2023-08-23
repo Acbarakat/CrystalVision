@@ -18,10 +18,7 @@ import pandas as pd
 import tensorflow as tf
 from keras import layers
 
-try:
-    from __init__ import CARD_API_FILEPATH, DATA_DIR
-except (ModuleNotFoundError, ImportError):
-    from data import CARD_API_FILEPATH, DATA_DIR
+from data import CARD_API_FILEPATH, DATA_DIR
 
 
 def make_database() -> pd.DataFrame:
@@ -83,14 +80,6 @@ def imagine_database(image="thumbs") -> pd.DataFrame:
     # Ignore
     df.query(f"~{image}.str.contains('_premium')", inplace=True)
 
-    # Ignore by language
-    # df = df.query(f"~{image}.str.contains('_eg')")  # English
-    df = df.query(f"~{image}.str.contains('_fr')")  # French
-    df = df.query(f"~{image}.str.contains('_es')")  # Spanish
-    df = df.query(f"~{image}.str.contains('_it')")  # Italian
-    df = df.query(f"~{image}.str.contains('_de')")  # German
-    df = df.query(f"~{image}.str.contains('_jp')")  # Japanese
-
     # WA: Bad Download/Image from server
     df.query(f"{image} not in ('8-080C_es.jpg', '11-138S_fr.jpg', '12-049H_fr_Premium.jpg', '13-106H_de.jpg')", inplace=True)
 
@@ -103,9 +92,6 @@ def imagine_database(image="thumbs") -> pd.DataFrame:
         image_dir = os.path.abspath(os.path.join(DATA_DIR, "thumb"))
         df.rename({"thumbs": "filename"}, axis=1, inplace=True)
     df["filename"] = image_dir + os.sep + df["filename"]
-    # df[df["Multicard"] == "\u25cb"]["Name_EN"] = "Generic"
-    # df[df["Job_EN"] == "Standard Unit"]["Name_EN"] = "Generic"
-    # df.query('multicard != True and job_en != "Standard Unit"', inplace=True)
 
     return df
 

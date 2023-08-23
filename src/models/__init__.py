@@ -15,11 +15,17 @@ import shutil
 from typing import Tuple, List, Any
 from functools import cached_property
 
+from pandas import DataFrame
 import tensorflow as tf
+from sklearn.model_selection import train_test_split
 from keras import callbacks, models, losses, metrics
+from keras.utils import image_utils
+from keras.utils.image_dataset import paths_and_labels_to_dataset
 from keras_tuner import HyperModel, HyperParameter
 from keras_tuner.tuners import RandomSearch, Hyperband, BayesianOptimization
 from keras_tuner.engine.tuner import maybe_distribute
+
+from data.dataset import extendDataset
 
 
 SRC_DIR = os.path.join(os.path.dirname(__file__), "..")
@@ -154,17 +160,41 @@ class CardModel(HyperModel):
 
     IMAGE_SHAPE: Tuple[int, int, int] = (250, 179, 3)
 
-    def __init__(self, name="unknown", tunable=True) -> None:
+    def __init__(self,
+                 df: DataFrame,
+                 vdf: DataFrame,
+                 feature_key: str,
+                 name: str = "unknown",
+                 tunable: bool = True) -> None:
         """
         Init the base hypermodel, CardModel.
 
         Args:
+            df (DataFrame): DataFrame of test/train data
+            vdf (DataFrame): DataFrame of validation data
+            feature_key (str): The binary/categorical class key
             name (str, optional): Name of the hypermodel.
                 (defaults is "unknown")
             tunable (bool, optional): If the hypermodel is tunable.
                 (defaults is True)
         """
         super().__init__(name=name, tunable=tunable)
+
+        self.df: DataFrame = self.filter_dataframe(df.copy())
+        self.vdf: DataFrame = self.filter_dataframe(vdf.copy())
+
+        self.feature_key: str = feature_key
+        self.stratify_cols: List[str] = [feature_key]
+
+        self.df_codes, uq1 = self.df[feature_key].factorize(sort=True)
+        self.vdf_codes, uq2 = self.vdf[feature_key].factorize(sort=True)
+
+        diff = set(uq1).difference(set(uq2))
+        if len(diff) > 0:
+            raise ValueError(f"missing/additional datapoints: {diff}")
+
+        self.labels = uq1
+
         self.callbacks = [
             callbacks.EarlyStopping(monitor='val_accuracy',
                                     min_delta=0.005,
@@ -175,6 +205,79 @@ class CardModel(HyperModel):
             #                         mode='min',
             #                         restore_best_weights=True),
         ]
+
+    def split_data(self,
+                   interpolation: str = "bilinear",
+                   batch_size: int = 64,
+                   **kwargs) -> List[tf.data.Dataset]:
+        stratify = self.df[self.stratify_cols]
+        img_paths = self.df["filename"]
+        interpolation = image_utils.get_interpolation("bilinear")
+
+        X_train, X_test, y_train, y_test = train_test_split(img_paths,
+                                                            self.df_codes,
+                                                            **kwargs,
+                                                            stratify=stratify)
+
+        training_dataset = extendDataset(paths_and_labels_to_dataset(
+            image_paths=X_train.tolist(),
+            image_size=self.IMAGE_SHAPE[:2],
+            num_channels=self.IMAGE_SHAPE[2],
+            labels=y_train.tolist(),
+            label_mode="binary" if len(self.labels) < 3 else "categorical",
+            num_classes=len(self.labels),
+            interpolation=interpolation,
+        ), batch_size=batch_size)
+
+        testing_dataset = extendDataset(paths_and_labels_to_dataset(
+            image_paths=X_test.tolist(),
+            image_size=self.IMAGE_SHAPE[:2],
+            num_channels=self.IMAGE_SHAPE[2],
+            labels=y_test.tolist(),
+            label_mode="binary" if len(self.labels) < 3 else "categorical",
+            num_classes=len(self.labels),
+            interpolation=interpolation,
+        ), batch_size=batch_size)
+
+        return training_dataset, testing_dataset
+
+    def split_validation(self,
+                         interpolation: str = "bilinear",
+                         batch_size: int = 64) -> List[tf.data.Dataset]:
+        interpolation = image_utils.get_interpolation("bilinear")
+
+        validation_dataset = paths_and_labels_to_dataset(
+            image_paths=self.vdf['filename'].tolist(),
+            image_size=self.IMAGE_SHAPE[:2],
+            num_channels=self.IMAGE_SHAPE[2],
+            labels=self.vdf_codes,
+            label_mode="binary" if len(self.labels) < 3 else "categorical",
+            num_classes=len(self.labels),
+            interpolation=interpolation,
+        ).batch(batch_size).cache()
+
+        return [validation_dataset]
+
+    @staticmethod
+    def filter_dataframe(df: DataFrame) -> DataFrame:
+        """
+        Filter out data from test/train/validation dataframe.
+
+        Args:
+            df (DataFrame): Data to be filtered
+
+        Returns:
+            The DataFrame
+        """
+        # Ignore by language
+        # df.query("~filename.str.contains('_eg')", inplace=True)  # English
+        df.query("~filename.str.contains('_fr')", inplace=True)  # French
+        df.query("~filename.str.contains('_es')", inplace=True)  # Spanish
+        df.query("~filename.str.contains('_it')", inplace=True)  # Italian
+        df.query("~filename.str.contains('_de')", inplace=True)  # German
+        df.query("~filename.str.contains('_jp')", inplace=True)  # Japanese
+
+        return df
 
     def build(self,
               hp: HyperParameter,
