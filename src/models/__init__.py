@@ -92,7 +92,9 @@ class TunerMixin:
 
     def clear_cache(self) -> None:
         """Delete the hypermodel cache."""
-        shutil.rmtree(os.path.join(MODEL_DIR, self.name))
+        project_dir = os.path.join(MODEL_DIR, self.name)
+        if os.path.exists(project_dir):
+            shutil.rmtree(project_dir)
 
     def search(self, train_ds, test_ds, validation_ds) -> None:
         """
