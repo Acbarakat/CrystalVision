@@ -11,195 +11,42 @@ Attributes:
 
 Todo:
     * Find more varied data, such as off-center or card with background
+    * Explore minimize function further
 
 """
 import json
 import os
 from glob import iglob
-from typing import Any, Callable
+from typing import Tuple
 
 import numpy as np
 import pandas as pd
 import tensorflow as tf
-from keras import backend as K
-from keras.layers import Activation, Flatten, Input, Layer
-from keras.models import Model, load_model
-from keras.utils.generic_utils import get_custom_objects
-from mlxtend.classifier import EnsembleVoteClassifier
+from keras.models import load_model
 from PIL import Image
 from skimage.io import imread
 from sklearn.metrics import accuracy_score
-from sklearn.preprocessing import normalize
+from scipy.optimize import minimize
+from scipy.optimize._minimize import MINIMIZE_METHODS
 
-from gatherdata import DATA_DIR
-from generatemodels import make_database
+from data import DATA_DIR
+from data.dataset import make_database
+from models import MODEL_DIR
+from models.ensemble import hard_activation, MyEnsembleVoteClassifier
 
-CATEGORIES: tuple = (
-    "name_en", "element", "type_en", "cost", "power", "ex_burst", "multicard"
+
+CATEGORIES: Tuple[str] = (
+    "name_en",
+    "element",
+    "type_en",
+    "cost",
+    "power",
+    "ex_burst",
+    "multicard",
+    "mono",
 )
 IMAGE_DF: pd.DataFrame = pd.read_json(os.path.join(os.path.dirname(__file__),
                                                    "testmodels.json"))
-
-
-class MyEnsembleVoteClassifier(EnsembleVoteClassifier):
-    """Custom ensemble voting classifier class."""
-
-    def __init__(self,
-                 clfs,
-                 voting: str = "hard",
-                 weights: Any | None = None,
-                 verbose: int = 0,
-                 use_clones: bool = True,
-                 fit_base_estimators: bool = False,
-                 activation: Callable | None = None,
-                 activation_kwargs: dict | None = None):
-        """
-        _summary_
-
-        Args:
-            clfs (_type_): _description_
-            voting (str, optional): _description_. Defaults to "hard".
-            weights (Any | None, optional): _description_. Defaults to None.
-            verbose (int, optional): _description_. Defaults to 0.
-            use_clones (bool, optional): _description_. Defaults to True.
-            fit_base_estimators (bool, optional): _description_. Defaults to False.
-            activation (Callable | None, optional): _description_. Defaults to None.
-            activation_kwargs (dict | None, optional): _description_. Defaults to None.
-        """
-        super().__init__(clfs,
-                         voting,
-                         weights,
-                         verbose,
-                         use_clones,
-                         fit_base_estimators)
-        self.clfs_ = clfs
-        self.activation = tf.keras.activations.linear
-        if activation is not None:
-            self.activation = activation
-        self.activation_kwargs = {}
-        if activation_kwargs is not None:
-            self.activation_kwargs = activation_kwargs
-
-    def _predict(self, X: np.ndarray) -> np.ndarray:
-        """Collect results from clf.predict calls."""
-        if not self.fit_base_estimators:
-            predictions = np.asarray([clf(X) for clf in self.clfs_]).T
-            if predictions.shape[0] == 1:
-                return self.activation(predictions[0],
-                                       **self.activation_kwargs)
-
-            predictions = np.array([
-                np.argmax(p, axis=1) for p in predictions.T
-            ])
-            return self.activation(predictions.T, **self.activation_kwargs)
-
-        return np.asarray(
-            [self.le_.transform(clf(X)) for clf in self.clfs_]
-        ).T
-
-    def _predict_probas(self, X) -> np.ndarray:
-        """Collect results from clf.predict_proba calls."""
-        probas = [clf(X, training=False) for clf in self.clfs_]
-        if self.weights:
-            probas = [np.dot(c, w) for c, w in zip(probas, self.weights)]
-        probas = np.sum(probas, axis=0) / len(self.clfs_)
-        return normalize(probas, axis=1, norm='l1')
-
-    def predict(self, X: np.ndarray, dtype: str = '') -> np.ndarray:
-        """
-        Predict class labels for X.
-
-        Parameters
-        ----------
-        X : {array-like, sparse matrix}, shape = [n_samples, n_features]
-            Training vectors, where n_samples is the number of samples and
-            n_features is the number of features.
-
-        Returns
-        ----------
-        maj : array-like, shape = [n_samples]
-            Predicted class labels.
-
-        """
-        predictions = self.transform(X)
-        if hasattr(predictions, "numpy"):
-            predictions = predictions.numpy()
-        if dtype:
-            predictions = predictions.astype(dtype)
-
-        if self.voting == "soft":
-            maj = np.argmax(predictions, axis=1)
-
-        else:  # 'hard' voting
-            maj = np.apply_along_axis(
-                lambda x: np.argmax(np.bincount(x, weights=self.weights)),
-                axis=1,
-                arr=predictions,
-            )
-
-        if self.fit_base_estimators:
-            maj = self.le_.inverse_transform(maj)
-
-        return maj
-
-    def scores(self, X, y, sample_weight=None) -> pd.Series:
-        """
-        Return the mean accuracy on the given test data and labels.
-
-        In multi-label classification, this is the subset accuracy
-        which is a harsh metric since you require for each sample that
-        each label set be correctly predicted.
-
-        Parameters
-        ----------
-        X : array-like of shape (n_samples, n_features)
-            Test samples.
-
-        y : array-like of shape (n_samples,) or (n_samples, n_outputs)
-            True labels for `X`.
-
-        sample_weight : array-like of shape (n_samples,), default=None
-            Sample weights.
-
-        Returns
-        -------
-        score : float
-            Mean accuracy of ``self.predict(X)`` w.r.t. `y`.
-        """
-        result = self._predict(X)
-        if hasattr(result, "numpy"):
-            result = result.numpy()
-        result = result.T
-
-        result = np.array([
-            accuracy_score(y, p, sample_weight=sample_weight) for p in result
-        ] + [self.score(X, y)])
-
-        return pd.Series(result,
-                         index=[c.name for c in self.clfs_] + ['ensemble'],
-                         name="accuracy")
-
-    def generate_model(self) -> Model:
-        """Converts/creates our ensemble as a single Model."""
-        if self.voting == 'soft':
-            raise NotImplementedError("Cannot generate a 'soft' voting model")
-
-        name = self.clfs_[0].name.replace("_1", "_ensemble")
-        model_input = Input(shape=self.clfs_[0].input_shape[1:])
-        y_models = [model(model_input, training=False) for model in self.clfs_]
-
-        active = self.activation(y_models, **self.activation_kwargs)
-        if self.clfs_[0].output_shape[1] == 1:
-            flatten = Flatten()(active)
-            outputs = HardBinaryVote(vote_weights=self.weights)(flatten)
-        else:
-            outputs = HardClassVote(vote_weights=self.weights)(active)
-
-        return Model(inputs=model_input, outputs=outputs, name=name)
-
-    def save_model(self, file_path: str) -> None:
-        """Save the model to Tensorflow SavedModel or a single HDF5 file."""
-        return self.generate_model().save(file_path)
 
 
 def load_image(url: str,
@@ -225,108 +72,54 @@ def load_image(url: str,
 
     dst = os.path.join(dst, img_fname)
     if os.path.exists(dst):
-        return imread(dst)[:, :, :3]
+        data = imread(dst)[:, :, :3]
+        return data * (1. / 255)
 
+    if url.startswith("blob:"):
+        url = url[5:]
     data = imread(url)
     if img_fname.endswith(".jpg"):
         Image.fromarray(data).convert("RGB").save(dst)
     else:
         Image.fromarray(data).save(dst)
 
-    return data[:, :, :3]
+    return data[:, :, :3] * (1. / 255)
 
 
-IMAGES = IMAGE_DF.pop("uri")
-IMAGES = [load_image(image, f"{i}.jpg") for i, image in enumerate(IMAGES)]
-IMAGES = np.array([tf.image.resize(image, (250, 179)) for image in IMAGES])
+def find_threshold(X, y_true, labels, method="nelder-mead"):
+    def function_to_minimize(threshold):
+        y_pred = hard_activation(X, threshold[0])
+        y_pred = [labels[y] for y in y_pred]
 
+        # this is the mean accuracy
+        score = accuracy_score(y_true, y_pred)
 
-class HardBinaryVote(Layer):
-    """Hard Binary Voting Layer."""
+        # change accuracy to error so that smaller is better
+        score_to_minimize = 1.0 - score
 
-    def __init__(self,
-                 trainable=False,
-                 name="hard_vote",
-                 dtype=None,
-                 dynamic=False,
-                 vote_weights: Any | None = None,
-                 **kwargs):
-        """_summary_
+        return score_to_minimize
 
-        Args:
-            trainable (bool, optional): _description_. Defaults to False.
-            name (str, optional): _description_. Defaults to "hard_vote".
-            dtype (_type_, optional): _description_. Defaults to None.
-            dynamic (bool, optional): _description_. Defaults to False.
-            vote_weights (Any | None, optional): _description_. Defaults to None.
-        """
-        super().__init__(trainable, name, dtype, dynamic, **kwargs)
-        self.vote_weights = None
-        if vote_weights is not None:
-            self.vote_weights = tf.convert_to_tensor(vote_weights,
-                                                     name="votes")
+    threshold = X.mean()
 
-    def call(self, inputs: Any):
-        """_summary_
+    best_score, best_threshold = 1.0, 1.0
+    for method in MINIMIZE_METHODS:
+        try:
+            results = minimize(
+                function_to_minimize,
+                threshold,
+                bounds=[(X.min(), X.max())],
+                method=method,
+            )
+            print(results)
+        except ValueError as err:
+            print(method)
+            print(err)
+            continue
+        if results["fun"] < best_score:
+            best_score = results["fun"]
+            best_threshold = results["x"]
 
-        Args:
-            inputs (Any): _description_
-
-        Returns:
-            _type_: _description_
-        """
-        inputs = K.transpose(inputs)
-
-        return K.tf.map_fn(
-            lambda z: K.cast(K.argmax(K.tf.math.bincount(z, weights=self.vote_weights)), 'int32'),  # noqa: E501
-            inputs,
-        )
-
-
-class HardClassVote(HardBinaryVote):
-    """Hard Classifer Voting Layer."""
-
-    def call(self, inputs: Any):
-        """_summary_
-
-        Args:
-            inputs (Any): _description_
-
-        Returns:
-            _type_: _description_
-        """
-        inputs = K.transpose(K.cast(K.argmax(inputs), 'int32'))
-
-        return K.tf.map_fn(
-            lambda z: K.cast(K.argmax(K.tf.math.bincount(z, weights=self.vote_weights)), 'int32'),  # noqa: E501
-            inputs,
-        )
-
-
-@tf.__internal__.dispatch.add_dispatch_support
-def hard_activation(z: Any, threshold: float = 0.5) -> tf.Tensor:
-    """
-    Hard activation function based on a threshold (default is 0.5).
-
-    For example:
-
-    >>> a = tf.constant([-.5, -.1, 0.0, .1, .5], dtype = tf.float32)
-    >>> b = hard_activation(a)
-    >>> b.numpy()
-    array([0., 0.,  0.,  0.,  1.], dtype=float32)
-
-    Args:
-        x: Input tensor.
-
-    Returns:
-        All values either 0 or 1 based on the threshold
-    """
-    return K.cast(K.greater_equal(z, threshold), tf.dtypes.int32)
-
-
-get_custom_objects().update({
-    'hard_activation': Activation(hard_activation, name="hard_activaiton"),
-})
+    return best_threshold
 
 
 def test_models() -> pd.DataFrame:
@@ -344,56 +137,91 @@ def test_models() -> pd.DataFrame:
         "cost",
         "power",
         "ex_burst",
-        "multicard"
+        "multicard",
     ]
     mdf: pd.DataFrame = make_database().set_index('code')[cols]
     df = df.merge(mdf, on="code", how='left', sort=False)
-    df['ex_burst'] = df['ex_burst'].astype('uint8')
-    df['multicard'] = df['multicard'].astype('uint8')
+    # df['ex_burst'] = df['ex_burst'].astype('uint8')
+    # df['multicard'] = df['multicard'].astype('uint8')
+    df["mono"] = df["element"].apply(lambda i: len(i) == 1 if i else True).astype(str)
+
+    df["uid"] = range(df.shape[0])
+    df["images"] = df.apply(
+        lambda x: tf.image.resize(
+            load_image(x["uri"], f"{x['uid']}.jpg"),
+            (250, 179)
+        ),
+        axis=1
+    )
+
+    df.query("full_art != 1 and focal == 1", inplace=True)
+    IMAGES = np.array(df.pop("images").tolist())
+
+    df.drop(["uid", "uri"], axis=1, inplace=True)
+    print(df)
+
+    if not os.path.exists(MODEL_DIR):
+        raise FileNotFoundError(f"Cannot find '{MODEL_DIR}', skipping")
 
     for category in CATEGORIES:
-        model_path = os.path.join(DATA_DIR, "model", f"{category}_model")
-        if not os.path.exists(model_path):
-            print(f"Cannot find '{model_path}', skipping")
+        label_fname = os.path.join(MODEL_DIR, f"{category}.json")
+        if not os.path.exists(label_fname):
+            print(f"Cannot find {label_fname}, skipping...")
             continue
 
-        with open(os.path.join(model_path, "category.json")) as fp:
+        with open(label_fname) as fp:
             labels = json.load(fp)
 
         models = [
-            load_model(model_path) for model_path in iglob(model_path + "*")
+            load_model(mpath) for mpath in iglob(MODEL_DIR + os.sep + f"{category}_*.h5")
         ]
-        ensemble_path = os.path.join(DATA_DIR, "model", f"{category}_ensemble")
-        if category in ("ex_burst", "cost", "multicard"):
+        ensemble_path = os.path.join(MODEL_DIR, f"{category}_ensemble.h5")
+        if len(models) > 1:
             # if os.path.exists(ensemble_path):
             #   model = tf.keras.models.load_model(ensemble_path)
             #   x = model(IMAGES, training=False)
             #   if category != "Ex_Burst":
             #       x = [labels[y] for y in x]
             # else:
-            if category in ("ex_burst", "multicard"):
+            if category in ("ex_burst", "multicard", "mono"):
                 voting = MyEnsembleVoteClassifier(models,
-                                                  weights=[1, 1, 3, 1, 1],
+                                                  labels=labels,
                                                   activation=hard_activation,
                                                   activation_kwargs={
-                                                      'threshold': 0.1
+                                                      'threshold': 0.0
                                                   })
                 x = voting.predict(IMAGES, 'uint8')
+                print(voting.find_activation(IMAGES, df[category]))
             else:
-                voting = MyEnsembleVoteClassifier(models)
-                x = [labels[y] for y in voting.predict(IMAGES)]
-            label_indexes = df[category].apply(lambda x: labels.index(x))
-            scores = voting.scores(IMAGES, label_indexes)
+                voting = MyEnsembleVoteClassifier(models, labels=labels)
+                x = voting.predict(IMAGES)
+            # print(voting._predict(IMAGES))
+            # print(df[category])
+            # labels = df[category].apply(lambda x: labels[x])
+            # print(voting._predict(IMAGES))
+            # print(voting.find_weights(IMAGES, df[category]))
+            scores = voting.scores(IMAGES, df[category])
             print(scores)
-            voting.save_model(ensemble_path)
+            # voting.save_model(ensemble_path)
+            x = x.to_numpy()
         else:
-            x = [
-                labels[np.argmax(y)] for y in models[0](IMAGES, training=False)
-            ]
+            #print(models[0].summary())
+            #print(models[0](IMAGES, training=False))
+            x = models[0].predict(IMAGES)
+            # print(x)
+            df[f"{category}_yhat"] = x
+            sample_size = min(df[category].value_counts())
+            data = df[[category, f"{category}_yhat"]].groupby(category)
+            print(data.min(), data.max())
+            data = data.sample(sample_size)
+            print(data)
+            threshold = find_threshold(data[f"{category}_yhat"], data[category], labels)
+            print(threshold)
+            #x = [labels[np.argmax(y)] for y in x]
+            x = [labels[y[0]] for y in hard_activation(x, threshold=threshold)]
 
         df[f"{category}_yhat"] = x
-        if len(labels) <= 2:
-            df[f"{category}_yhat"] = df[f"{category}_yhat"].astype('UInt8')
+        # if len(labels) <= 2: df[f"{category}_yhat"] = df[f"{category}_yhat"].astype('UInt8')
 
     return df
 
@@ -401,11 +229,6 @@ def test_models() -> pd.DataFrame:
 def main() -> None:
     """Test the various models."""
     df = test_models().reset_index()
-
-    # Remove the ones we know wont work without:
-    # - object detection
-    # - full art enablement
-    df.drop([2, 3, 4, 5, 17, 19, 26, 27, 32], inplace=True)
 
     for category in CATEGORIES:
         key = f"{category}_yhat"
@@ -415,7 +238,7 @@ def main() -> None:
         comp = comp.value_counts(normalize=True)
         # print(comp)
 
-        print(f"{category} accuracy: {comp.get(True, 0.0) * 100}%%")
+        print(f"{category} accuracy: {comp.get(True, 0.0) * 100}%")
         # print(xf)
 
     df.sort_index(axis=1, inplace=True)
