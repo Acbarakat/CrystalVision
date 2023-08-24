@@ -76,7 +76,7 @@ class MyEnsembleVoteClassifier(EnsembleVoteClassifier):
         """Collect results from clf.predict calls."""
         if not self.fit_base_estimators:
             predictions = np.asarray([clf(X) for clf in self.clfs_]).T
-            print(predictions.shape)
+            # print(predictions.shape)
             if predictions.shape[0] == 1:
                 return self.activation(predictions[0],
                                        **self.activation_kwargs)
