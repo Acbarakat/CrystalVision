@@ -17,12 +17,22 @@ import asyncio
 import json
 import os
 import typing
+from io import BytesIO
 
+from tqdm.asyncio import tqdm
+import aiohttp
+import aiofiles
+import aiofiles.os as aioos
 import requests
 import pandas as pd
 from PIL import ImageFile, Image
 
-from .base import MISSING_CARDS_FILEPATH, CARD_API_FILEPATH, DATA_DIR
+try:
+    from .base import MISSING_CARDS_FILEPATH, CARD_API_FILEPATH, \
+        DATA_DIR
+except ImportError:
+    from crystalvision.data.base import MISSING_CARDS_FILEPATH, \
+        CARD_API_FILEPATH, DATA_DIR
 
 
 def download_and_save() -> dict:
@@ -100,16 +110,19 @@ async def download_image(img_url: str,
     if fname is None:
         fname = img_url.split("/")[-1]
     dst = os.path.join(DATA_DIR, subfolder, fname)
-    if os.path.exists(dst):
+    if await aioos.path.exists(dst):
         return dst
 
-    p = ImageFile.Parser()
-    with requests.get(img_url, allow_redirects=True) as url:
-        p.feed(url.content)
+    async with aiohttp.ClientSession() as session:
+        async with session.get(img_url, allow_redirects=True) as resp:
+            content = await resp.read()
 
-        if url.status_code == 404:
-            print(f"Failed to download {img_url}")
-            return
+            if resp.status == 404:
+                print(f"Failed to download {img_url}")
+                return
+
+    p = ImageFile.Parser()
+    p.feed(content)
 
     # Convert to jpg
     img = p.close().convert('RGB')
@@ -120,7 +133,11 @@ async def download_image(img_url: str,
     if resize:
         img.resize(resize, Image.LANCZOS)
 
-    img.save(dst)
+    # img.save(dst)
+    buffer = BytesIO()
+    img.save(buffer, format="JPEG")
+    async with aiofiles.open(dst, "wb") as file:
+        await file.write(buffer.getbuffer())
 
     return dst
 
@@ -133,19 +150,17 @@ async def main() -> None:
     for card in data["cards"]:
         img_urls += card["images"]["full"]
 
-    images = asyncio.gather(*[download_image(img_url) for img_url in img_urls])
-    await images
-    print(images)
+    images = await tqdm.gather(*[
+        download_image(img_url) for img_url in img_urls
+    ], desc='full card images', unit="cards")
 
     thumb_urls = []
     for card in data["cards"]:
         thumb_urls += card["images"]["thumbs"]
 
-    images = asyncio.gather(*[
+    images = await tqdm.gather(*[
         download_image(thumb_url, "thumb") for thumb_url in thumb_urls
-    ])
-    await images
-    print(images)
+    ], desc='thumb card images', unit="cards")
 
     df = pd.read_table("http://www.square-enix-shop.com/jp/ff-tcg/card/data/list_card.txt", header=None)
     df.rename({
@@ -178,7 +193,7 @@ async def main() -> None:
         df.query(f"code != '{d[key]}'", inplace=True)
         df.query(f"~(code.str.endswith('/{d[key]}') and code.str.startswith('PR'))", inplace=True)
 
-        for idx, row in rows.iterrows():
+        for _, row in rows.iterrows():
             img_loc = row['image']
             if "_FL" in img_loc:
                 fname = f"{d[key].split('/')[0]}_FL_jp.jpg"
@@ -209,9 +224,7 @@ async def main() -> None:
     with open(CARD_API_FILEPATH, "w+") as fp:
         json.dump(data, fp, indent=4)
 
-    images = asyncio.gather(*images)
-    await images
-    print(images)
+    images = await tqdm.gather(*images, desc='JP card images', unit="cards")
 
 
 if __name__ == "__main__":
