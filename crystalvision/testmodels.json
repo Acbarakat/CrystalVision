@@ -391,7 +391,7 @@
         "uri": "https://52f4e29a8321344e30ae-0f55c9129972ac85d6b1f4e703468e6b.ssl.cf2.rackcdn.com/products/pictures/1726875.jpg"
     },
     {
-        "code": "17-022L",
+        "code": "17-002L",
         "uri": "https://52f4e29a8321344e30ae-0f55c9129972ac85d6b1f4e703468e6b.ssl.cf2.rackcdn.com/products/pictures/1757040.jpg"
     },
     {
@@ -599,7 +599,7 @@
         "uri": "https://52f4e29a8321344e30ae-0f55c9129972ac85d6b1f4e703468e6b.ssl.cf2.rackcdn.com/products/pictures/1470532.jpg"
     },
     {
-        "code": "8-125C",
+        "code": "8-125C/1-170C",
         "uri": "https://52f4e29a8321344e30ae-0f55c9129972ac85d6b1f4e703468e6b.ssl.cf2.rackcdn.com/products/pictures/1470522.jpg"
     },
     {
@@ -625,5 +625,50 @@
     {
         "code": "12-114R",
         "uri": "https://52f4e29a8321344e30ae-0f55c9129972ac85d6b1f4e703468e6b.ssl.cf2.rackcdn.com/products/pictures/1681471.jpg"
+    },
+    {
+        "code": "19-128L",
+        "foil": 0,
+        "uri": "https://pbs.twimg.com/media/FoAjsDOaIAEzsjf.png"
+    },
+    {
+        "code": "1-183H",
+        "uri": "https://52f4e29a8321344e30ae-0f55c9129972ac85d6b1f4e703468e6b.ssl.cf2.rackcdn.com/products/pictures/1106989.jpg"
+    },
+    {
+        "code": "3-145L",
+        "uri": "https://52f4e29a8321344e30ae-0f55c9129972ac85d6b1f4e703468e6b.ssl.cf2.rackcdn.com/products/pictures/1124975.jpg"
+    },
+    {
+        "code": "5-090R",
+        "uri": "https://52f4e29a8321344e30ae-0f55c9129972ac85d6b1f4e703468e6b.ssl.cf2.rackcdn.com/products/pictures/1167551.jpg"
+    },
+    {
+        "code": "14-102L",
+        "uri": "https://52f4e29a8321344e30ae-0f55c9129972ac85d6b1f4e703468e6b.ssl.cf2.rackcdn.com/products/pictures/1726942.jpg"
+    },
+    {
+        "code": "14-113R",
+        "uri": "https://52f4e29a8321344e30ae-0f55c9129972ac85d6b1f4e703468e6b.ssl.cf2.rackcdn.com/products/pictures/1726941.jpg"
+    },
+    {
+        "code": "13-028L",
+        "uri": "https://52f4e29a8321344e30ae-0f55c9129972ac85d6b1f4e703468e6b.ssl.cf2.rackcdn.com/products/pictures/1711916.jpg"
+    },
+    {
+        "code": "3-148H",
+        "uri": "https://52f4e29a8321344e30ae-0f55c9129972ac85d6b1f4e703468e6b.ssl.cf2.rackcdn.com/products/pictures/1124978.jpg"
+    },
+    {
+        "code": "12-038H",
+        "uri": "https://52f4e29a8321344e30ae-0f55c9129972ac85d6b1f4e703468e6b.ssl.cf2.rackcdn.com/products/pictures/1681445.jpg"
+    },
+    {
+        "code": "10-085H",
+        "uri": "https://52f4e29a8321344e30ae-0f55c9129972ac85d6b1f4e703468e6b.ssl.cf2.rackcdn.com/products/pictures/1612715.jpg"
+    },
+    {
+        "code": "8-066C/3-071H",
+        "uri": "https://52f4e29a8321344e30ae-0f55c9129972ac85d6b1f4e703468e6b.ssl.cf2.rackcdn.com/products/pictures/1470463.jpg"
     }
 ]
