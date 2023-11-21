@@ -21,7 +21,7 @@ from keras import layers
 from .base import CARD_API_FILEPATH, DATA_DIR
 
 
-def make_database() -> pd.DataFrame:
+def make_database(clear_extras: bool = False) -> pd.DataFrame:
     """
     Load card data and clean up any issue found in the API.
 
@@ -32,18 +32,24 @@ def make_database() -> pd.DataFrame:
         data = json.load(fp)["cards"]
 
     df = pd.DataFrame(data)
+    # Remove the extra lang columns
+    if clear_extras:
+        for lang in ("_es", "_de", "_fr", "_it", "_ja"):
+            df = df.loc[:, ~df.columns.str.endswith(lang)]
+
     df["thumbs"] = df["images"].apply(lambda i: [j.split("/")[-1] for j in i["thumbs"]])
     df["images"] = df["images"].apply(lambda i: [j.split("/")[-1] for j in i["full"]])
     df["ex_burst"] = df["ex_burst"].apply(lambda i: i == "\u25cb" or i == "1").astype(bool)
     df["multicard"] = df["multicard"].apply(lambda i: i == "\u25cb" or i == "1").astype(bool)
-    df["mono"] = df["element"].apply(lambda i: len(i) == 1 if i else True).astype(str)
+    df["mono"] = df["element"].apply(lambda i: len(i) == 1 if i else True).astype(bool)
     df["element"] = df["element"].str.join("_")
     df["power"] = df["power"].str.replace(" ", "").replace("\u2015", "").replace("\uff0d", "")
 
     return df
 
 
-def imagine_database(image: str = "thumbs") -> pd.DataFrame:
+def imagine_database(image: str = "thumbs",
+                     clear_extras: bool = False) -> pd.DataFrame:
     """
     Explode the database based on `image` kwarg.
 
@@ -92,6 +98,11 @@ def imagine_database(image: str = "thumbs") -> pd.DataFrame:
         image_dir = os.path.abspath(os.path.join(DATA_DIR, "thumb"))
         df.rename({"thumbs": "filename"}, axis=1, inplace=True)
     df["filename"] = image_dir + os.sep + df["filename"]
+
+    # Remove the extra lang columns
+    if clear_extras:
+        for lang in ("_es", "_de", "_fr", "_it", "_ja"):
+            df = df.loc[:, ~df.columns.str.endswith(lang)]
 
     return df
 
