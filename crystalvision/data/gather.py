@@ -226,6 +226,18 @@ async def main() -> None:
 
     images = await tqdm.gather(*images, desc='JP card images', unit="cards")
 
+    # Download testdata images
+    df = pd.read_json(os.path.join(os.path.dirname(__file__),
+                                   "..",
+                                   "testmodels.json"))
+
+    images = [
+        download_image(row["uri"],
+                       "test",
+                       f"{idx}.jpg") for idx, row in df.iterrows()
+    ]
+    images = await tqdm.gather(*images, desc='testing images', unit="cards")
+    
 
 if __name__ == "__main__":
     asyncio.run(main())
