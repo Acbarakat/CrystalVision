@@ -12,176 +12,21 @@ Todo:
 """
 import os
 import json
-import shutil
 import math
 from typing import Tuple, List, Any
-from functools import cached_property
 
 from pandas import DataFrame
 import tensorflow as tf
 from sklearn.model_selection import train_test_split
-from keras import callbacks, models, losses, metrics
+from keras import callbacks, models
 from keras.utils import image_utils
 from keras.utils.image_dataset import paths_and_labels_to_dataset
-from keras_tuner import HyperModel, HyperParameter
-from keras_tuner.tuners import RandomSearch, Hyperband, BayesianOptimization
-from keras_tuner.engine.tuner import maybe_distribute
+from keras_tuner import HyperModel, HyperParameters
+
+from crystalvision.models import MODEL_DIR
+
 
 from ..data.dataset import extendDataset
-
-
-SRC_DIR = os.path.join(os.path.dirname(__file__), "..")
-MODEL_DIR = os.path.join(SRC_DIR, "..", "data", "model")
-
-
-class BinaryMixin:
-    """Binary compile mixins."""
-
-    @cached_property
-    def loss(self) -> losses.BinaryCrossentropy:
-        """The Binary loss function."""
-        return losses.BinaryCrossentropy()
-
-    @cached_property
-    def metrics(self) -> List[metrics.Metric]:
-        """A list of Binary Metrics."""
-        return [tf.keras.metrics.BinaryAccuracy(name='accuracy')]
-
-
-class CategoricalMixin:
-    """Categorical compile mixins."""
-
-    @cached_property
-    def loss(self) -> losses.CategoricalCrossentropy:
-        """The Categorical loss function."""
-        return losses.CategoricalCrossentropy()
-
-    @cached_property
-    def metrics(self) -> List[metrics.Metric]:
-        """A list of Categorical Metrics."""
-        return [tf.keras.metrics.CategoricalAccuracy(name='accuracy')]
-
-
-class MyRandomSearch(RandomSearch):
-    """Random search tuner."""
-
-    def load_model(self, trial):
-        """
-        Load a Model from a given trial.
-
-        For models that report intermediate results to the `Oracle`, generally
-        `load_model` should load the best reported `step` by relying of
-        `trial.best_step`.
-
-        Args:
-            trial: A `Trial` instance, the `Trial` corresponding to the model
-                to load.
-        """
-        model = self._try_build(trial.hyperparameters)
-        # Reload best checkpoint.
-        # Only load weights to avoid loading `custom_objects`.
-        with maybe_distribute(self.distribution_strategy):
-            fname = self._get_checkpoint_fname(trial.trial_id)
-            model.load_weights(fname).expect_partial()
-            model._name += f"_trial{trial.trial_id}"
-        return model
-
-
-class TunerMixin:
-    """Base Tuner Mixin."""
-
-    MAX_EXECUTIONS = 1
-
-    def clear_cache(self) -> None:
-        """Delete the hypermodel cache."""
-        project_dir = os.path.join(MODEL_DIR, self.name)
-        if os.path.exists(project_dir):
-            shutil.rmtree(project_dir)
-
-    def search(self, train_ds, test_ds, validation_ds) -> None:
-        """
-        Perform a search for best hyperparameter configuations.
-
-        Args:
-            train_ds (tf.data.Dataset): training data
-            test_ds (tf.data.Dataset): testing data
-            validation_ds (tf.data.Dataset): validation data
-        """
-        tf.keras.backend.clear_session()
-
-        self.tuner.search(train_ds,
-                          testing_data=test_ds,
-                          validation_data=validation_ds,
-                          validation_steps=len(validation_ds),
-                          callbacks=self.callbacks)
-
-
-class RandomSearchTunerMixin(TunerMixin):
-    """RandomSearch Tuner Mixin."""
-
-    MAX_TRIALS = 20
-
-    @cached_property
-    def tuner(self) -> RandomSearch:
-        """Random search tuner."""
-        return MyRandomSearch(self,
-                              objective="val_accuracy",
-                              max_trials=self.MAX_TRIALS,
-                              executions_per_trial=self.MAX_EXECUTIONS,
-                              directory=MODEL_DIR,
-                              project_name=self.name)
-
-
-class HyperbandTunerMixin(TunerMixin):
-    """Hyperband Tuner Mixin."""
-
-    @cached_property
-    def tuner(self) -> RandomSearch:
-        """Hyperband search tuner."""
-        return Hyperband(self,
-                         objective="val_accuracy",
-                         executions_per_trial=self.MAX_EXECUTIONS,
-                         directory=MODEL_DIR,
-                         project_name=self.name)
-
-
-class MyBayesianOptimization(BayesianOptimization):
-    """Random search tuner."""
-
-    def load_model(self, trial):
-        """
-        Load a Model from a given trial.
-
-        For models that report intermediate results to the `Oracle`, generally
-        `load_model` should load the best reported `step` by relying of
-        `trial.best_step`.
-
-        Args:
-            trial: A `Trial` instance, the `Trial` corresponding to the model
-                to load.
-        """
-        model = self._try_build(trial.hyperparameters)
-        # Reload best checkpoint.
-        # Only load weights to avoid loading `custom_objects`.
-        with maybe_distribute(self.distribution_strategy):
-            fname = self._get_checkpoint_fname(trial.trial_id)
-            model.load_weights(fname).expect_partial()
-            model._name += f"_trial{trial.trial_id}"
-        return model
-
-
-class BayesianOptimizationTunerMixin(RandomSearchTunerMixin):
-    """Bayesian Optimization Tuner Mixin."""
-
-    @cached_property
-    def tuner(self) -> RandomSearch:
-        """Bayesian Optimization tuner."""
-        return MyBayesianOptimization(self,
-                                      objective="val_accuracy",
-                                      max_trials=self.MAX_TRIALS,
-                                      executions_per_trial=self.MAX_EXECUTIONS,
-                                      directory=MODEL_DIR,
-                                      project_name=self.name)
 
 
 class CardModel(HyperModel):
@@ -240,6 +85,7 @@ class CardModel(HyperModel):
                    batch_size: int = 64,
                    **kwargs) -> List[tf.data.Dataset]:
         stratify = self.df[self.stratify_cols]
+        # print(self.df.groupby(self.stratify_cols).count()['id'])
         img_paths = self.df["filename"]
         interpolation = image_utils.get_interpolation("bilinear")
 
@@ -309,7 +155,7 @@ class CardModel(HyperModel):
         return df
 
     def build(self,
-              hp: HyperParameter,
+              hp: HyperParameters,
               seed: int | None = None) -> models.Model:
         """
         Build a model.
@@ -341,15 +187,20 @@ class CardModel(HyperModel):
                 (defaults is 1)
         """
         self.search(train_ds, test_ds, validation_ds)
-        print(self.tuner.results_summary())
+        # print(self.tuner.results_summary())
         best_models, best_hparams = (
             self.tuner.get_best_models(num_models=num_models),
             self.tuner.get_best_hyperparameters(num_trials=num_models)
         )
+        
+        best_trials = {}
         for idx, (bm, bhp) in enumerate(zip(best_models, best_hparams)):
             # print(bm.summary())
             # print(bm.optimizer.get_config())
-            print(bm.name, bhp.values)
+            trial = self.tuner.oracle.trials[bm.name[-2:]]
+            print(bm.name, bhp.values, trial.score)
+            best_trials[bm.name] = bhp.values
+            best_trials[bm.name]["score"] = trial.score
             bm.save(os.path.join(MODEL_DIR,
                                  f"{self.name}_{idx + 1}.h5"))
 
@@ -357,8 +208,12 @@ class CardModel(HyperModel):
         with open(os.path.join(MODEL_DIR, f"{self.name}.json"), "w+") as fp:
             json.dump(self.labels.to_list(), fp)
 
+        # Save the top X
+        with open(os.path.join(MODEL_DIR, f"{self.name}_best.json"), "w+") as fp:
+            json.dump(best_trials, fp)
+
     def fit(self,
-            hp: HyperParameter,
+            hp: HyperParameters,
             model: models.Model,
             train_ds: tf.data.Dataset,
             *args,
@@ -369,7 +224,7 @@ class CardModel(HyperModel):
         Train the hypermodel.
 
         Args:
-            hp (HyperParameter): The hyperparameters
+            hp (HyperParameters): The hyperparameters
             model: `keras.Model` built in the `build()` function
             train_ds (tf.data.Dataset): Training data
             *args: All arguments passed to `Tuner.search`
