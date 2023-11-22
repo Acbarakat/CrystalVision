@@ -10,8 +10,14 @@ from pandas import DataFrame
 from keras import layers, models, optimizers
 from keras_tuner import HyperParameters
 
-from __init__ import CardModel, CategoricalMixin, \
-    BayesianOptimizationTunerMixin
+try:
+    from . import CardModel
+    from .mixins.compiles import CategoricalMixin
+    from .mixins.tuners import BayesianOptimizationTunerMixin
+except ImportError:
+    from __init__ import CardModel
+    from crystalvision.models.mixins.compiles import CategoricalMixin
+    from crystalvision.models.mixins.tuners import BayesianOptimizationTunerMixin
 
 
 class CardTyping(CategoricalMixin, BayesianOptimizationTunerMixin, CardModel):
@@ -93,42 +99,6 @@ class CardTyping(CategoricalMixin, BayesianOptimizationTunerMixin, CardModel):
 
 
 if __name__ == "__main__":
-    import os
+    from crystalvision.models import tune_model
 
-    import pandas as pd
-    from keras.models import load_model
-
-    from data import SRC_DIR
-    from data.dataset import imagine_database, make_database
-    from models import MODEL_DIR
-
-    df = imagine_database()
-    for lang in ("_es", "_de", "_fr", "_it", "_ja"):
-        df = df.loc[:, ~df.columns.str.endswith(lang)]
-
-    TEST_IMG_DIR = os.path.abspath(os.path.join(MODEL_DIR,
-                                                "..",
-                                                "test")) + os.sep
-
-    vdf = pd.read_json(os.path.join(SRC_DIR, "testmodels.json"))
-    vdf["filename"] = TEST_IMG_DIR + vdf["uri"].index.astype(str) + ".jpg"
-    vdf = vdf.merge(make_database(), on="code", how='left', sort=False)
-    vdf.drop(["thumbs", "images", "uri", "id"], axis=1, inplace=True)
-    for lang in ("_es", "_de", "_fr", "_it", "_ja"):
-        vdf = vdf.loc[:, ~vdf.columns.str.endswith(lang)]
-    vdf.query("full_art != 1 and focal == 1", inplace=True)
-    # print(vdf)
-
-    m = CardTyping(df, vdf)
-    training_dataset, testing_dataset = m.split_data(test_size=0.1,
-                                                     random_state=23,
-                                                     shuffle=True)
-    validation_dataset = m.split_validation()[0]
-    m.clear_cache()
-    m.tune_and_save(training_dataset,
-                    testing_dataset,
-                    validation_dataset,
-                    3)
-
-    best_model = load_model(os.path.join(MODEL_DIR, f"{m.name}_1.h5"))
-    # print(best_model.summary())
+    tune_model(CardTyping)

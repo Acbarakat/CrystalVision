@@ -210,7 +210,7 @@ class CardModel(HyperModel):
 
         # Save the top X
         with open(os.path.join(MODEL_DIR, f"{self.name}_best.json"), "w+") as fp:
-            json.dump(best_trials, fp)
+            json.dump(best_trials, fp, indent=4)
 
     def fit(self,
             hp: HyperParameters,
