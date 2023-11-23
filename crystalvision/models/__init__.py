@@ -68,10 +68,10 @@ def tune_model(model: CardModel) -> None:
 
     if args.verbose:
         print(vdf)
-        print(vdf.groupby('element').count()['code'].sort_values())
-        print(vdf.groupby('type_en').count()['code'])
-        print(vdf.query("mono == True").groupby(['element', 'type_en']).count()['code'])
-        print(vdf.groupby('cost').count()["code"])
+        if isinstance(model, BinaryMixin):
+            print(vdf.query("@model.feature_key == True").groupby(model.stratify_cols).count()['code'])
+        else:
+            print(vdf.groupby(model.stratify_cols).count()["code"])
 
     m = model(df, vdf)
     training_dataset, testing_dataset = m.split_data(test_size=0.1,
