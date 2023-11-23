@@ -66,14 +66,15 @@ def tune_model(model: CardModel) -> None:
         print(null_vdf)
         raise ValueError("There are null values in test dataset")
 
+    m = model(df, vdf)
+
     if args.verbose:
         print(vdf)
-        if isinstance(model, BinaryMixin):
-            print(vdf.query("@model.feature_key == True").groupby(model.stratify_cols).count()['code'])
+        if isinstance(m, BinaryMixin):
+            print(vdf.query("@m.feature_key == True").groupby(m.stratify_cols).count()['code'])
         else:
-            print(vdf.groupby(model.stratify_cols).count()["code"])
+            print(vdf.groupby(m.stratify_cols).count()["code"])
 
-    m = model(df, vdf)
     training_dataset, testing_dataset = m.split_data(test_size=0.1,
                                                      batch_size=args.batch_size,
                                                      random_state=args.random_state,
