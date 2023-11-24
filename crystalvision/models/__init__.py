@@ -21,11 +21,13 @@ TEST_IMG_DIR = Path(MODEL_DIR, "..", "test")
 try:
     from .mixins.tuners import BayesianOptimizationTunerMixin, RandomSearchTunerMixin
     from .mixins.compiles import BinaryMixin, CategoricalMixin
+    from .layers import Identity, MinPooling2D
     from .base import CardModel
     from ..data.dataset import imagine_database, make_database
 except ImportError:
     from crystalvision.models.mixins.tuners import BayesianOptimizationTunerMixin, RandomSearchTunerMixin
     from crystalvision.models.mixins.compiles import BinaryMixin, CategoricalMixin
+    from crystalvision.models.layers import Identity, MinPooling2D
     from crystalvision.models.base import CardModel
     from crystalvision.data.dataset import imagine_database, make_database
 
