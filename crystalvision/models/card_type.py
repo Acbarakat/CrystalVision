@@ -75,7 +75,7 @@ class CardTyping(CategoricalMixin, BayesianOptimizationTunerMixin, CardModel):
             layers.Conv2D(64, (3, 3), padding='same', activation='relu'),
             pl2(padding='same'),
             layers.Conv2D(128, (3, 3), padding='same', activation='relu'),
-            # layers.Dropout(0.2, seed=seed),
+            layers.Dropout(0.2, seed=seed),
             layers.Flatten(),
             # layers.Dense(hp.Int('dense_units', min_value=128, max_value=512, step=128), activation='relu'),
             layers.Dense(128, activation='relu'),
@@ -83,16 +83,17 @@ class CardTyping(CategoricalMixin, BayesianOptimizationTunerMixin, CardModel):
         ], name=self.name)
 
         optimizer = hp.Choice('optimizer',
-                              values=['adam', 'rmsprop', 'sgd', 'nesterov'])
+                              values=['adam', 'rmsprop'])
+
+        learning_rate = hp.Float('learning_rate',
+                                 min_value=1.0e-4,
+                                 max_value=1.0e-2,
+                                 sampling='LOG')
 
         if optimizer == 'adam':
-            optimizer = optimizers.Adam()
+            optimizer = optimizers.Adam(learning_rate=learning_rate)
         elif optimizer == 'rmsprop':
-            optimizer = optimizers.RMSprop()
-        elif optimizer == 'nesterov':
-            optimizer = optimizers.SGD(momentum=0.9, nesterov=True)
-        else:
-            optimizer = optimizers.SGD()
+            optimizer = optimizers.RMSprop(learning_rate=learning_rate)
 
         m.compile(optimizer=optimizer,
                   loss=self.loss,
