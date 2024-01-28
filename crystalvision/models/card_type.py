@@ -61,11 +61,13 @@ class CardTyping(CategoricalMixin, BayesianOptimizationTunerMixin, CardModel):
         Returns:
             A model instance.
         """
-        pooling_type = hp.Choice('pooling', values=['maxavg', 'avgmax'])
-        if pooling_type == 'max':
+        pooling_type = hp.Choice('pooling', values=['maxavg', 'avgmax', 'maxmax'])
+        if pooling_type == 'maxavg':
             pl1, pl2 = layers.MaxPooling2D, layers.AveragePooling2D
-        else:
+        elif pooling_type == 'avgmax':
             pl1, pl2 = layers.AveragePooling2D, layers.MaxPooling2D
+        else:
+            pl1, pl2 = layers.MaxPooling2D, layers.MaxPooling2D
 
         m = models.Sequential(layers=[
             layers.Conv2D(32, (3, 3), padding='same', activation='relu', input_shape=self.IMAGE_SHAPE),
