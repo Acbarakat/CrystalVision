@@ -15,43 +15,19 @@ import json
 import math
 from typing import Tuple, List, Any
 
-import numpy as np
 from pandas import DataFrame
 import tensorflow as tf
 from sklearn.model_selection import train_test_split
 from keras import callbacks, models
-from keras.utils import image_utils, io_utils
+from keras.utils import image_utils
 from keras.utils.image_dataset import paths_and_labels_to_dataset
 from keras_tuner import HyperModel, HyperParameters
 
 from crystalvision.models import MODEL_DIR
+from crystalvision.models.callbacks import StopOnValue
 
 
 from ..data.dataset import extendDataset
-
-
-class StopOnValue(callbacks.Callback):
-    def __init__(
-        self,
-        monitor: str ="val_loss",
-        monitor_op: Any = np.equal,
-        value: float = 0.0,
-    ):
-        super().__init__()
-
-        self.monitor = monitor
-        self.monitor_op = monitor_op
-        self.value = value
-
-    def on_epoch_end(self, epoch, logs=None) -> None:
-        if logs is None:
-            return
-
-        if self.monitor_op(logs[self.monitor], self.value):
-            io_utils.print_msg(
-                f"\nReached {self.monitor} of {logs[self.monitor]} ({self.monitor_op} {self.value}). Stopping training."
-            )
-            self.model.stop_training = True
 
 
 class CardModel(HyperModel):
