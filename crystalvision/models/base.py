@@ -15,6 +15,7 @@ import json
 import math
 from typing import Tuple, List, Any
 
+import pandas as pd
 from pandas import DataFrame
 import tensorflow as tf
 from sklearn.model_selection import train_test_split
@@ -33,6 +34,7 @@ class CardModel(HyperModel):
     """Base hypermodel for Cards."""
 
     IMAGE_SHAPE: Tuple[int, int, int] = (250, 179, 3)
+    DEFAULT_EPOCHS = 30
 
     def __init__(self,
                  df: DataFrame,
@@ -99,7 +101,7 @@ class CardModel(HyperModel):
             image_size=self.IMAGE_SHAPE[:2],
             num_channels=self.IMAGE_SHAPE[2],
             labels=y_train.tolist(),
-            label_mode="binary" if len(self.labels) < 3 else "categorical",
+            label_mode=self.LABEL_MODE,
             num_classes=len(self.labels),
             interpolation=interpolation,
         ), batch_size=batch_size)
@@ -109,7 +111,7 @@ class CardModel(HyperModel):
             image_size=self.IMAGE_SHAPE[:2],
             num_channels=self.IMAGE_SHAPE[2],
             labels=y_test.tolist(),
-            label_mode="binary" if len(self.labels) < 3 else "categorical",
+            label_mode=self.LABEL_MODE,
             num_classes=len(self.labels),
             interpolation=interpolation,
         ), batch_size=batch_size)
@@ -126,7 +128,7 @@ class CardModel(HyperModel):
             image_size=self.IMAGE_SHAPE[:2],
             num_channels=self.IMAGE_SHAPE[2],
             labels=self.vdf_codes,
-            label_mode="binary" if len(self.labels) < 3 else "categorical",
+            label_mode=self.LABEL_MODE,
             num_classes=len(self.labels),
             interpolation=interpolation,
         ).batch(batch_size).cache()
@@ -218,7 +220,7 @@ class CardModel(HyperModel):
             train_ds: tf.data.Dataset,
             *args,
             testing_data: tf.data.Dataset | None = None,
-            epochs: int = 30,
+            epochs: int | None = None,
             **kwargs) -> Any:
         """
         Train the hypermodel.
@@ -228,8 +230,8 @@ class CardModel(HyperModel):
             model: `keras.Model` built in the `build()` function
             train_ds (tf.data.Dataset): Training data
             *args: All arguments passed to `Tuner.search`
-            epochs (int): epochs (iterations on a dataset).
-                (default is 30)
+            epochs (int | None): epochs (iterations on a dataset).
+                (default is DEFAULT_EPOCHS)
             testing_data (tf.data.Dataset): Testing data.
                 (default is None)
             **kwargs: All arguments passed to `Tuner.search()` are in the
@@ -250,6 +252,8 @@ class CardModel(HyperModel):
 
             If return a float, it should be the `objective` value.
         """
+        if epochs is None:
+            epochs = self.DEFAULT_EPOCHS
         try:
             history = model.fit(train_ds,
                                 epochs=epochs,
