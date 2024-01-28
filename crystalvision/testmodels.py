@@ -29,10 +29,10 @@ from sklearn.metrics import accuracy_score
 from scipy.optimize import minimize
 from scipy.optimize._minimize import MINIMIZE_METHODS
 
-from data import DATA_DIR
-from data.dataset import make_database
-from models import MODEL_DIR
-from models.ensemble import hard_activation, MyEnsembleVoteClassifier
+from crystalvision.data.base import DATA_DIR
+from crystalvision.data.dataset import make_database
+from crystalvision.models.base import MODEL_DIR
+from crystalvision.models.ensemble import hard_activation, MyEnsembleVoteClassifier
 
 
 CATEGORIES: Tuple[str] = (
@@ -47,7 +47,7 @@ CATEGORIES: Tuple[str] = (
 )
 IMAGE_DF: pd.DataFrame = pd.read_json(os.path.join(os.path.dirname(__file__),
                                                    "testmodels.json"))
-
+# print(IMAGE_DF)
 
 def load_image(url: str,
                img_fname: str = '') -> np.ndarray:
@@ -143,7 +143,7 @@ def test_models() -> pd.DataFrame:
     df = df.merge(mdf, on="code", how='left', sort=False)
     # df['ex_burst'] = df['ex_burst'].astype('uint8')
     # df['multicard'] = df['multicard'].astype('uint8')
-    df["mono"] = df["element"].apply(lambda i: len(i) == 1 if i else True).astype(str)
+    # df["mono"] = df["element"].apply(lambda i: len(i) == 1 if i else True).astype(bool)
 
     df["uid"] = range(df.shape[0])
     df["images"] = df.apply(
@@ -173,7 +173,7 @@ def test_models() -> pd.DataFrame:
             labels = json.load(fp)
 
         models = [
-            load_model(mpath) for mpath in iglob(MODEL_DIR + os.sep + f"{category}_*.h5")
+            load_model(mpath) for mpath in iglob(str(MODEL_DIR) + os.sep + f"{category}_*.h5") if "_model" not in mpath
         ]
         ensemble_path = os.path.join(MODEL_DIR, f"{category}_ensemble.h5")
         if len(models) > 1:
