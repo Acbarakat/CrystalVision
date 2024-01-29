@@ -43,11 +43,11 @@ if gpus:
         print(e)
 
 
-def tune_model(model: CardModel) -> None:
+def tune_model(model: CardModel, num: int = 3) -> None:
     parser = argparse.ArgumentParser(description="Model tuning command-line tool")
-    parser.add_argument("--num", "-n", type=int, default=3, help="The number of best models to keep")
+    parser.add_argument("--num", "-n", type=int, default=num, help="The number of best models to keep")
     parser.add_argument("--random-state", "-r", type=int, default=23, help="The random state number")
-    parser.add_argument("--batch-size", "-b", type=int, default=256, help="The number images to batch")
+    parser.add_argument("--batch-size", "-b", type=int, default=512, help="The number images to batch")
     parser.add_argument("--disable-clear-cache", "-d", action="store_true", help="Disable the clearing of the tuning cache")
     parser.add_argument("--verbose", "-v", action="store_true", help="Enable verbose mode")
 
