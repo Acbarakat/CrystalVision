@@ -1,4 +1,3 @@
-
 import warnings
 from typing import Any, Callable, List, Iterable
 
@@ -6,7 +5,6 @@ import numpy as np
 import pandas as pd
 import tensorflow as tf
 from scipy.optimize import minimize
-from scipy.optimize._minimize import MINIMIZE_METHODS
 from keras import backend as K
 from keras.layers import Activation, Flatten, Input, Layer
 from keras.models import Model
@@ -23,16 +21,18 @@ from sklearn.model_selection import train_test_split
 class MyEnsembleVoteClassifier(EnsembleVoteClassifier):
     """Custom ensemble voting classifier class."""
 
-    def __init__(self,
-                 clfs,
-                 voting: str = "hard",
-                 weights: Any | None = None,
-                 verbose: int = 0,
-                 use_clones: bool = True,
-                 fit_base_estimators: bool = False,
-                 activation: Callable | None = None,
-                 activation_kwargs: dict | None = None,
-                 labels: List[str] | None = None):
+    def __init__(
+        self,
+        clfs,
+        voting: str = "hard",
+        weights: Any | None = None,
+        verbose: int = 0,
+        use_clones: bool = True,
+        fit_base_estimators: bool = False,
+        activation: Callable | None = None,
+        activation_kwargs: dict | None = None,
+        labels: List[str] | None = None,
+    ):
         """
         _summary_
 
@@ -55,12 +55,9 @@ class MyEnsembleVoteClassifier(EnsembleVoteClassifier):
             labels (List[str] | None, optional): _description_.
                 (defaults is None)
         """
-        super().__init__(clfs,
-                         voting,
-                         weights,
-                         verbose,
-                         use_clones,
-                         fit_base_estimators)
+        super().__init__(
+            clfs, voting, weights, verbose, use_clones, fit_base_estimators
+        )
         self.clfs_ = clfs
         self.activation = tf.keras.activations.linear
         if activation is not None:
@@ -78,26 +75,21 @@ class MyEnsembleVoteClassifier(EnsembleVoteClassifier):
             predictions = np.asarray([clf(X) for clf in self.clfs_]).T
             # print(predictions.shape)
             if predictions.shape[0] == 1:
-                return self.activation(predictions[0],
-                                       **self.activation_kwargs)
+                return self.activation(predictions[0], **self.activation_kwargs)
 
-            predictions = np.array([
-                np.argmax(p, axis=1) for p in predictions.T
-            ])
+            predictions = np.array([np.argmax(p, axis=1) for p in predictions.T])
             return self.activation(predictions.T, **self.activation_kwargs)
 
-        return np.asarray(
-            [self.le_.transform(clf(X)) for clf in self.clfs_]
-        ).T
+        return np.asarray([self.le_.transform(clf(X)) for clf in self.clfs_]).T
 
     def _predict_probas(self, X) -> np.ndarray:
         """Collect results from clf.predict_proba calls."""
         probas = [clf(X, training=False) for clf in self.clfs_]
         probas = [np.dot(c, w) for c, w in zip(probas, self.weights)]
         probas = np.sum(probas, axis=0) / len(self.clfs_)
-        return normalize(probas, axis=1, norm='l1')
+        return normalize(probas, axis=1, norm="l1")
 
-    def predict(self, X: np.ndarray, dtype: str = '') -> np.ndarray:
+    def predict(self, X: np.ndarray, dtype: str = "") -> np.ndarray:
         """
         Predict class labels for X.
 
@@ -125,7 +117,7 @@ class MyEnsembleVoteClassifier(EnsembleVoteClassifier):
             maj = np.argmax(predictions, axis=1)
 
         else:  # 'hard' voting
-            predictions = predictions.astype('int64')
+            predictions = predictions.astype("int64")
             maj = np.apply_along_axis(
                 lambda x: np.argmax(np.bincount(x, weights=self.weights)),
                 axis=1,
@@ -168,14 +160,17 @@ class MyEnsembleVoteClassifier(EnsembleVoteClassifier):
         result = self._predict(X)
         if hasattr(result, "numpy"):
             result = result.numpy()
-        result = pd.DataFrame(result,
-                              columns=[c.name for c in self.clfs_])
+        result = pd.DataFrame(result, columns=[c.name for c in self.clfs_])
 
         if self.labels:
             result.replace(dict(enumerate(self.labels)), inplace=True)
 
-        result = result.apply(lambda p: accuracy_score(y, p, sample_weight=sample_weight),
-                              axis="rows", raw=True, result_type='reduce')
+        result = result.apply(
+            lambda p: accuracy_score(y, p, sample_weight=sample_weight),
+            axis="rows",
+            raw=True,
+            result_type="reduce",
+        )
         result["ensemble"] = self.score(X, y)
         result.name = "accuracy"
 
@@ -183,7 +178,7 @@ class MyEnsembleVoteClassifier(EnsembleVoteClassifier):
 
     def generate_model(self) -> Model:
         """Converts/creates our ensemble as a single Model."""
-        if self.voting == 'soft':
+        if self.voting == "soft":
             raise NotImplementedError("Cannot generate a 'soft' voting model")
 
         name = self.clfs_[0].name.replace("_1", "_ensemble")
@@ -358,30 +353,19 @@ class MyEnsembleVoteClassifier(EnsembleVoteClassifier):
 
         return results
 
-        print(self.score(X_val, y_val))
-        for method in MINIMIZE_METHODS:
-            results = minimize(
-                function_to_minimize,
-                init_weights,
-                bounds=[(0, 5)] * len(self.clfs_),
-                # method=method,
-            )
-            #print(results)
-            #print(results["x"])
-            self.weights = results["x"]
-            print(method, self.score(X_val, y_val), results["x"])
-
 
 class HardBinaryVote(Layer):
     """Hard Binary Voting Layer."""
 
-    def __init__(self,
-                 trainable: bool = False,
-                 name: str = "hard_vote",
-                 dtype: str | None = None,
-                 dynamic: bool = False,
-                 vote_weights: Iterable[int] | Iterable[float] | None = None,
-                 **kwargs):
+    def __init__(
+        self,
+        trainable: bool = False,
+        name: str = "hard_vote",
+        dtype: str | None = None,
+        dynamic: bool = False,
+        vote_weights: Iterable[int] | Iterable[float] | None = None,
+        **kwargs
+    ):
         """
         Initialize the voting layer.
 
@@ -414,8 +398,7 @@ class HardBinaryVote(Layer):
         super().__init__(trainable, name, dtype, dynamic, **kwargs)
         self.vote_weights = None
         if vote_weights is not None:
-            self.vote_weights = tf.convert_to_tensor(vote_weights,
-                                                     name="votes")
+            self.vote_weights = tf.convert_to_tensor(vote_weights, name="votes")
 
     def call(self, inputs: Any) -> tf.Tensor | Iterable[tf.Tensor]:
         """
@@ -454,7 +437,9 @@ class HardBinaryVote(Layer):
         inputs = K.transpose(inputs)
 
         return K.tf.map_fn(
-            lambda z: K.cast(K.argmax(K.tf.math.bincount(z, weights=self.vote_weights)), 'int32'),  # noqa: E501
+            lambda z: K.cast(
+                K.argmax(K.tf.math.bincount(z, weights=self.vote_weights)), "int32"
+            ),  # noqa: E501
             inputs,
         )
 
@@ -496,10 +481,12 @@ class HardClassVote(HardBinaryVote):
         Returns:
             A tensor or list/tuple of tensors.
         """
-        inputs = K.transpose(K.cast(K.argmax(inputs), 'int32'))
+        inputs = K.transpose(K.cast(K.argmax(inputs), "int32"))
 
         return K.tf.map_fn(
-            lambda z: K.cast(K.argmax(K.tf.math.bincount(z, weights=self.vote_weights)), 'int32'),  # noqa: E501
+            lambda z: K.cast(
+                K.argmax(K.tf.math.bincount(z, weights=self.vote_weights)), "int32"
+            ),  # noqa: E501
             inputs,
         )
 
@@ -527,6 +514,8 @@ def hard_activation(z: Any, threshold: float = 0.5) -> tf.Tensor:
     return K.cast(K.greater_equal(z, threshold), tf.dtypes.int32)
 
 
-get_custom_objects().update({
-    'hard_activation': Activation(hard_activation, name="hard_activaiton"),
-})
+get_custom_objects().update(
+    {
+        "hard_activation": Activation(hard_activation, name="hard_activaiton"),
+    }
+)
