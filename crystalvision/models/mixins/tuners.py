@@ -1,6 +1,9 @@
 from functools import cached_property
 import os
 import shutil
+from typing import List
+
+from keras_tuner import Objective
 from keras_tuner.engine.tuner import maybe_distribute
 from keras_tuner.tuners import BayesianOptimization, Hyperband, RandomSearch
 
@@ -38,6 +41,13 @@ class TunerMixin:
 
     MAX_EXECUTIONS = 1
 
+    @cached_property
+    def objective(self) -> List[Objective]:
+        loss_objective = Objective("val_loss", "min")
+        accuracy_objective = Objective("val_accuracy", "max")
+
+        return [accuracy_objective, loss_objective]
+
     def clear_cache(self) -> None:
         """Delete the hypermodel cache."""
         project_dir = os.path.join(MODEL_DIR, self.name)
@@ -71,7 +81,7 @@ class RandomSearchTunerMixin(TunerMixin):
         """Random search tuner."""
         return MyRandomSearch(
             self,
-            objective="val_accuracy",
+            objective=self.objective,
             max_trials=self.MAX_TRIALS,
             executions_per_trial=self.MAX_EXECUTIONS,
             directory=MODEL_DIR,
@@ -87,7 +97,7 @@ class HyperbandTunerMixin(TunerMixin):
         """Hyperband search tuner."""
         return Hyperband(
             self,
-            objective="val_accuracy",
+            objective=self.objective,
             executions_per_trial=self.MAX_EXECUTIONS,
             directory=MODEL_DIR,
             project_name=self.name,
@@ -155,7 +165,7 @@ class BayesianOptimizationTunerMixin(RandomSearchTunerMixin):
         """Bayesian Optimization tuner."""
         return MyBayesianOptimization(
             self,
-            objective="val_accuracy",
+            objective=self.objective,
             max_trials=self.MAX_TRIALS,
             executions_per_trial=self.MAX_EXECUTIONS,
             directory=MODEL_DIR,
