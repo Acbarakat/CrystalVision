@@ -9,7 +9,7 @@ from typing import Any
 class StopOnValue(callbacks.Callback):
     def __init__(
         self,
-        monitor: str ="val_loss",
+        monitor: str = "val_loss",
         monitor_op: Any = np.equal,
         value: float = 0.0,
     ):
