@@ -13,21 +13,29 @@ Todo:
 import os
 import json
 import math
-from typing import Tuple, List, Any
+from typing import Tuple, List, Any, Set
+from functools import partial
 
 from pandas import DataFrame
 import tensorflow as tf
 from sklearn.model_selection import train_test_split
-from keras import callbacks, models
+from keras import callbacks, models, layers, optimizers
 from keras.utils import image_utils
 from keras.utils.image_dataset import paths_and_labels_to_dataset
 from keras_tuner import HyperModel, HyperParameters
 
 from crystalvision.models import MODEL_DIR
 from crystalvision.models.callbacks import StopOnValue
+from crystalvision.models.layers import MinPooling2D
 
 
 from ..data.dataset import extendDataset
+
+
+layers.MinPooling2D = MinPooling2D
+optimizers.Amsgrad = partial(optimizers.Adam, amsgrad=True)
+optimizers.Nesterov = partial(optimizers.SGD, nesterov=True)
+optimizers.RMSpropCentered = partial(optimizers.RMSprop, centered=True)
 
 
 class CardModel(HyperModel):
@@ -36,12 +44,14 @@ class CardModel(HyperModel):
     IMAGE_SHAPE: Tuple[int, int, int] = (250, 179, 3)
     DEFAULT_EPOCHS = 30
 
-    def __init__(self,
-                 df: DataFrame,
-                 vdf: DataFrame,
-                 feature_key: str,
-                 name: str = "unknown",
-                 tunable: bool = True) -> None:
+    def __init__(
+        self,
+        df: DataFrame,
+        vdf: DataFrame,
+        feature_key: str,
+        name: str = "unknown",
+        tunable: bool = True,
+    ) -> None:
         """
         Init the base hypermodel, CardModel.
 
@@ -72,63 +82,87 @@ class CardModel(HyperModel):
         self.labels = uq1
 
         self.callbacks = [
-            callbacks.EarlyStopping(monitor='val_accuracy',
-                                    min_delta=0.005,
-                                    patience=2,
-                                    restore_best_weights=True),
+            callbacks.EarlyStopping(
+                monitor="val_accuracy",
+                min_delta=0.005,
+                patience=2,
+                restore_best_weights=True,
+            ),
             StopOnValue(),
         ]
 
-    def split_data(self,
-                   interpolation: str = "bilinear",
-                   batch_size: int = 64,
-                   **kwargs) -> List[tf.data.Dataset]:
+    DEFAULT_BATCH_SIZE = 256
+
+    def split_data(
+        self,
+        interpolation: str = "bilinear",
+        batch_size: int | None = None,
+        random_state: int | None = None,
+        **kwargs,
+    ) -> List[tf.data.Dataset]:
+        if batch_size is None:
+            batch_size = self.DEFAULT_BATCH_SIZE
         stratify = self.df[self.stratify_cols]
-        # print(self.df.groupby(self.stratify_cols).count()['id'])
         img_paths = self.df["filename"]
-        interpolation = image_utils.get_interpolation("bilinear")
+        interpolation = image_utils.get_interpolation(interpolation)
 
-        X_train, X_test, y_train, y_test = train_test_split(img_paths,
-                                                            self.df_codes,
-                                                            **kwargs,
-                                                            stratify=stratify)
+        X_train, X_test, y_train, y_test = train_test_split(
+            img_paths,
+            self.df_codes,
+            **kwargs,
+            stratify=stratify,
+            random_state=random_state,
+        )
 
-        training_dataset = extendDataset(paths_and_labels_to_dataset(
-            image_paths=X_train.tolist(),
-            image_size=self.IMAGE_SHAPE[:2],
-            num_channels=self.IMAGE_SHAPE[2],
-            labels=y_train.tolist(),
-            label_mode=self.LABEL_MODE,
-            num_classes=len(self.labels),
-            interpolation=interpolation,
-        ), batch_size=batch_size)
+        training_dataset = extendDataset(
+            paths_and_labels_to_dataset(
+                image_paths=X_train.tolist(),
+                image_size=self.IMAGE_SHAPE[:2],
+                num_channels=self.IMAGE_SHAPE[2],
+                labels=y_train.tolist(),
+                label_mode=self.LABEL_MODE,
+                num_classes=len(self.labels),
+                interpolation=interpolation,
+            ),
+            batch_size=batch_size,
+        )
 
-        testing_dataset = extendDataset(paths_and_labels_to_dataset(
-            image_paths=X_test.tolist(),
-            image_size=self.IMAGE_SHAPE[:2],
-            num_channels=self.IMAGE_SHAPE[2],
-            labels=y_test.tolist(),
-            label_mode=self.LABEL_MODE,
-            num_classes=len(self.labels),
-            interpolation=interpolation,
-        ), batch_size=batch_size)
+        testing_dataset = extendDataset(
+            paths_and_labels_to_dataset(
+                image_paths=X_test.tolist(),
+                image_size=self.IMAGE_SHAPE[:2],
+                num_channels=self.IMAGE_SHAPE[2],
+                labels=y_test.tolist(),
+                label_mode=self.LABEL_MODE,
+                num_classes=len(self.labels),
+                interpolation=interpolation,
+            ),
+            batch_size=batch_size,
+        )
 
         return training_dataset, testing_dataset
 
-    def split_validation(self,
-                         interpolation: str = "bilinear",
-                         batch_size: int = 64) -> List[tf.data.Dataset]:
-        interpolation = image_utils.get_interpolation("bilinear")
+    def split_validation(
+        self, interpolation: str = "bilinear", batch_size: int | None = None
+    ) -> List[tf.data.Dataset]:
+        interpolation = image_utils.get_interpolation(interpolation)
+        if batch_size is None:
+            batch_size = self.DEFAULT_BATCH_SIZE
 
         validation_dataset = paths_and_labels_to_dataset(
-            image_paths=self.vdf['filename'].tolist(),
+            image_paths=self.vdf["filename"].tolist(),
             image_size=self.IMAGE_SHAPE[:2],
             num_channels=self.IMAGE_SHAPE[2],
             labels=self.vdf_codes,
             label_mode=self.LABEL_MODE,
             num_classes=len(self.labels),
             interpolation=interpolation,
-        ).batch(batch_size).cache()
+        )
+
+        if batch_size:
+            validation_dataset = validation_dataset.batch(batch_size)
+
+        validation_dataset = validation_dataset.cache()
 
         return [validation_dataset]
 
@@ -153,9 +187,7 @@ class CardModel(HyperModel):
 
         return df
 
-    def build(self,
-              hp: HyperParameters,
-              seed: int | None = None) -> models.Model:
+    def build(self, hp: HyperParameters, seed: int | None = None) -> models.Model:
         """
         Build a model.
 
@@ -170,11 +202,50 @@ class CardModel(HyperModel):
         """
         raise NotImplementedError()
 
-    def tune_and_save(self,
-                      train_ds: tf.data.Dataset,
-                      test_ds: tf.data.Dataset,
-                      validation_ds: tf.data.Dataset,
-                      num_models: int = 1) -> None:
+    @staticmethod
+    def _pooling2d_choice(
+        name: str, hp: HyperParameters, exclude: Set[str] | None = None
+    ) -> Tuple[str, layers.Layer]:
+        choices: Set[str] = {"Min", "Max", "Average"}
+        if exclude is not None:
+            choices -= exclude
+
+        pooling_type = hp.Choice(name, values=list(choices))
+
+        return pooling_type, getattr(layers, f"{pooling_type}Pooling2D")
+
+    @staticmethod
+    def _optimizer_choice(
+        name: str, hp: HyperParameters, exclude: Set[str] | None = None
+    ) -> Tuple[str, optimizers.Optimizer]:
+        choices: Set[str] = {
+            "Adadelta",
+            "Adagrad",
+            "Adam",
+            "Amsgrad",
+            # "NonFusedAdam", "NonFusedAmsgrad"
+            "Adamax",
+            "Ftrl",
+            "SGD",
+            "Nesterov",
+            "Nadam",
+            "RMSprop",
+            "RMSpropCentered",
+        }
+
+        if exclude is not None:
+            choices -= exclude
+
+        optimizer = hp.Choice(name, values=list(choices))
+
+        return optimizer, getattr(optimizers, optimizer)
+
+    def tune_and_save(
+        self,
+        num_models: int = 1,
+        random_state: int | None = None,
+        save_models: bool = True,
+    ) -> None:
         """
         Tune the hypermodel and save the top num_models as .h5 files.
 
@@ -184,24 +255,35 @@ class CardModel(HyperModel):
             validation_ds (tf.data.Dataset): validation data
             num_models (int, optional): Top number of models to save.
                 (defaults is 1)
+            save_models (bool, optional): Save the top models.
+                (default is True)
         """
-        self.search(train_ds, test_ds, validation_ds)
+        self.search(random_state=random_state)
         # print(self.tuner.results_summary())
-        best_models, best_hparams = (
-            self.tuner.get_best_models(num_models=num_models),
-            self.tuner.get_best_hyperparameters(num_trials=num_models)
-        )
-        
-        best_trials = {}
-        for idx, (bm, bhp) in enumerate(zip(best_models, best_hparams)):
-            # print(bm.summary())
-            # print(bm.optimizer.get_config())
-            trial = self.tuner.oracle.trials[bm.name[-2:]]
-            print(bm.name, bhp.values, trial.score)
-            best_trials[bm.name] = bhp.values
-            best_trials[bm.name]["score"] = trial.score
-            bm.save(os.path.join(MODEL_DIR,
-                                 f"{self.name}_{idx + 1}.h5"))
+        best_trials = []
+
+        if save_models:
+            best_hparams = self.tuner.get_best_hyperparameters(num_trials=num_models)
+            best_models = (self.tuner.get_best_models(num_models=num_models),)
+
+            for idx, (bm, bhp) in enumerate(zip(best_models, best_hparams)):
+                # print(bm.summary())
+                # print(bm.optimizer.get_config())
+                trial = self.tuner.oracle.trials[bm.name[-2:]]
+                best_trials.append(dict(name=bm.name, score=trial.score, **bhp.values))
+                bm.save(os.path.join(MODEL_DIR, f"{self.name}_{idx + 1}.h5"))
+        else:
+            for trial in self.tuner.oracle.get_best_trials(num_trials=num_models):
+                best_trials.append(
+                    dict(
+                        name=f"trial_{trial.trial_id}",
+                        score=trial.score,
+                        **trial.hyperparameters.values,
+                    )
+                )
+
+        best_trials = DataFrame(best_trials).set_index("name")
+        print(best_trials)
 
         # Save the labels
         with open(os.path.join(MODEL_DIR, f"{self.name}.json"), "w+") as fp:
@@ -211,14 +293,16 @@ class CardModel(HyperModel):
         with open(os.path.join(MODEL_DIR, f"{self.name}_best.json"), "w+") as fp:
             json.dump(best_trials, fp, indent=4)
 
-    def fit(self,
-            hp: HyperParameters,
-            model: models.Model,
-            train_ds: tf.data.Dataset,
-            *args,
-            testing_data: tf.data.Dataset | None = None,
-            epochs: int | None = None,
-            **kwargs) -> Any:
+    def fit(
+        self,
+        hp: HyperParameters,
+        model: models.Model,
+        *args,
+        epochs: int | None = None,
+        batch_size: int | None = None,
+        random_state: int | None = None,
+        **kwargs,
+    ) -> Any:
         """
         Train the hypermodel.
 
@@ -229,6 +313,8 @@ class CardModel(HyperModel):
             *args: All arguments passed to `Tuner.search`
             epochs (int | None): epochs (iterations on a dataset).
                 (default is DEFAULT_EPOCHS)
+            batch_size (int | None): batch_size of dataset.
+                (default is DEFAULT_BATCH_SIZE)
             testing_data (tf.data.Dataset): Testing data.
                 (default is None)
             **kwargs: All arguments passed to `Tuner.search()` are in the
@@ -250,21 +336,38 @@ class CardModel(HyperModel):
             If return a float, it should be the `objective` value.
         """
         if epochs is None:
-            epochs = self.DEFAULT_EPOCHS
+            epochs = hp.values.get("epochs", self.DEFAULT_EPOCHS)
+        if batch_size is None:
+            batch_size = hp.values.get("batch_size", self.DEFAULT_BATCH_SIZE)
+
+        train_ds, testing_ds = self.split_data(
+            test_size=0.1,
+            random_state=random_state,
+            shuffle=True,
+            batch_size=hp.values.get("batch_size"),
+        )
+        validation_ds = self.split_validation(batch_size=hp.values.get("batch_size"))[0]
+
         try:
-            history = model.fit(train_ds,
-                                epochs=epochs,
-                                steps_per_epoch=len(train_ds),
-                                **kwargs)
-            test_loss, test_acc = model.evaluate(testing_data)
+            history = model.fit(
+                train_ds,
+                batch_size=batch_size,
+                epochs=epochs,
+                steps_per_epoch=len(train_ds),
+                validation_data=validation_ds,
+                validation_batch_size=batch_size,
+                validation_steps=len(validation_ds),
+                **kwargs,
+            )
+            test_loss, test_acc = model.evaluate(testing_ds)
         except tf.errors.ResourceExhaustedError:
             return -math.inf
 
         return {
-            "loss": history.history['loss'][-1],
-            "accuracy": history.history['accuracy'][-1],
-            "val_loss": history.history['val_loss'][-1],
-            "val_accuracy": history.history['val_accuracy'][-1],
+            "loss": history.history["loss"][-1],
+            "accuracy": history.history["accuracy"][-1],
+            "val_loss": history.history["val_loss"][-1],
+            "val_accuracy": history.history["val_accuracy"][-1],
             "test_loss": test_loss,
             "test_accuracy": test_acc,
         }

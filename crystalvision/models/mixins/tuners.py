@@ -44,7 +44,7 @@ class TunerMixin:
         if os.path.exists(project_dir):
             shutil.rmtree(project_dir)
 
-    def search(self, train_ds, test_ds, validation_ds) -> None:
+    def search(self, random_state: int | None = None) -> None:
         """
         Perform a search for best hyperparameter configuations.
 
@@ -55,11 +55,10 @@ class TunerMixin:
         """
         tf.keras.backend.clear_session()
 
-        self.tuner.search(train_ds,
-                          testing_data=test_ds,
-                          validation_data=validation_ds,
-                          validation_steps=len(validation_ds),
-                          callbacks=self.callbacks)
+        self.tuner.search(
+            random_state=random_state,
+            callbacks=self.callbacks,
+        )
 
 
 class RandomSearchTunerMixin(TunerMixin):
@@ -70,12 +69,14 @@ class RandomSearchTunerMixin(TunerMixin):
     @cached_property
     def tuner(self) -> RandomSearch:
         """Random search tuner."""
-        return MyRandomSearch(self,
-                              objective="val_accuracy",
-                              max_trials=self.MAX_TRIALS,
-                              executions_per_trial=self.MAX_EXECUTIONS,
-                              directory=MODEL_DIR,
-                              project_name=self.name)
+        return MyRandomSearch(
+            self,
+            objective="val_accuracy",
+            max_trials=self.MAX_TRIALS,
+            executions_per_trial=self.MAX_EXECUTIONS,
+            directory=MODEL_DIR,
+            project_name=self.name,
+        )
 
 
 class HyperbandTunerMixin(TunerMixin):
@@ -84,11 +85,13 @@ class HyperbandTunerMixin(TunerMixin):
     @cached_property
     def tuner(self) -> RandomSearch:
         """Hyperband search tuner."""
-        return Hyperband(self,
-                         objective="val_accuracy",
-                         executions_per_trial=self.MAX_EXECUTIONS,
-                         directory=MODEL_DIR,
-                         project_name=self.name)
+        return Hyperband(
+            self,
+            objective="val_accuracy",
+            executions_per_trial=self.MAX_EXECUTIONS,
+            directory=MODEL_DIR,
+            project_name=self.name,
+        )
 
 
 class MyBayesianOptimization(BayesianOptimization):
@@ -115,6 +118,34 @@ class MyBayesianOptimization(BayesianOptimization):
             model._name += f"_trial{trial.trial_id}"
         return model
 
+    def get_best_models(self, num_models=1):
+        """Returns the best model(s), as determined by the objective.
+
+        This method is for querying the models trained during the search.
+        For best performance, it is recommended to retrain your Model on the
+        full dataset using the best hyperparameters found during `search`,
+        which can be obtained using `tuner.get_best_hyperparameters()`.
+
+        Args:
+            num_models: Optional number of best models to return.
+                Defaults to 1.
+
+        Returns:
+            List of trained models sorted from the best to the worst.
+        """
+        best_trials = self.oracle.get_best_trials(num_models)
+        models = []
+
+        for trial in best_trials:
+            try:
+                models.append(self.load_model(trial))
+            except Exception as err:
+                print(err)
+                print(trial)
+                tf.keras.backend.clear_session()
+
+        return models
+
 
 class BayesianOptimizationTunerMixin(RandomSearchTunerMixin):
     """Bayesian Optimization Tuner Mixin."""
@@ -122,9 +153,11 @@ class BayesianOptimizationTunerMixin(RandomSearchTunerMixin):
     @cached_property
     def tuner(self) -> RandomSearch:
         """Bayesian Optimization tuner."""
-        return MyBayesianOptimization(self,
-                                      objective="val_accuracy",
-                                      max_trials=self.MAX_TRIALS,
-                                      executions_per_trial=self.MAX_EXECUTIONS,
-                                      directory=MODEL_DIR,
-                                      project_name=self.name)
+        return MyBayesianOptimization(
+            self,
+            objective="val_accuracy",
+            max_trials=self.MAX_TRIALS,
+            executions_per_trial=self.MAX_EXECUTIONS,
+            directory=MODEL_DIR,
+            project_name=self.name,
+        )
