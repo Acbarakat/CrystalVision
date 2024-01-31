@@ -19,7 +19,7 @@ class BinaryMixin:
     @cached_property
     def metrics(self) -> List[metrics.Metric]:
         """A list of Binary Metrics."""
-        return [tf.keras.metrics.BinaryAccuracy(name='accuracy')]
+        return [tf.keras.metrics.BinaryAccuracy(name="accuracy")]
 
 
 class BinaryCrossMixin:
@@ -35,7 +35,7 @@ class BinaryCrossMixin:
     @cached_property
     def metrics(self) -> List[metrics.Metric]:
         """A list of Binary Metrics."""
-        return [tf.keras.metrics.BinaryCrossentropy(name='accuracy')]
+        return [tf.keras.metrics.BinaryCrossentropy(name="accuracy")]
 
 
 class CategoricalMixin:
@@ -51,7 +51,7 @@ class CategoricalMixin:
     @cached_property
     def metrics(self) -> List[metrics.Metric]:
         """A list of Categorical Metrics."""
-        return [tf.keras.metrics.CategoricalAccuracy(name='accuracy')]
+        return [tf.keras.metrics.CategoricalAccuracy(name="accuracy")]
 
 
 class SparseCategoricalMixin:
@@ -67,4 +67,4 @@ class SparseCategoricalMixin:
     @cached_property
     def metrics(self) -> List[metrics.Metric]:
         """A list of Sparse Categorical Metrics."""
-        return [tf.keras.metrics.SparseCategoricalCrossentropy(name='accuracy')]
+        return [tf.keras.metrics.SparseCategoricalCrossentropy(name="accuracy")]
