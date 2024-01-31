@@ -39,17 +39,22 @@ def make_database(clear_extras: bool = False) -> pd.DataFrame:
 
     df["thumbs"] = df["images"].apply(lambda i: [j.split("/")[-1] for j in i["thumbs"]])
     df["images"] = df["images"].apply(lambda i: [j.split("/")[-1] for j in i["full"]])
-    df["ex_burst"] = df["ex_burst"].apply(lambda i: i == "\u25cb" or i == "1").astype(bool)
-    df["multicard"] = df["multicard"].apply(lambda i: i == "\u25cb" or i == "1").astype(bool)
+    df["ex_burst"] = (
+        df["ex_burst"].apply(lambda i: i == "\u25cb" or i == "1").astype(bool)
+    )
+    df["multicard"] = (
+        df["multicard"].apply(lambda i: i == "\u25cb" or i == "1").astype(bool)
+    )
     df["mono"] = df["element"].apply(lambda i: len(i) == 1 if i else True).astype(bool)
     df["element"] = df["element"].str.join("_")
-    df["power"] = df["power"].str.replace(" ", "").replace("\u2015", "").replace("\uff0d", "")
+    df["power"] = (
+        df["power"].str.replace(" ", "").replace("\u2015", "").replace("\uff0d", "")
+    )
 
     return df
 
 
-def imagine_database(image: str = "thumbs",
-                     clear_extras: bool = False) -> pd.DataFrame:
+def imagine_database(image: str = "thumbs", clear_extras: bool = False) -> pd.DataFrame:
     """
     Explode the database based on `image` kwarg.
 
@@ -77,8 +82,9 @@ def imagine_database(image: str = "thumbs",
     df.query("rarity != 'B'", inplace=True)
 
     # Ignore Full Art Cards
-    df.query(f"~{image}.str.contains('_FL') and ~{image}.str.contains('_2_')",
-             inplace=True)
+    df.query(
+        f"~{image}.str.contains('_FL') and ~{image}.str.contains('_2_')", inplace=True
+    )
 
     # Ignore Promo Cards, they tend to be Full Art
     df.query(f"~{image}.str.contains('_PR')", inplace=True)
@@ -87,7 +93,10 @@ def imagine_database(image: str = "thumbs",
     df.query(f"~{image}.str.contains('_premium')", inplace=True)
 
     # WA: Bad Download/Image from server
-    df.query(f"{image} not in ('8-080C_es.jpg', '11-138S_fr.jpg', '12-049H_fr_Premium.jpg', '13-106H_de.jpg')", inplace=True)
+    df.query(
+        f"{image} not in ('8-080C_es.jpg', '11-138S_fr.jpg', '12-049H_fr_Premium.jpg', '13-106H_de.jpg')",
+        inplace=True,
+    )
 
     # Source image folder
     df = df.copy()  # WA: for pandas modification on slice
@@ -107,18 +116,20 @@ def imagine_database(image: str = "thumbs",
     return df
 
 
-def extendDataset(ds: tf.data.Dataset,
-                  seed: int | None = None,
-                  name: str | None = None,
-                  batch_size: int | None = 32,
-                  shuffle: bool = False,
-                  reshuffle_each_iteration: bool = True,
-                  flip_horizontal: bool = False,
-                  flip_vertical: bool = True,
-                  brightness: float = 0.1,
-                  contrast: Tuple[float] | None = (0.80, 1.25),
-                  saturation: Tuple[float] | None = (0.65, 1.75),
-                  hue: float = 0.025) -> tf.data.Dataset:
+def extendDataset(
+    ds: tf.data.Dataset,
+    seed: int | None = None,
+    name: str | None = None,
+    batch_size: int | None = 32,
+    shuffle: bool = False,
+    reshuffle_each_iteration: bool = True,
+    flip_horizontal: bool = False,
+    flip_vertical: bool = True,
+    brightness: float = 0.1,
+    contrast: Tuple[float] | None = (0.80, 1.25),
+    saturation: Tuple[float] | None = (0.65, 1.75),
+    hue: float = 0.025,
+) -> tf.data.Dataset:
     """
     Preprocess and add any extra augmented entries to the dataset.
 
@@ -158,31 +169,34 @@ def extendDataset(ds: tf.data.Dataset,
     """
     assert brightness >= 0.0, "brightness must be >= 0.0"
 
-    preprocess_layer = layers.Rescaling(1. / 255)
+    preprocess_layer = layers.Rescaling(1.0 / 255)
     # preprocess_layer = layers.Rescaling(scale=1./127.5, offset=-1)
 
     if name:
         ds.element_spec[0]._name = f"orig_{name}"
 
-    ds = ds.map(tf.autograph.experimental.do_not_convert(
-        lambda x, y: (preprocess_layer(x), y)),
-        name=name
+    ds = ds.map(
+        tf.autograph.experimental.do_not_convert(lambda x, y: (preprocess_layer(x), y)),
+        name=name,
     )
     if flip_horizontal:
         raise NotImplementedError("flip_horizontal")
 
     if flip_vertical:
         vertical_ds = ds.map(
-            lambda x, y: (tf.image.flip_up_down(x), y),
-            name=f"vertical_{name}"
+            lambda x, y: (tf.image.flip_up_down(x), y), name=f"vertical_{name}"
         )
         cardinality = ds.cardinality() * 2
         # ds = ds.concatenate(veritcal_ds)
-        ds = tf.data.Dataset.from_tensor_slices([ds, vertical_ds]).interleave(
-            lambda x: x,
-            cycle_length=2,
-            num_parallel_calls=tf.data.AUTOTUNE,
-        ).apply(tf.data.experimental.assert_cardinality(cardinality))
+        ds = (
+            tf.data.Dataset.from_tensor_slices([ds, vertical_ds])
+            .interleave(
+                lambda x: x,
+                cycle_length=2,
+                num_parallel_calls=tf.data.AUTOTUNE,
+            )
+            .apply(tf.data.experimental.assert_cardinality(cardinality))
+        )
 
     ds = ds.cache()
 
@@ -190,26 +204,44 @@ def extendDataset(ds: tf.data.Dataset,
 
     if brightness:
         ds = ds.map(
-            lambda x, y: (tf.clip_by_value(tf.image.random_brightness(x, brightness, seed=seed), 0.0, 1.0), y),
-            name=f"brightness_{name}"
+            lambda x, y: (
+                tf.clip_by_value(
+                    tf.image.random_brightness(x, brightness, seed=seed), 0.0, 1.0
+                ),
+                y,
+            ),
+            name=f"brightness_{name}",
         )
 
     if contrast:
         ds = ds.map(
-            lambda x, y: (tf.clip_by_value(tf.image.random_contrast(x, *contrast, seed=seed), 0.0, 1.0), y),
-            name=f"contrast_{name}"
+            lambda x, y: (
+                tf.clip_by_value(
+                    tf.image.random_contrast(x, *contrast, seed=seed), 0.0, 1.0
+                ),
+                y,
+            ),
+            name=f"contrast_{name}",
         )
 
     if saturation:
         ds = ds.map(
-            lambda x, y: (tf.clip_by_value(tf.image.random_saturation(x, *saturation, seed=seed), 0.0, 1.0), y),
-            name=f"saturated_{name}"
+            lambda x, y: (
+                tf.clip_by_value(
+                    tf.image.random_saturation(x, *saturation, seed=seed), 0.0, 1.0
+                ),
+                y,
+            ),
+            name=f"saturated_{name}",
         )
 
     if hue:
         ds = ds.map(
-            lambda x, y: (tf.clip_by_value(tf.image.random_hue(x, hue, seed=seed), 0.0, 1.0), y),
-            name=f"hue_{name}"
+            lambda x, y: (
+                tf.clip_by_value(tf.image.random_hue(x, hue, seed=seed), 0.0, 1.0),
+                y,
+            ),
+            name=f"hue_{name}",
         )
 
     for effect in effects:
@@ -217,10 +249,12 @@ def extendDataset(ds: tf.data.Dataset,
 
     if shuffle:
         # buffer_size = batch_size * 2 if batch_size else ds.cardinality()
-        ds = ds.shuffle(buffer_size=ds.cardinality(),
-                        seed=seed,
-                        reshuffle_each_iteration=reshuffle_each_iteration,
-                        name=f"shuffled_{name}")
+        ds = ds.shuffle(
+            buffer_size=ds.cardinality(),
+            seed=seed,
+            reshuffle_each_iteration=reshuffle_each_iteration,
+            name=f"shuffled_{name}",
+        )
 
     if batch_size:
         ds = ds.batch(batch_size, name=f"batch_{name}")
