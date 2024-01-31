@@ -32,19 +32,4 @@ class MinPooling2D(MaxPooling2D):
         return -MaxPooling2D.call(self, -inputs)
 
 
-get_custom_objects().update({
-    'Identity': Identity,
-    'MinPooling2D': MinPooling2D
-})
-
-
-if __name__ == '__main__':
-    x = tf.constant([[1., 2., 3.],
-                     [4., 5., 6.],
-                     [7., 8., 9.]])
-    x = tf.reshape(x, [1, 3, 3, 1])
-    min_pool_2d = MinPooling2D(pool_size=(2, 2),
-                               strides=(1, 1),
-                               padding='valid')
-    result = min_pool_2d(x)
-    print(result)
+get_custom_objects().update({"Identity": Identity, "MinPooling2D": MinPooling2D})
