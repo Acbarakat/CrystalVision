@@ -27,11 +27,20 @@ def test_identity() -> None:
 
 
 def test_threshold():
-    x = tf.constant([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0], [7.0, 8.0, 9.0]])
+    x = tf.constant([[1.1, 2.0, 3.0], [4.0, 5.0, 6.0], [7.0, 8.0, 9.0]])
     layer = Threshold(5.0)
     result = layer(x)
-    print(result)
     assert result.shape == (3, 3), "TensorShape mismatch"
     assert np.equal(
         result, [[0, 0, 0], [0, 1, 1], [1, 1, 1]]
+    ).all(), "Failed to create Threshold"
+
+
+def test_threshold_nonzero():
+    x = tf.constant([[1.1, 2.0, 3.0], [4.9, 5.0, 6.0], [7.0, 8.0, 9.0]])
+    layer = Threshold(5.0, below_zero=False)
+    result = layer(x)
+    assert result.shape == (3, 3), "TensorShape mismatch"
+    assert np.equal(
+        result, [[1.1, 2, 3], [4.9, 1, 1], [1, 1, 1]]
     ).all(), "Failed to create Threshold"

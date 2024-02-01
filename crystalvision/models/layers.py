@@ -35,12 +35,17 @@ class MinPooling2D(MaxPooling2D):
 
 @keras_export("keras.layers.Threshold")
 class Threshold(Layer):
-    def __init__(self, threshold, **kwargs):
+    def __init__(self, threshold, below_zero=True, **kwargs):
         super(Threshold, self).__init__(**kwargs)
         self.threshold = threshold
+        self.below_zero = below_zero
 
     def call(self, inputs):
-        return K.cast(K.greater_equal(inputs, self.threshold), K.floatx())
+        result = K.cast(K.greater_equal(inputs, self.threshold), K.floatx())
+        if self.below_zero:
+            return result
+
+        return (inputs * K.cast(K.less(inputs, self.threshold), K.floatx())) + result
 
 
 get_custom_objects().update(
