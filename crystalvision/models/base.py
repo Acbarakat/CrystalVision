@@ -12,10 +12,10 @@ Todo:
 """
 import os
 import json
-import math
 from typing import Tuple, List, Any, Set
 from functools import partial
 
+import numpy as np
 from pandas import DataFrame
 import tensorflow as tf
 from sklearn.model_selection import train_test_split
@@ -260,30 +260,48 @@ class CardModel(HyperModel):
         """
         self.search(random_state=random_state)
         # print(self.tuner.results_summary())
-        best_trials = []
+        df = []
 
+        best_trials = self.tuner.oracle.get_best_trials(num_trials=num_models)
         if save_models:
             best_hparams = self.tuner.get_best_hyperparameters(num_trials=num_models)
-            best_models = (self.tuner.get_best_models(num_models=num_models),)
+            best_models = self.tuner.get_best_models(num_models=num_models)
 
-            for idx, (bm, bhp) in enumerate(zip(best_models, best_hparams)):
-                # print(bm.summary())
-                # print(bm.optimizer.get_config())
-                trial = self.tuner.oracle.trials[bm.name[-2:]]
-                best_trials.append(dict(name=bm.name, score=trial.score, **bhp.values))
+            for idx, (bm, bhp, bt) in enumerate(
+                zip(best_models, best_hparams, best_trials)
+            ):
+                df.append(
+                    dict(
+                        name=bm.name,
+                        score=bt.score,
+                        loss=bt.metrics.get_last_value("loss"),
+                        accuracy=bt.metrics.get_last_value("accuracy"),
+                        val_loss=bt.metrics.get_last_value("val_loss"),
+                        val_accuracy=bt.metrics.get_last_value("val_accuracy"),
+                        test_loss=bt.metrics.get_last_value("test_loss"),
+                        test_accuracy=bt.metrics.get_last_value("test_accuracy"),
+                        **bhp.values,
+                    )
+                )
                 bm.save(os.path.join(MODEL_DIR, f"{self.name}_{idx + 1}.h5"))
         else:
-            for trial in self.tuner.oracle.get_best_trials(num_trials=num_models):
-                best_trials.append(
+            for trial in best_trials:
+                df.append(
                     dict(
                         name=f"trial_{trial.trial_id}",
                         score=trial.score,
+                        loss=trial.metrics.get_last_value("loss"),
+                        accuracy=trial.metrics.get_last_value("accuracy"),
+                        val_loss=trial.metrics.get_last_value("val_loss"),
+                        val_accuracy=trial.metrics.get_last_value("val_accuracy"),
+                        test_loss=trial.metrics.get_last_value("test_loss"),
+                        test_accuracy=trial.metrics.get_last_value("test_accuracy"),
                         **trial.hyperparameters.values,
                     )
                 )
 
-        best_trials = DataFrame(best_trials).set_index("name")
-        print(best_trials)
+        df = DataFrame(df).set_index("name")
+        print(df)
 
         # Save the labels
         with open(os.path.join(MODEL_DIR, f"{self.name}.json"), "w+") as fp:
@@ -361,13 +379,22 @@ class CardModel(HyperModel):
             )
             test_loss, test_acc = model.evaluate(testing_ds)
         except tf.errors.ResourceExhaustedError:
-            return -math.inf
+            return (np.nan, np.nan)
+
+        val_accuracy = history.history["val_accuracy"][-1]
+        # if val_accuracy > 1.0:
+        #      val_accuracy = np.nan
+
+        val_loss = history.history["val_loss"][-1]
+        if val_loss < 0.0:
+            val_loss = np.nan
 
         return {
             "loss": history.history["loss"][-1],
             "accuracy": history.history["accuracy"][-1],
-            "val_loss": history.history["val_loss"][-1],
-            "val_accuracy": history.history["val_accuracy"][-1],
+            "val_loss": val_loss,
+            "val_accuracy": val_accuracy,
             "test_loss": test_loss,
             "test_accuracy": test_acc,
+            "multi_objective": (val_accuracy, val_loss),
         }
