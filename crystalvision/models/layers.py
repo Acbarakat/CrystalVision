@@ -5,6 +5,7 @@ import tensorflow.compat.v2 as tf
 from keras.utils.generic_utils import get_custom_objects
 from keras.engine.base_layer import Layer
 from keras.layers.pooling.max_pooling2d import MaxPooling2D
+from keras import backend as K
 
 # isort: off
 from tensorflow.python.util.tf_export import keras_export
@@ -32,4 +33,16 @@ class MinPooling2D(MaxPooling2D):
         return -MaxPooling2D.call(self, -inputs)
 
 
-get_custom_objects().update({"Identity": Identity, "MinPooling2D": MinPooling2D})
+@keras_export("keras.layers.Threshold")
+class Threshold(Layer):
+    def __init__(self, threshold, **kwargs):
+        super(Threshold, self).__init__(**kwargs)
+        self.threshold = threshold
+
+    def call(self, inputs):
+        return K.cast(K.greater_equal(inputs, self.threshold), K.floatx())
+
+
+get_custom_objects().update(
+    {"Identity": Identity, "MinPooling2D": MinPooling2D, "Threshold": Threshold}
+)

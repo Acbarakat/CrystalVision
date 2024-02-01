@@ -3,7 +3,7 @@
 import numpy as np
 import tensorflow.compat.v2 as tf
 
-from crystalvision.models.layers import MinPooling2D, Identity
+from crystalvision.models.layers import MinPooling2D, Identity, Threshold
 
 
 def test_minpooling2d() -> None:
@@ -24,3 +24,14 @@ def test_identity() -> None:
     result = layer(x)
     assert result.shape == (1, 3, 3, 1), "TensorShape mismatch"
     assert np.equal(result, x).all(), "Failed to create Identity"
+
+
+def test_threshold():
+    x = tf.constant([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0], [7.0, 8.0, 9.0]])
+    layer = Threshold(5.0)
+    result = layer(x)
+    print(result)
+    assert result.shape == (3, 3), "TensorShape mismatch"
+    assert np.equal(
+        result, [[0, 0, 0], [0, 1, 1], [1, 1, 1]]
+    ).all(), "Failed to create Threshold"
