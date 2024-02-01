@@ -1,9 +1,9 @@
 from functools import cached_property
 import os
 import shutil
-from typing import List
 
 from keras_tuner import Objective
+from keras_tuner.src.engine.objective import MultiObjective
 from keras_tuner.engine.tuner import maybe_distribute
 from keras_tuner.tuners import BayesianOptimization, Hyperband, RandomSearch
 
@@ -42,11 +42,11 @@ class TunerMixin:
     MAX_EXECUTIONS = 1
 
     @cached_property
-    def objective(self) -> List[Objective]:
+    def objective(self) -> MultiObjective:
         loss_objective = Objective("val_loss", "min")
         accuracy_objective = Objective("val_accuracy", "max")
 
-        return [accuracy_objective, loss_objective]
+        return MultiObjective([accuracy_objective, loss_objective])
 
     def clear_cache(self) -> None:
         """Delete the hypermodel cache."""
