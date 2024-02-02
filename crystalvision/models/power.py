@@ -21,9 +21,7 @@ except ImportError:
 
 
 class Power(CategoricalMixin, BayesianOptimizationTunerMixin, CardModel):
-    def __init__(self,
-                 df: DataFrame,
-                 vdf: DataFrame) -> None:
+    def __init__(self, df: DataFrame, vdf: DataFrame) -> None:
         super().__init__(df, vdf, "power", name="power")
 
         self.stratify_cols.extend(["element", "type_en"])
@@ -49,9 +47,7 @@ class Power(CategoricalMixin, BayesianOptimizationTunerMixin, CardModel):
 
         return df
 
-    def build(self,
-              hp: HyperParameters,
-              seed: int | None = None) -> models.Sequential:
+    def build(self, hp: HyperParameters, seed: int | None = None) -> models.Sequential:
         """
         Build a model.
 
@@ -62,30 +58,42 @@ class Power(CategoricalMixin, BayesianOptimizationTunerMixin, CardModel):
             A model instance.
         """
 
-        m = models.Sequential(layers=[
-            layers.Conv2D(32, (3, 3), padding='same', activation='relu', input_shape=self.IMAGE_SHAPE),
-            layers.MaxPooling2D(padding='same'),
-            layers.Conv2D(64, kernel_size=(3, 3), padding='same', activation='relu'),
-            layers.MaxPooling2D(padding='same'),
-            layers.Conv2D(128, kernel_size=(3, 3), padding='same', activation='relu'),
-            layers.MaxPooling2D(padding='same'),
-            layers.Dropout(0.2, seed=seed),
-            layers.Flatten(),
-            layers.Dense(hp.Int('dense_units', min_value=128, max_value=512, step=128), activation='relu'),
-            layers.Dense(len(self.labels), activation="softmax")
-        ], name=self.name)
+        m = models.Sequential(
+            layers=[
+                layers.Conv2D(
+                    32,
+                    (3, 3),
+                    padding="same",
+                    activation="relu",
+                    input_shape=self.IMAGE_SHAPE,
+                ),
+                layers.MaxPooling2D(padding="same"),
+                layers.Conv2D(
+                    64, kernel_size=(3, 3), padding="same", activation="relu"
+                ),
+                layers.MaxPooling2D(padding="same"),
+                layers.Conv2D(
+                    128, kernel_size=(3, 3), padding="same", activation="relu"
+                ),
+                layers.MaxPooling2D(padding="same"),
+                layers.Dropout(0.2, seed=seed),
+                layers.Flatten(),
+                layers.Dense(
+                    hp.Int("dense_units", min_value=128, max_value=512, step=128),
+                    activation="relu",
+                ),
+                layers.Dense(len(self.labels), activation="softmax"),
+            ],
+            name=self.name,
+        )
 
-        learning_rate = hp.Float('learning_rate',
-                                 min_value=1.0e-5,
-                                 max_value=1.0e-2,
-                                 sampling='LOG')
+        learning_rate = hp.Float(
+            "learning_rate", min_value=1.0e-5, max_value=1.0e-2, sampling="LOG"
+        )
 
-        optimizer = optimizers.Adam(learning_rate=learning_rate,
-                                    amsgrad=True)
+        optimizer = optimizers.Adam(learning_rate=learning_rate, amsgrad=True)
 
-        m.compile(optimizer=optimizer,
-                  loss=self.loss,
-                  metrics=self.metrics)
+        m.compile(optimizer=optimizer, loss=self.loss, metrics=self.metrics)
         return m
 
 
