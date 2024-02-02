@@ -43,10 +43,14 @@ class TunerMixin:
 
     @cached_property
     def objective(self) -> MultiObjective:
-        loss_objective = Objective("val_loss", "min")
-        accuracy_objective = Objective("val_accuracy", "max")
-
-        return MultiObjective([accuracy_objective, loss_objective])
+        return MultiObjective(
+            [
+                Objective("val_accuracy", "max"),
+                Objective("test_accuracy", "max"),
+                Objective("val_loss", "min"),
+                Objective("test_loss", "min"),
+            ]
+        )
 
     def clear_cache(self) -> None:
         """Delete the hypermodel cache."""

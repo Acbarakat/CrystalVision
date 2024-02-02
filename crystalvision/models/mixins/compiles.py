@@ -68,3 +68,23 @@ class SparseCategoricalMixin:
     def metrics(self) -> List[metrics.Metric]:
         """A list of Sparse Categorical Metrics."""
         return [tf.keras.metrics.SparseCategoricalCrossentropy(name="accuracy")]
+
+
+class OneHotMeanIoUMixin:
+    """OneHotMeanIoU compile mixins."""
+
+    LABEL_MODE = "binary"
+
+    @cached_property
+    def loss(self) -> losses.BinaryCrossentropy:
+        """The Binary Cross loss function."""
+        return losses.BinaryCrossentropy()
+
+    @cached_property
+    def metrics(self) -> List[metrics.Metric]:
+        """A list of OneHotMeanIoUl Metrics."""
+        return [
+            tf.keras.metrics.OneHotMeanIoU(
+                num_classes=len(self.labels), name="accuracy"
+            )
+        ]
