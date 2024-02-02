@@ -373,11 +373,10 @@ class CardModel(HyperModel):
                 epochs=epochs,
                 steps_per_epoch=len(train_ds),
                 validation_data=validation_ds,
-                validation_batch_size=batch_size,
                 validation_steps=len(validation_ds),
                 **kwargs,
             )
-            test_loss, test_acc = model.evaluate(testing_ds)
+            test_loss, test_acc = model.evaluate(testing_ds, batch_size=batch_size)
         except tf.errors.ResourceExhaustedError:
             return (np.nan, np.nan)
 
@@ -389,6 +388,9 @@ class CardModel(HyperModel):
         if val_loss < 0.0:
             val_loss = np.nan
 
+        if test_loss < 0.0:
+            test_loss = np.nan
+
         return {
             "loss": history.history["loss"][-1],
             "accuracy": history.history["accuracy"][-1],
@@ -396,5 +398,5 @@ class CardModel(HyperModel):
             "val_accuracy": val_accuracy,
             "test_loss": test_loss,
             "test_accuracy": test_acc,
-            "multi_objective": (val_accuracy, val_loss),
+            "multi_objective": (val_accuracy, test_acc, val_loss, test_loss),
         }
