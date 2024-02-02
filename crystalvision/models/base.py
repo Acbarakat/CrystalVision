@@ -305,11 +305,16 @@ class CardModel(HyperModel):
 
         # Save the labels
         with open(os.path.join(MODEL_DIR, f"{self.name}.json"), "w+") as fp:
-            json.dump(self.labels.to_list(), fp)
+            json.dump(
+                self.labels.to_list()
+                if not isinstance(self.labels, list)
+                else self.labels,
+                fp,
+            )
 
         # Save the top X
         with open(os.path.join(MODEL_DIR, f"{self.name}_best.json"), "w+") as fp:
-            json.dump(best_trials, fp, indent=4)
+            json.dump(df.to_list(), fp, indent=4)
 
     def fit(
         self,
@@ -376,12 +381,11 @@ class CardModel(HyperModel):
                 validation_steps=len(validation_ds),
                 **kwargs,
             )
-            test_loss, test_acc = model.evaluate(testing_ds, batch_size=batch_size)
+            test_metrics = model.evaluate(testing_ds, return_dict=True)
         except tf.errors.ResourceExhaustedError:
             return (np.nan, np.nan, np.nan, np.nan)
 
-        print(f"test_lost: {test_loss}")
-        print(f"test_acc: {test_acc}")
+        print(f"test: {test_metrics}")
 
         val_accuracy = history.history["val_accuracy"][-1]
         # if val_accuracy > 1.0:
@@ -391,6 +395,8 @@ class CardModel(HyperModel):
         if val_loss < 0.0:
             val_loss = np.nan
 
+        test_acc = test_metrics["accuracy"]
+        test_loss = test_metrics["loss"]
         if test_loss < 0.0:
             test_loss = np.nan
 
