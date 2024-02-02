@@ -39,8 +39,11 @@ def test_threshold():
 def test_threshold_nonzero():
     x = tf.constant([[1.1, 2.0, 3.0], [4.9, 5.0, 6.0], [7.0, 8.0, 9.0]])
     layer = Threshold(5.0, below_zero=False)
-    result = layer(x)
+    result = layer(x).numpy()
     assert result.shape == (3, 3), "TensorShape mismatch"
     assert np.equal(
-        result, [[1.1, 2, 3], [4.9, 1, 1], [1, 1, 1]]
+        result,
+        np.array(
+            [[1.1, 2.0, 3.0], [4.9, 1.0, 1.0], [1.0, 1.0, 1.0]], dtype=result.dtype
+        ),
     ).all(), "Failed to create Threshold"
