@@ -378,7 +378,10 @@ class CardModel(HyperModel):
             )
             test_loss, test_acc = model.evaluate(testing_ds, batch_size=batch_size)
         except tf.errors.ResourceExhaustedError:
-            return (np.nan, np.nan)
+            return (np.nan, np.nan, np.nan, np.nan)
+
+        print(f"test_lost: {test_loss}")
+        print(f"test_acc: {test_acc}")
 
         val_accuracy = history.history["val_accuracy"][-1]
         # if val_accuracy > 1.0:
