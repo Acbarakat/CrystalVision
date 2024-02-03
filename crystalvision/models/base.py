@@ -383,7 +383,15 @@ class CardModel(HyperModel):
             )
             test_metrics = model.evaluate(testing_ds, return_dict=True)
         except tf.errors.ResourceExhaustedError:
-            return (np.nan, np.nan, np.nan, np.nan)
+            return {
+                "loss": np.nan,
+                "accuracy": np.nan,
+                "val_loss": np.nan,
+                "val_accuracy": np.nan,
+                "test_loss": np.nan,
+                "test_accuracy": np.nan,
+                "multi_objective": (np.nan, np.nan, np.nan, np.nan),
+            }
 
         print(f"test: {test_metrics}")
 
