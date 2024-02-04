@@ -2039,6 +2039,21 @@ test = ["hypothesis (>=6.46.1)", "pytest (>=7.3.2)", "pytest-asyncio (>=0.17.0)"
 xml = ["lxml (>=4.8.0)"]
 
 [[package]]
+name = "paretoset"
+version = "1.2.3"
+description = "Compute the Pareto (non-dominated) set, i.e., skyline operator/query."
+optional = false
+python-versions = "*"
+files = [
+    {file = "paretoset-1.2.3-py3-none-any.whl", hash = "sha256:7ee91e4e1bba1da50be94cca6f0d99fd5b61f0b4a7990b8e02a00c265880ba71"},
+    {file = "paretoset-1.2.3.tar.gz", hash = "sha256:c3605bf35a50661c68f38fde1e9cc816f00880f80f956a6423f9035eb0ca1977"},
+]
+
+[package.dependencies]
+numpy = "*"
+pandas = "*"
+
+[[package]]
 name = "parso"
 version = "0.8.3"
 description = "A Python Parser"
@@ -3485,4 +3500,4 @@ multidict = ">=4.0"
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.10,<3.11"
-content-hash = "5c98e09bb9f5f3f382b075d536bc154d2a4ba7bc01d21dcff1db15ca7aff4f74"
+content-hash = "ca536e1a368b261453e633c27b4439d541d35954f5bbbce00716371598703384"

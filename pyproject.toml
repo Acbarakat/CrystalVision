@@ -33,6 +33,11 @@ black = ">=24.1.1"
 ruff = ">=0.1.14"
 pytest = ">=8.0.0"
 
+
+
+[tool.poetry.group.debug.dependencies]
+paretoset = "^1.2.3"
+
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
