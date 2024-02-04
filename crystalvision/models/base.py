@@ -24,12 +24,16 @@ from keras.utils import image_utils
 from keras.utils.image_dataset import paths_and_labels_to_dataset
 from keras_tuner import HyperModel, HyperParameters
 
-from crystalvision.models import MODEL_DIR
-from crystalvision.models.callbacks import StopOnValue
-from crystalvision.models.layers import MinPooling2D
-
-
-from ..data.dataset import extendDataset
+try:
+    from . import MODEL_DIR
+    from .callbacks import StopOnValue
+    from .layers import MinPooling2D
+    from ..data.dataset import extendDataset
+except ImportError:
+    from crystalvision.models import MODEL_DIR
+    from crystalvision.models.callbacks import StopOnValue
+    from crystalvision.models.layers import MinPooling2D
+    from crystalvision.data.dataset import extendDataset
 
 
 layers.MinPooling2D = MinPooling2D
@@ -259,7 +263,7 @@ class CardModel(HyperModel):
                 (default is True)
         """
         self.search(random_state=random_state)
-        # print(self.tuner.results_summary())
+
         df = []
 
         best_trials = self.tuner.oracle.get_best_trials(num_trials=num_models)
@@ -300,21 +304,20 @@ class CardModel(HyperModel):
                     )
                 )
 
-        df = DataFrame(df).set_index("name")
+        df = DataFrame(df)
+        # .set_index("name").sort_values(
+        #     by=['accuracy', 'val_accuracy', 'test_accuracy', 'loss', 'val_loss', 'test_loss'],
+        #     ascending=[False, False, False, True, True, True]
+        # )
         print(df)
 
         # Save the labels
-        with open(os.path.join(MODEL_DIR, f"{self.name}.json"), "w+") as fp:
-            json.dump(
-                self.labels.to_list()
-                if not isinstance(self.labels, list)
-                else self.labels,
-                fp,
-            )
+        with open(MODEL_DIR / f"{self.name}.json", "w+") as fp:
+            json.dump(self.labels, fp)
 
         # Save the top X
-        with open(os.path.join(MODEL_DIR, f"{self.name}_best.json"), "w+") as fp:
-            json.dump(df.to_list(), fp, indent=4)
+        with open(MODEL_DIR / f"{self.name}_best.json", "w+") as fp:
+            df.to_json(fp)
 
     def fit(
         self,
@@ -384,29 +387,22 @@ class CardModel(HyperModel):
             test_metrics = model.evaluate(testing_ds, return_dict=True)
         except tf.errors.ResourceExhaustedError:
             return {
-                "loss": np.nan,
-                "accuracy": np.nan,
-                "val_loss": np.nan,
-                "val_accuracy": np.nan,
-                "test_loss": np.nan,
-                "test_accuracy": np.nan,
-                "multi_objective": (np.nan, np.nan, np.nan, np.nan),
+                "loss": np.inf,
+                "accuracy": 0,
+                "val_loss": np.inf,
+                "val_accuracy": 0,
+                "test_loss": np.inf,
+                "test_accuracy": 0,
+                "multi_objective": None,
             }
 
         print(f"test: {test_metrics}")
 
         val_accuracy = history.history["val_accuracy"][-1]
-        # if val_accuracy > 1.0:
-        #      val_accuracy = np.nan
-
         val_loss = history.history["val_loss"][-1]
-        if val_loss < 0.0:
-            val_loss = np.nan
 
         test_acc = test_metrics["accuracy"]
         test_loss = test_metrics["loss"]
-        if test_loss < 0.0:
-            test_loss = np.nan
 
         return {
             "loss": history.history["loss"][-1],
@@ -415,5 +411,5 @@ class CardModel(HyperModel):
             "val_accuracy": val_accuracy,
             "test_loss": test_loss,
             "test_accuracy": test_acc,
-            "multi_objective": (val_accuracy, test_acc, val_loss, test_loss),
+            "multi_objective": None,
         }

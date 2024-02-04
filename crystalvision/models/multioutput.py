@@ -30,6 +30,7 @@ except ImportError:
 class MultiLabel(OneHotMeanIoUMixin, BayesianOptimizationTunerMixin, CardModel):
     MAX_TRIALS = 50
     DEFAULT_EPOCHS = 50
+    MAX_CONSECUTIVE_FAILED_TRIALS = 5
 
     def __init__(self, df: DataFrame, vdf: DataFrame) -> None:
         self.name = "multilabel"
@@ -178,9 +179,6 @@ class MultiLabel(OneHotMeanIoUMixin, BayesianOptimizationTunerMixin, CardModel):
                 MyOneHotMeanIoU(
                     num_classes=len(self.labels), threshold=0.95, name="accuracy"
                 ),
-                # MyOneHotIoU(
-                #     num_classes=len(self.labels), target_class_ids=list(range(len(self.labels))), threshold=0.95, name="accuracy"
-                # ),
             ],
         )
         return m
@@ -191,4 +189,4 @@ if __name__ == "__main__":
 
     # from crystalvision.testmodels import IMAGE_DF
 
-    tune_model(MultiLabel, num=10, save_models=False)
+    tune_model(MultiLabel, num=MultiLabel.MAX_TRIALS, save_models=False)

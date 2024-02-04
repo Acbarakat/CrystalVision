@@ -58,7 +58,6 @@ def tune_model(model: CardModel, num: int = 5, save_models: bool = True) -> None
     )
 
     args = parser.parse_args()
-    print(args)
 
     df = imagine_database(clear_extras=True)
 

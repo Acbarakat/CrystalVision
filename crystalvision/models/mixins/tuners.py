@@ -47,8 +47,10 @@ class TunerMixin:
             [
                 Objective("val_accuracy", "max"),
                 Objective("test_accuracy", "max"),
-                Objective("val_loss", "min"),
-                Objective("test_loss", "min"),
+                Objective("accuracy", "max"),
+                # Objective("val_loss", "min"),
+                # Objective("test_loss", "min"),
+                # Objective("loss", "min"),
             ]
         )
 
@@ -160,9 +162,23 @@ class MyBayesianOptimization(BayesianOptimization):
 
         return models
 
+    def run_trial(self, trial, *args, **kwargs):
+        result = super().run_trial(trial, *args, **kwargs)
+
+        if isinstance(result, list) and len(result) == 1:
+            result = result[0]
+
+        objective = self.oracle.objective
+        if isinstance(result, dict) and isinstance(objective, MultiObjective):
+            result[objective.name] = objective.get_value(result)
+
+        return result
+
 
 class BayesianOptimizationTunerMixin(RandomSearchTunerMixin):
     """Bayesian Optimization Tuner Mixin."""
+
+    MAX_CONSECUTIVE_FAILED_TRIALS = 3
 
     @cached_property
     def tuner(self) -> RandomSearch:
@@ -174,4 +190,5 @@ class BayesianOptimizationTunerMixin(RandomSearchTunerMixin):
             executions_per_trial=self.MAX_EXECUTIONS,
             directory=MODEL_DIR,
             project_name=self.name,
+            max_consecutive_failed_trials=self.MAX_CONSECUTIVE_FAILED_TRIALS,
         )
