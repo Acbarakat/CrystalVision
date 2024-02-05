@@ -1,9 +1,9 @@
 """Test custom layers."""
 
 import numpy as np
-import tensorflow.compat.v2 as tf
+import tensorflow as tf
 
-from crystalvision.models.layers import MinPooling2D, Identity, Threshold
+from crystalvision.models.ext.layers import MinPooling2D, Identity, Threshold
 
 
 def test_minpooling2d() -> None:
@@ -28,7 +28,17 @@ def test_identity() -> None:
 
 def test_threshold():
     x = tf.constant([[1.1, 2.0, 3.0], [4.0, 5.0, 6.0], [7.0, 8.0, 9.0]])
-    layer = Threshold(5.0)
+    layer = Threshold(4.9)
+    result = layer(x)
+    assert result.shape == (3, 3), "TensorShape mismatch"
+    assert np.equal(
+        result, [[0, 0, 0], [0, 1, 1], [1, 1, 1]]
+    ).all(), "Failed to create Threshold"
+
+
+def test_threshold2():
+    x = tf.constant([[0.1, 0.2, 0.3], [0.4, 0.5, 0.6], [0.7, 0.8, 0.9]])
+    layer = Threshold(0.49)
     result = layer(x)
     assert result.shape == (3, 3), "TensorShape mismatch"
     assert np.equal(
@@ -38,12 +48,25 @@ def test_threshold():
 
 def test_threshold_nonzero():
     x = tf.constant([[1.1, 2.0, 3.0], [4.9, 5.0, 6.0], [7.0, 8.0, 9.0]])
-    layer = Threshold(5.0, below_zero=False)
+    layer = Threshold(4.9, below_zero=False)
     result = layer(x).numpy()
     assert result.shape == (3, 3), "TensorShape mismatch"
     assert np.equal(
         result,
         np.array(
             [[1.1, 2.0, 3.0], [4.9, 1.0, 1.0], [1.0, 1.0, 1.0]], dtype=result.dtype
+        ),
+    ).all(), "Failed to create Threshold"
+
+
+def test_threshold_nonzero2():
+    x = tf.constant([[0.1, 0.2, 0.3], [0.4, 0.5, 0.6], [0.7, 0.8, 0.9]])
+    layer = Threshold(0.49, below_zero=False)
+    result = layer(x).numpy()
+    assert result.shape == (3, 3), "TensorShape mismatch"
+    assert np.equal(
+        result,
+        np.array(
+            [[0.1, 0.2, 0.3], [0.4, 1.0, 1.0], [1.0, 1.0, 1.0]], dtype=result.dtype
         ),
     ).all(), "Failed to create Threshold"

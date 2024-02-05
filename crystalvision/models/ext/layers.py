@@ -5,7 +5,6 @@ import tensorflow.compat.v2 as tf
 from keras.utils.generic_utils import get_custom_objects
 from keras.engine.base_layer import Layer
 from keras.layers.pooling.max_pooling2d import MaxPooling2D
-from keras import backend as K
 
 # isort: off
 from tensorflow.python.util.tf_export import keras_export
@@ -30,22 +29,26 @@ class Identity(Layer):
 @keras_export("keras.layers.MinPooling2D", "keras.layers.MinPool2D")
 class MinPooling2D(MaxPooling2D):
     def call(self, inputs):
-        return -MaxPooling2D.call(self, -inputs)
+        return tf.negative(MaxPooling2D.call(self, tf.negative(inputs)))
 
 
 @keras_export("keras.layers.Threshold")
 class Threshold(Layer):
     def __init__(self, threshold, below_zero=True, **kwargs):
-        super(Threshold, self).__init__(**kwargs)
+        super(Threshold, self).__init__(name="threshold", **kwargs)
         self.threshold = threshold
         self.below_zero = below_zero
 
     def call(self, inputs):
-        result = K.cast(K.greater_equal(inputs, self.threshold), K.floatx())
-        if self.below_zero:
+        result = tf.keras.activations.relu(
+            inputs, threshold=self.threshold, max_value=1.0
+        )
+
+        if not self.below_zero:
+            # return tf.where(inputs >= self.threshold, 1.0, 0.0)
             return result
 
-        return (inputs * K.cast(K.less(inputs, self.threshold), K.floatx())) + result
+        return tf.where(inputs > self.threshold, 1.0, input)
 
 
 get_custom_objects().update(

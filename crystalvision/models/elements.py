@@ -24,8 +24,8 @@ try:
         BayesianOptimizationTunerMixin,
         RandomSearchTunerMixin,
     )
-    from .metrics import MyOneHotMeanIoU
-    from .callbacks import StopOnValue
+    from .ext.metrics import MyOneHotMeanIoU
+    from .ext.callbacks import StopOnValue
 except ImportError:
     from crystalvision.models import CardModel
     from crystalvision.models.mixins.compiles import (
@@ -37,8 +37,8 @@ except ImportError:
         BayesianOptimizationTunerMixin,
         RandomSearchTunerMixin,
     )
-    from crystalvision.models.metrics import MyOneHotMeanIoU
-    from crystalvision.models.callbacks import StopOnValue
+    from crystalvision.models.ext.metrics import MyOneHotMeanIoU
+    from crystalvision.models.ext.callbacks import StopOnValue
 
 
 class Mono(BinaryMixin, RandomSearchTunerMixin, CardModel):
@@ -190,14 +190,14 @@ class Element(CategoricalMixin, BayesianOptimizationTunerMixin, CardModel):
 
 class ElementV2(OneHotMeanIoUMixin, BayesianOptimizationTunerMixin, CardModel):
     def __init__(self, df: DataFrame, vdf: DataFrame) -> None:
-        super().__init__(df, vdf, "element", name="element_v2")
+        self.name = "element_v2"
+        self.tunable = True
 
-        self.stratify_cols.extend(["type_en"])
+        self.df: DataFrame = self.filter_dataframe(df.copy())
+        self.vdf: DataFrame = self.filter_dataframe(vdf.copy())
 
-        self.df["element_v2"] = self.df["element"].apply(lambda x: tuple(x.split("_")))
-        self.vdf["element_v2"] = self.vdf["element"].apply(
-            lambda x: tuple(x.split("_"))
-        )
+        self.feature_key: str = "element_v2"
+        self.stratify_cols: List[str] = ["element", "type_en"]
 
         self.labels: List[str] = [
             elem[0] for elem in self.df["element_v2"].unique() if len(elem) == 1

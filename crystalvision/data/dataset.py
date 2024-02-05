@@ -45,7 +45,13 @@ def make_database(clear_extras: bool = False) -> pd.DataFrame:
     df["multicard"] = (
         df["multicard"].apply(lambda i: i == "\u25cb" or i == "1").astype(bool)
     )
+    df["icons"] = df[["ex_burst", "multicard"]].apply(
+        lambda row: tuple(row[row].index), axis=1
+    )
     df["mono"] = df["element"].apply(lambda i: len(i) == 1 if i else True).astype(bool)
+    df["element_v2"] = df["element"].apply(
+        lambda x: tuple(x) if x is not None else tuple()
+    )
     df["element"] = df["element"].str.join("_")
     df["power"] = (
         df["power"].str.replace(" ", "").replace("\u2015", "").replace("\uff0d", "")

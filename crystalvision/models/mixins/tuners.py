@@ -111,7 +111,7 @@ class HyperbandTunerMixin(TunerMixin):
 
 
 class MyBayesianOptimization(BayesianOptimization):
-    """Random search tuner."""
+    """BayesianOptimization tuning with Gaussian process."""
 
     def load_model(self, trial):
         """

@@ -26,13 +26,13 @@ from keras_tuner import HyperModel, HyperParameters
 
 try:
     from . import MODEL_DIR
-    from .callbacks import StopOnValue
-    from .layers import MinPooling2D
+    from .ext.callbacks import StopOnValue
+    from .ext.layers import MinPooling2D
     from ..data.dataset import extendDataset
 except ImportError:
     from crystalvision.models import MODEL_DIR
-    from crystalvision.models.callbacks import StopOnValue
-    from crystalvision.models.layers import MinPooling2D
+    from crystalvision.models.ext.callbacks import StopOnValue
+    from crystalvision.models.ext.layers import MinPooling2D
     from crystalvision.data.dataset import extendDataset
 
 
@@ -384,7 +384,9 @@ class CardModel(HyperModel):
                 validation_steps=len(validation_ds),
                 **kwargs,
             )
-            test_metrics = model.evaluate(testing_ds, return_dict=True)
+            test_metrics = model.evaluate(
+                testing_ds, batch_size=batch_size, return_dict=True
+            )
         except tf.errors.ResourceExhaustedError:
             return {
                 "loss": np.inf,
@@ -396,20 +398,12 @@ class CardModel(HyperModel):
                 "multi_objective": None,
             }
 
-        print(f"test: {test_metrics}")
-
-        val_accuracy = history.history["val_accuracy"][-1]
-        val_loss = history.history["val_loss"][-1]
-
-        test_acc = test_metrics["accuracy"]
-        test_loss = test_metrics["loss"]
-
         return {
             "loss": history.history["loss"][-1],
             "accuracy": history.history["accuracy"][-1],
-            "val_loss": val_loss,
-            "val_accuracy": val_accuracy,
-            "test_loss": test_loss,
-            "test_accuracy": test_acc,
+            "val_loss": history.history["val_loss"][-1],
+            "val_accuracy": history.history["val_accuracy"][-1],
+            "test_loss": test_metrics["loss"],
+            "test_accuracy": test_metrics["accuracy"],
             "multi_objective": None,
         }

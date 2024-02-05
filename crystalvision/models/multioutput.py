@@ -15,26 +15,26 @@ from sklearn.preprocessing import MultiLabelBinarizer
 
 try:
     from . import CardModel
-    from .metrics import MyOneHotMeanIoU, MyOneHotIoU
-    from .callbacks import StopOnValue
+    from .ext.metrics import MyOneHotMeanIoU, MyOneHotIoU
+    from .ext.callbacks import StopOnValue
     from .mixins.compiles import OneHotMeanIoUMixin
     from .mixins.tuners import BayesianOptimizationTunerMixin
 except ImportError:
     from __init__ import CardModel
-    from crystalvision.models.metrics import MyOneHotMeanIoU, MyOneHotIoU
-    from crystalvision.models.callbacks import StopOnValue
+    from crystalvision.models.ext.metrics import MyOneHotMeanIoU, MyOneHotIoU
+    from crystalvision.models.ext.callbacks import StopOnValue
     from crystalvision.models.mixins.compiles import OneHotMeanIoUMixin
     from crystalvision.models.mixins.tuners import BayesianOptimizationTunerMixin
 
 
 class MultiLabel(OneHotMeanIoUMixin, BayesianOptimizationTunerMixin, CardModel):
-    MAX_TRIALS = 50
-    DEFAULT_EPOCHS = 50
-    MAX_CONSECUTIVE_FAILED_TRIALS = 5
+    MAX_TRIALS: int = 100
+    DEFAULT_EPOCHS: int = 50
+    MAX_CONSECUTIVE_FAILED_TRIALS: int = 5
 
     def __init__(self, df: DataFrame, vdf: DataFrame) -> None:
-        self.name = "multilabel"
-        self.tunable = True
+        self.name: str = "multilabel"
+        self.tunable: bool = True
 
         self._build = self.build
         self.build = self._build_wrapper

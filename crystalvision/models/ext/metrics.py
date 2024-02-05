@@ -1,6 +1,6 @@
 from typing import Optional, Union, List, Tuple
 
-import tensorflow.compat.v2 as tf
+import tensorflow as tf
 from keras import metrics
 from keras.dtensor import utils as dtensor_utils
 
