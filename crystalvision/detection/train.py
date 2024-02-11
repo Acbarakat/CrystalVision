@@ -6,15 +6,15 @@ from multiprocessing import freeze_support
 from ultralytics import YOLO
 
 
+# See https://github.com/ultralytics/ultralytics?tab=readme-ov-file#models
 DEFAULT_MODEL = {
-    "detect": "yolov8s.pt",
-    "segement": "yolov8s-seg.pt",
+    "detect": "yolov8x.pt",
+    "segement": "yolov8x-seg.pt",
 }
 
 
 def main(args):
     # Transfer learning
-    # See https://github.com/ultralytics/ultralytics?tab=readme-ov-file#models
     model = YOLO(args.model)  # load an official detection model
 
     results = model.train(
