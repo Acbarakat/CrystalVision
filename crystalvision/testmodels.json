@@ -31,7 +31,7 @@
         "code": "5-068L",
         "full_art": 1,
         "foil": 1,
-        "focal": 1,
+        "focal": 0,
         "uri": "http://img.over-blog-kiwi.com/2/21/23/79/20181209/ob_78f42c_y-shtola.jpg"
     },
     {
@@ -185,7 +185,7 @@
         "code": "18-086H",
         "full_art": 1,
         "foil": 1,
-        "focal": 0,
+        "focal": 1,
         "uri": "https://cdn.shopify.com/s/files/1/1715/6019/products/AsheEXFullArt_foil_500x.png"
     },
     {

@@ -133,5 +133,6 @@ dmypy.json
 img/
 thumb/
 frozen_models/
-.vscode/
+runs/
 cards.json
+yolo*.pt

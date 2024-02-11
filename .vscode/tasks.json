@@ -1,0 +1,108 @@
+{
+    // See https://go.microsoft.com/fwlink/?LinkId=733558
+    // for the documentation about the tasks.json format
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Annotate Images",
+            "type": "shell",
+            "command": "poetry",
+            "args": [
+                "run",
+                "labelme",
+                ".\\data\\labeling",
+                "--labelflags",
+                ".\\data\\labeling\\_flags.yaml",
+                "--autosave",
+                "--nodata"
+            ],
+            "problemMatcher": []
+        },
+        {
+            "label": "LabelMe2COCO",
+            "type": "shell",
+            "command": "poetry",
+            "args": [
+                "run",
+                "labelme2coco",
+                ".\\data\\labeling",
+                "-e",
+                ".\\data"
+            ],
+            "problemMatcher": []
+        },
+        {
+            "label": "LabelMe2YOLO: bbox",
+            "type": "shell",
+            "command": "poetry",
+            "args": [
+                "run",
+                // "labelme2yolo",
+                "python",
+                ".\\crystalvision\\detection\\labelconvert.py",
+                "--json_dir",
+                ".\\data\\labeling",
+                "--output_format",
+                "bbox",
+                "--test_size",
+                "0.0",
+                "--val_size",
+                "0.1",
+                "--flags"
+            ],
+            "problemMatcher": []
+        },
+        {
+            "label": "LabelMe2YOLO: polygon",
+            "type": "shell",
+            "command": "poetry",
+            "args": [
+                "run",
+                //"labelme2yolo",
+                "python",
+                ".\\crystalvision\\detection\\labelconvert.py",
+                "--json_dir",
+                ".\\data\\labeling",
+                "--output_format",
+                "polygon",
+                "--test_size",
+                "0.0",
+                "--val_size",
+                "0.1",
+                "--flags"
+            ],
+            "problemMatcher": []
+        },
+        {
+            "label": "Train Model: detect",
+            "type": "shell",
+            "command": "poetry",
+            "args": [
+                "run",
+                "python",
+                ".\\crystalvision\\detection\\train.py",
+                "--task",
+                "detect"
+            ],
+            "problemMatcher": []
+        },
+        {
+            "label": "Build Detection Model",
+            "dependsOrder": "sequence",
+            "dependsOn": ["LabelMe2YOLO: bbox", "Train Model: detect"],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            }
+        },
+        {
+            "label": "Build Segmentation Model",
+            "dependsOrder": "sequence",
+            "dependsOn": ["LabelMe2YOLO: polygon", "Train Model: segment"],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            }
+        }
+    ]
+}

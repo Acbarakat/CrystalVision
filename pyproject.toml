@@ -36,7 +36,33 @@ pytest = ">=8.0.0"
 
 
 [tool.poetry.group.debug.dependencies]
-paretoset = "^1.2.3"
+paretoset = ">=1.2.3"
+
+
+[tool.poetry.group.labeling.dependencies]
+pyqt5-qt5 = [
+    {version = "*", platform="linux"},
+    {version = "<=5.15.10", platform="win32"},
+]
+labelme = ">=5.4.1"
+pyqt5 = "^5.15.10"
+labelme2yolo = "^0.1.4"
+
+
+[tool.poetry.group.detection.dependencies]
+torch = {version = "^2.2.0+cu121", source = "pytorch"}
+torchvision = {version = "^0.17.0+cu121", source = "pytorch"}
+torchaudio = {version = "^2.2.0+cu121", source = "pytorch"}
+ultralytics = "^8.1.11"
+# onnx = ">=1.12.0"
+# onnxsim = ">=0.4.33"
+# onnxruntime-gpu = ">=1.12.0"
+
+
+[[tool.poetry.source]]
+name = "pytorch"
+url = "https://download.pytorch.org/whl/cu121"
+priority = "supplemental"
 
 [build-system]
 requires = ["poetry-core"]
