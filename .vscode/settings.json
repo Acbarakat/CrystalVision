@@ -1,14 +1,4 @@
 {
-    "python.linting.pylintEnabled": false,
-    "python.linting.pylintArgs": ["--ignore=C901"],
-    "python.linting.enabled": true,
-    "python.linting.flake8Enabled": true,
-    "python.linting.flake8Args": ["--ignore=C901"],
-    "python.linting.pycodestyleEnabled": true,
-    "python.linting.pycodestyleArgs": [
-        "--ignore=C901",
-    ],
-    "python.linting.pydocstyleEnabled": true,
     "python.testing.pytestArgs": [
         "tests"
     ],
@@ -19,4 +9,9 @@
         "${workspaceFolder}/src"
     ],
     "cmake.configureOnOpen": false,
+    "crystalvision": {
+        "task": "segment",
+        "output_format": "polygon",
+        "flags": "",
+    },
 }

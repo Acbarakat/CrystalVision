@@ -11,70 +11,46 @@
                 "run",
                 "labelme",
                 ".\\data\\labeling",
-                "--labelflags",
+                "--flags",
                 ".\\data\\labeling\\_flags.yaml",
+                "--labelflags",
+                ".\\data\\labeling\\_label_flags.yaml",
                 "--autosave",
                 "--nodata"
             ],
             "problemMatcher": []
         },
         {
-            "label": "LabelMe2COCO",
+            "label": "LabelMe2YOLO",
             "type": "shell",
             "command": "poetry",
             "args": [
                 "run",
-                "labelme2coco",
-                ".\\data\\labeling",
-                "-e",
-                ".\\data"
-            ],
-            "problemMatcher": []
-        },
-        {
-            "label": "LabelMe2YOLO: bbox",
-            "type": "shell",
-            "command": "poetry",
-            "args": [
-                "run",
-                // "labelme2yolo",
                 "python",
                 ".\\crystalvision\\detection\\labelconvert.py",
                 "--json_dir",
                 ".\\data\\labeling",
                 "--output_format",
-                "bbox",
+                "${config:crystalvision.output_format}",
                 "--test_size",
                 "0.0",
                 "--val_size",
                 "0.1",
-                "--flags"
+                "${config:crystalvision.flags}",
             ],
             "problemMatcher": []
         },
         {
-            "label": "LabelMe2YOLO: polygon",
-            "type": "shell",
-            "command": "poetry",
-            "args": [
-                "run",
-                //"labelme2yolo",
-                "python",
-                ".\\crystalvision\\detection\\labelconvert.py",
-                "--json_dir",
-                ".\\data\\labeling",
-                "--output_format",
-                "polygon",
-                "--test_size",
-                "0.0",
-                "--val_size",
-                "0.1",
-                "--flags"
-            ],
-            "problemMatcher": []
+            "label": "Build Model",
+            "dependsOrder": "sequence",
+            "dependsOn": ["LabelMe2YOLO", "Train Model"],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            }
         },
         {
-            "label": "Train Model: detect",
+            "label": "Train Model: tune",
             "type": "shell",
             "command": "poetry",
             "args": [
@@ -82,27 +58,70 @@
                 "python",
                 ".\\crystalvision\\detection\\train.py",
                 "--task",
-                "detect"
+                "tune-${config:crystalvision.task}",
             ],
             "problemMatcher": []
         },
         {
-            "label": "Build Detection Model",
-            "dependsOrder": "sequence",
-            "dependsOn": ["LabelMe2YOLO: bbox", "Train Model: detect"],
-            "group": {
-                "kind": "build",
-                "isDefault": true
-            }
+            "label": "Train Model",
+            "type": "shell",
+            "command": "poetry",
+            "args": [
+                "run",
+                "python",
+                ".\\crystalvision\\detection\\train.py",
+                "--task",
+                "${config:crystalvision.task}",
+                "--hyperparams",
+                ".\\runs\\${config:crystalvision.task}\\tune\\best_hyperparameters.yaml",
+            ],
+            "problemMatcher": []
         },
         {
-            "label": "Build Segmentation Model",
-            "dependsOrder": "sequence",
-            "dependsOn": ["LabelMe2YOLO: polygon", "Train Model: segment"],
-            "group": {
-                "kind": "build",
-                "isDefault": true
-            }
-        }
+            "label": "Camera Detect: dnn",
+            "type": "shell",
+            "command": "poetry",
+            "args": [
+                "run",
+                "python",
+                ".\\crystalvision\\detection\\detect.py",
+                "--model",
+                "runs\\${config:crystalvision.task}\\train\\weights\\best.onnx",
+                "--classes",
+                ".\\data\\labeling\\YOLODataset\\dataset.yaml",
+                "--plot=dnn",
+                "--camera",
+                "3840",
+                "2160",
+                "30",
+                "0",
+                "-v"
+            ],
+            "problemMatcher": []
+        },
+        {
+            "label": "Camera Detect: ultralytics",
+            "type": "shell",
+            "command": "poetry",
+            "args": [
+                "run",
+                "python",
+                ".\\crystalvision\\detection\\detect.py",
+                "--threshold=0.75",
+                "--model",
+                "runs\\${config:crystalvision.task}\\train\\weights\\best.pt",
+                "--model_task=${config:crystalvision.task}",
+                "--classes",
+                ".\\data\\labeling\\YOLODataset\\dataset.yaml",
+                "--plot=ultralytics",
+                "--camera",
+                "3840",
+                "2160",
+                "30",
+                "0",
+                "-v"
+            ],
+            "problemMatcher": []
+        },
     ]
 }

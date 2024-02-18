@@ -2,7 +2,7 @@ import os
 import yaml
 
 import numpy as np
-from labelme2yolo.l2y import Labelme2YOLO, extend_point_list
+from labelme2yolo.l2y import Labelme2YOLO, extend_point_list, logger as log
 
 
 class MyLabelme2YOLO(Labelme2YOLO):
@@ -17,10 +17,14 @@ class MyLabelme2YOLO(Labelme2YOLO):
         points[::2] = [float(point[0]) / img_w for point in point_list]
         points[1::2] = [float(point[1]) / img_h for point in point_list]
 
+        if self._output_format == "obb" and len(point_list) != 4:
+            log.error("Shape has too many points: %s", shape)
+            return None
+
         if len(points) == 4:
             if self._output_format == "polygon":
                 points = extend_point_list(points)
-            if self._output_format == "bbox":
+            elif self._output_format == "bbox":
                 points = extend_point_list(points, "bbox")
 
         if shape["label"]:
