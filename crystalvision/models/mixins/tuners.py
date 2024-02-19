@@ -2,6 +2,7 @@ from functools import cached_property
 import os
 import shutil
 
+from keras import backend
 from keras_tuner import Objective
 from keras_tuner.src.engine.objective import MultiObjective
 from keras_tuner.engine.tuner import maybe_distribute
@@ -69,7 +70,7 @@ class TunerMixin:
             test_ds (tf.data.Dataset): testing data
             validation_ds (tf.data.Dataset): validation data
         """
-        tf.keras.backend.clear_session()
+        backend.clear_session()
 
         self.tuner.search(
             random_state=random_state,

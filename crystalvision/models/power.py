@@ -57,15 +57,16 @@ class Power(CategoricalMixin, BayesianOptimizationTunerMixin, CardModel):
         Returns:
             A model instance.
         """
+        batch_size = hp.Choice("batch_size", values=[128, 256, 512])  # noqa
 
         m = models.Sequential(
             layers=[
+                layers.Input(shape=self.IMAGE_SHAPE, batch_size=batch_size),
                 layers.Conv2D(
                     32,
                     (3, 3),
                     padding="same",
                     activation="relu",
-                    input_shape=self.IMAGE_SHAPE,
                 ),
                 layers.MaxPooling2D(padding="same"),
                 layers.Conv2D(

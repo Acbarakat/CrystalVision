@@ -121,18 +121,18 @@ class MultiLabel(OneHotMeanIoUMixin, BayesianOptimizationTunerMixin, CardModel):
 
         m = models.Sequential(
             layers=[
+                layers.Input(shape=self.IMAGE_SHAPE, batch_size=batch_size),
                 layers.Conv2D(
                     32,
                     (3, 3),
                     padding="same",
                     activation="relu",
-                    input_shape=self.IMAGE_SHAPE,
                 ),
-                pl1(padding="same"),
+                pl1(pool_size=(2, 2), padding="same"),
                 layers.Conv2D(64, (3, 3), padding="same", activation="relu"),
-                pl2(padding="same"),
+                pl2(pool_size=(2, 2), padding="same"),
                 layers.Conv2D(128, (3, 3), padding="same", activation="relu"),
-                pl3(padding="same"),
+                pl3(pool_size=(2, 2), padding="same"),
                 layers.Conv2D(128, (3, 3), padding="same", activation="relu"),
                 # layers.Dropout(0.2, seed=seed),
                 layers.Flatten(),
@@ -181,6 +181,7 @@ class MultiLabel(OneHotMeanIoUMixin, BayesianOptimizationTunerMixin, CardModel):
                 ),
             ],
         )
+
         return m
 
 

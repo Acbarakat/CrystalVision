@@ -17,29 +17,41 @@ from functools import partial
 
 import numpy as np
 from pandas import DataFrame
-import tensorflow as tf
 from sklearn.model_selection import train_test_split
 from keras import callbacks, models, layers, optimizers
-from keras.utils import image_utils
-from keras.utils.image_dataset import paths_and_labels_to_dataset
 from keras_tuner import HyperModel, HyperParameters
 
 try:
     from . import MODEL_DIR
     from .ext.callbacks import StopOnValue
     from .ext.layers import MinPooling2D
-    from ..data.dataset import extendDataset
+    from ..data.dataset import (
+        extend_dataset,
+        paths_and_labels_to_dataset,
+        KERAS_BACKEND,
+    )
 except ImportError:
     from crystalvision.models import MODEL_DIR
     from crystalvision.models.ext.callbacks import StopOnValue
     from crystalvision.models.ext.layers import MinPooling2D
-    from crystalvision.data.dataset import extendDataset
+    from crystalvision.data.dataset import (
+        extend_dataset,
+        paths_and_labels_to_dataset,
+        KERAS_BACKEND,
+    )
 
 
 layers.MinPooling2D = MinPooling2D
 optimizers.Amsgrad = partial(optimizers.Adam, amsgrad=True)
 optimizers.Nesterov = partial(optimizers.SGD, nesterov=True)
 optimizers.RMSpropCentered = partial(optimizers.RMSprop, centered=True)
+
+if KERAS_BACKEND == "tensorflow":
+    from keras.src.utils.module_utils import tensorflow as tf
+
+    ResourceExhaustedError = tf.errors.ResourceExhaustedError
+else:
+    ResourceExhaustedError = ResourceWarning
 
 
 class CardModel(HyperModel):
@@ -103,12 +115,11 @@ class CardModel(HyperModel):
         batch_size: int | None = None,
         random_state: int | None = None,
         **kwargs,
-    ) -> List[tf.data.Dataset]:
+    ) -> List[Any]:
         if batch_size is None:
             batch_size = self.DEFAULT_BATCH_SIZE
         stratify = self.df[self.stratify_cols]
         img_paths = self.df["filename"]
-        interpolation = image_utils.get_interpolation(interpolation)
 
         X_train, X_test, y_train, y_test = train_test_split(
             img_paths,
@@ -118,7 +129,7 @@ class CardModel(HyperModel):
             random_state=random_state,
         )
 
-        training_dataset = extendDataset(
+        training_dataset = extend_dataset(
             paths_and_labels_to_dataset(
                 image_paths=X_train.tolist(),
                 image_size=self.IMAGE_SHAPE[:2],
@@ -127,11 +138,12 @@ class CardModel(HyperModel):
                 label_mode=self.LABEL_MODE,
                 num_classes=len(self.labels),
                 interpolation=interpolation,
+                data_format="channel_first",
             ),
             batch_size=batch_size,
         )
 
-        testing_dataset = extendDataset(
+        testing_dataset = extend_dataset(
             paths_and_labels_to_dataset(
                 image_paths=X_test.tolist(),
                 image_size=self.IMAGE_SHAPE[:2],
@@ -140,6 +152,7 @@ class CardModel(HyperModel):
                 label_mode=self.LABEL_MODE,
                 num_classes=len(self.labels),
                 interpolation=interpolation,
+                data_format="channel_first",
             ),
             batch_size=batch_size,
         )
@@ -148,8 +161,7 @@ class CardModel(HyperModel):
 
     def split_validation(
         self, interpolation: str = "bilinear", batch_size: int | None = None
-    ) -> List[tf.data.Dataset]:
-        interpolation = image_utils.get_interpolation(interpolation)
+    ) -> List[Any]:
         if batch_size is None:
             batch_size = self.DEFAULT_BATCH_SIZE
 
@@ -161,12 +173,14 @@ class CardModel(HyperModel):
             label_mode=self.LABEL_MODE,
             num_classes=len(self.labels),
             interpolation=interpolation,
+            data_format="channel_first",
         )
 
         if batch_size:
             validation_dataset = validation_dataset.batch(batch_size)
 
-        validation_dataset = validation_dataset.cache()
+        if hasattr(validation_dataset, "cache"):
+            validation_dataset = validation_dataset.cache()
 
         return [validation_dataset]
 
@@ -370,24 +384,23 @@ class CardModel(HyperModel):
             test_size=0.1,
             random_state=random_state,
             shuffle=True,
-            batch_size=hp.values.get("batch_size"),
+            batch_size=batch_size,
         )
-        validation_ds = self.split_validation(batch_size=hp.values.get("batch_size"))[0]
+        validation_ds = self.split_validation(batch_size=batch_size)[0]
 
         try:
             history = model.fit(
                 train_ds,
                 batch_size=batch_size,
                 epochs=epochs,
-                steps_per_epoch=len(train_ds),
                 validation_data=validation_ds,
-                validation_steps=len(validation_ds),
+                validation_batch_size=batch_size,
                 **kwargs,
             )
             test_metrics = model.evaluate(
                 testing_ds, batch_size=batch_size, return_dict=True
             )
-        except tf.errors.ResourceExhaustedError:
+        except ResourceExhaustedError:
             return {
                 "loss": np.inf,
                 "accuracy": 0,

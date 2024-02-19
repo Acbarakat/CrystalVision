@@ -1,4 +1,3 @@
-import tensorflow as tf
 from keras import losses, metrics
 
 
@@ -19,7 +18,7 @@ class BinaryMixin:
     @cached_property
     def metrics(self) -> List[metrics.Metric]:
         """A list of Binary Metrics."""
-        return [tf.keras.metrics.BinaryAccuracy(name="accuracy")]
+        return [metrics.BinaryAccuracy(name="accuracy")]
 
 
 class BinaryCrossMixin:
@@ -35,7 +34,7 @@ class BinaryCrossMixin:
     @cached_property
     def metrics(self) -> List[metrics.Metric]:
         """A list of Binary Metrics."""
-        return [tf.keras.metrics.BinaryCrossentropy(name="accuracy")]
+        return [metrics.BinaryCrossentropy(name="accuracy")]
 
 
 class CategoricalMixin:
@@ -44,14 +43,14 @@ class CategoricalMixin:
     LABEL_MODE = "categorical"
 
     @cached_property
-    def loss(self) -> losses.CategoricalCrossentropy:
+    def loss(self) -> losses.SparseCategoricalCrossentropy:
         """The Categorical loss function."""
-        return losses.CategoricalCrossentropy()
+        return losses.SparseCategoricalCrossentropy()
 
     @cached_property
     def metrics(self) -> List[metrics.Metric]:
         """A list of Categorical Metrics."""
-        return [tf.keras.metrics.CategoricalAccuracy(name="accuracy")]
+        return [metrics.SparseCategoricalAccuracy(name="accuracy")]
 
 
 class SparseCategoricalMixin:
@@ -67,7 +66,7 @@ class SparseCategoricalMixin:
     @cached_property
     def metrics(self) -> List[metrics.Metric]:
         """A list of Sparse Categorical Metrics."""
-        return [tf.keras.metrics.SparseCategoricalCrossentropy(name="accuracy")]
+        return [metrics.SparseCategoricalCrossentropy(name="accuracy")]
 
 
 class OneHotMeanIoUMixin:
@@ -83,8 +82,4 @@ class OneHotMeanIoUMixin:
     @cached_property
     def metrics(self) -> List[metrics.Metric]:
         """A list of OneHotMeanIoUl Metrics."""
-        return [
-            tf.keras.metrics.OneHotMeanIoU(
-                num_classes=len(self.labels), name="accuracy"
-            )
-        ]
+        return [metrics.OneHotMeanIoU(num_classes=len(self.labels), name="accuracy")]

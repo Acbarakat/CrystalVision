@@ -10,7 +10,6 @@ import os
 import argparse
 from pathlib import Path
 
-import tensorflow as tf
 import pandas as pd
 from keras.models import load_model
 
@@ -26,17 +25,6 @@ except ImportError:
     from crystalvision.models.mixins.compiles import BinaryMixin
     from crystalvision.models.base import CardModel
     from crystalvision.data.dataset import imagine_database, make_database
-
-
-gpus = tf.config.experimental.list_physical_devices("GPU")
-if gpus:
-    try:
-        # Currently, memory growth needs to be the same across GPUs
-        for gpu in gpus:
-            tf.config.experimental.set_memory_growth(gpu, True)
-    except RuntimeError as e:
-        # Memory growth must be set before GPUs have been initialized
-        print(e)
 
 
 def tune_model(model: CardModel, num: int = 5, save_models: bool = True) -> None:

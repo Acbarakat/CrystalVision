@@ -1,6 +1,6 @@
 import numpy as np
 from keras import callbacks
-from keras.utils import io_utils
+from keras.src.utils import io_utils
 
 
 from typing import Any

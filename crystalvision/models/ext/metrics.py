@@ -1,18 +1,18 @@
 from typing import Optional, Union, List, Tuple
 
-import tensorflow as tf
-from keras import metrics
-from keras.dtensor import utils as dtensor_utils
+from keras import metrics, ops
+from keras.src.metrics.iou_metrics import _IoUBase
+from keras.src.metrics.metrics_utils import confusion_matrix
 
 
 class MyOneHotMeanIoU(metrics.OneHotMeanIoU):
-    @dtensor_utils.inject_mesh
+    # @dtensor_utils.inject_mesh
     def __init__(
         self,
         num_classes: int,
         threshold: int | float,
         name: str = None,
-        dtype: Optional[Union[str, tf.dtypes.DType]] = None,
+        dtype: Optional[str] = None,
         ignore_class: Optional[int] = None,
         sparse_y_pred: bool = True,
         axis: int = -1,
@@ -53,37 +53,33 @@ class MyOneHotMeanIoU(metrics.OneHotMeanIoU):
           Update op.
         """
 
-        # if not self.sparse_y_true:
-        #     y_true = tf.argmax(y_true, axis=self.axis)
-        # if not self.sparse_y_pred:
-        #     y_pred = tf.argmax(y_pred, axis=self.axis)
-        y_pred = tf.where(y_pred >= self.threshold, 1.0, y_pred)
+        y_pred = ops.where(y_pred >= self.threshold, 1.0, y_pred)
 
-        y_true = tf.cast(y_true, self._dtype)
-        y_pred = tf.cast(y_pred, self._dtype)
+        y_true = ops.cast(y_true, self._dtype)
+        y_pred = ops.cast(y_pred, self._dtype)
 
         # Flatten the input if its rank > 1.
         if y_pred.shape.ndims > 1:
-            y_pred = tf.reshape(y_pred, [-1])
+            y_pred = ops.reshape(y_pred, [-1])
 
         if y_true.shape.ndims > 1:
-            y_true = tf.reshape(y_true, [-1])
+            y_true = ops.reshape(y_true, [-1])
 
         if sample_weight is not None:
-            sample_weight = tf.cast(sample_weight, self._dtype)
+            sample_weight = ops.cast(sample_weight, self._dtype)
             if sample_weight.shape.ndims > 1:
-                sample_weight = tf.reshape(sample_weight, [-1])
+                sample_weight = ops.reshape(sample_weight, [-1])
 
         if self.ignore_class is not None:
-            ignore_class = tf.cast(self.ignore_class, y_true.dtype)
-            valid_mask = tf.not_equal(y_true, ignore_class)
+            ignore_class = ops.cast(self.ignore_class, y_true.dtype)
+            valid_mask = ops.not_equal(y_true, ignore_class)
             y_true = y_true[valid_mask]
             y_pred = y_pred[valid_mask]
             if sample_weight is not None:
                 sample_weight = sample_weight[valid_mask]
 
         # Accumulate the prediction to current confusion matrix.
-        current_cm = tf.math.confusion_matrix(
+        current_cm = confusion_matrix(
             y_true,
             y_pred,
             self.num_classes,
@@ -93,8 +89,8 @@ class MyOneHotMeanIoU(metrics.OneHotMeanIoU):
         return self.total_cm.assign_add(current_cm)
 
 
-class MyOneHotIoU(metrics._IoUBase):
-    @dtensor_utils.inject_mesh
+class MyOneHotIoU(_IoUBase):
+    # @dtensor_utils.inject_mesh
     def __init__(
         self,
         target_class_ids: Union[List[int], Tuple[int, ...]],
@@ -118,30 +114,27 @@ class MyOneHotIoU(metrics._IoUBase):
 
     def result(self):
         """Compute the intersection-over-union via the confusion matrix."""
-        sum_over_row = tf.cast(tf.reduce_sum(self.total_cm, axis=0), dtype=self._dtype)
-        sum_over_col = tf.cast(tf.reduce_sum(self.total_cm, axis=1), dtype=self._dtype)
-        true_positives = tf.cast(
-            tf.linalg.tensor_diag_part(self.total_cm), dtype=self._dtype
-        )
+        sum_over_row = ops.cast(ops.sum(self.total_cm, axis=0), dtype=self._dtype)
+        sum_over_col = ops.cast(ops.sum(self.total_cm, axis=1), dtype=self._dtype)
+
+        true_positives = ops.cast(ops.diag(self.total_cm), dtype=self.dtype)
 
         # sum_over_row + sum_over_col =
         #     2 * true_positives + false_positives + false_negatives.
         denominator = sum_over_row + sum_over_col - true_positives
 
         # Only keep the target classes
-        # true_positives = tf.gather(true_positives, self.target_class_ids)
-        # denominator = tf.gather(denominator, self.target_class_ids)
+        # true_positives = ops.take(true_positives, self.target_class_ids)
+        # denominator = ops.take(denominator, self.target_class_ids)
 
         # If the denominator is 0, we need to ignore the class.
-        num_valid_entries = tf.reduce_sum(
-            tf.cast(tf.not_equal(denominator, 0), dtype=self._dtype)
+        num_valid_entries = ops.sum(
+            ops.cast(ops.not_equal(denominator, 0), dtype=self._dtype)
         )
 
-        iou = tf.math.divide_no_nan(true_positives, denominator)
+        iou = ops.divide_no_nan(true_positives, denominator)
 
-        return tf.math.divide_no_nan(
-            tf.reduce_sum(iou, name="mean_iou"), num_valid_entries
-        )
+        return ops.divide_no_nan(ops.sum(iou, name="mean_iou"), num_valid_entries)
 
     def get_config(self):
         return {
@@ -170,39 +163,39 @@ class MyOneHotIoU(metrics._IoUBase):
         """
 
         # if not self.sparse_y_true:
-        #     y_true = tf.argmax(y_true, axis=self.axis)
+        #     y_true = ops.argmax(y_true, axis=self.axis)
         # if not self.sparse_y_pred:
-        #     y_pred = tf.argmax(y_pred, axis=self.axis)
-        y_pred = tf.where(y_pred >= self.threshold, 1.0, y_pred)
+        #     y_pred = ops.argmax(y_pred, axis=self.axis)
+        y_pred = ops.where(y_pred >= self.threshold, 1.0, y_pred)
 
-        y_true = tf.cast(y_true, self._dtype)
-        y_pred = tf.cast(y_pred, self._dtype)
+        y_true = ops.cast(y_true, self._dtype)
+        y_pred = ops.cast(y_pred, self._dtype)
 
-        y_true = tf.gather(y_true, self.target_class_ids, axis=1)
-        y_pred = tf.gather(y_pred, self.target_class_ids, axis=1)
+        y_true = ops.take(y_true, self.target_class_ids, axis=1)
+        y_pred = ops.take(y_pred, self.target_class_ids, axis=1)
 
         # Flatten the input if its rank > 1.
         if y_pred.shape.ndims > 1:
-            y_pred = tf.reshape(y_pred, [-1])
+            y_pred = ops.reshape(y_pred, [-1])
 
         if y_true.shape.ndims > 1:
-            y_true = tf.reshape(y_true, [-1])
+            y_true = ops.reshape(y_true, [-1])
 
         if sample_weight is not None:
-            sample_weight = tf.cast(sample_weight, self._dtype)
+            sample_weight = ops.cast(sample_weight, self._dtype)
             if sample_weight.shape.ndims > 1:
-                sample_weight = tf.reshape(sample_weight, [-1])
+                sample_weight = ops.reshape(sample_weight, [-1])
 
         if self.ignore_class is not None:
-            ignore_class = tf.cast(self.ignore_class, y_true.dtype)
-            valid_mask = tf.not_equal(y_true, ignore_class)
+            ignore_class = ops.cast(self.ignore_class, y_true.dtype)
+            valid_mask = ops.not_equal(y_true, ignore_class)
             y_true = y_true[valid_mask]
             y_pred = y_pred[valid_mask]
             if sample_weight is not None:
                 sample_weight = sample_weight[valid_mask]
 
         # Accumulate the prediction to current confusion matrix.
-        current_cm = tf.math.confusion_matrix(
+        current_cm = confusion_matrix(
             y_true,
             y_pred,
             self.num_classes,
