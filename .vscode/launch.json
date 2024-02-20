@@ -5,7 +5,7 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Python: Current File",
+            "name": "Python: Current File (pytorch)",
             "type": "debugpy",
             "request": "launch",
             "program": "${file}",
@@ -15,9 +15,23 @@
             "env": {
                 "PYTHONPATH": "${python.pythonPath};${workspaceFolder}/crystalvision",
                 "KERAS_BACKEND": "torch",
+                "CUDA_LAUNCH_BLOCKING": "1",
                 // "CUDA_VISIBLE_DEVICES": "0",
             },
             // "args": ["-d"]
+        },
+        {
+            "name": "Python: Current File (tensorflow)",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal",
+            "justMyCode": true,
+            "env": {
+                "PYTHONPATH": "${python.pythonPath};${workspaceFolder}/crystalvision",
+                "KERAS_BACKEND": "tensorflow",
+                "TF_CPP_MIN_LOG_LEVEL": "2",
+            },
         }
     ]
 }

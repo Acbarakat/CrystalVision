@@ -57,7 +57,7 @@ class Power(CategoricalMixin, BayesianOptimizationTunerMixin, CardModel):
         Returns:
             A model instance.
         """
-        batch_size = hp.Choice("batch_size", values=[128, 256, 512])  # noqa
+        batch_size = hp.Choice("batch_size", values=[64, 128, 256])  # noqa
 
         m = models.Sequential(
             layers=[

@@ -1,8 +1,7 @@
-from keras import losses, metrics
-
-
 from functools import cached_property
 from typing import List
+
+from keras import losses, metrics, backend
 
 
 class BinaryMixin:
@@ -43,14 +42,18 @@ class CategoricalMixin:
     LABEL_MODE = "categorical"
 
     @cached_property
-    def loss(self) -> losses.SparseCategoricalCrossentropy:
+    def loss(self) -> losses.Loss:
         """The Categorical loss function."""
-        return losses.SparseCategoricalCrossentropy()
+        if backend.backend() == "torch":
+            return losses.SparseCategoricalCrossentropy()
+        return losses.CategoricalCrossentropy()
 
     @cached_property
     def metrics(self) -> List[metrics.Metric]:
         """A list of Categorical Metrics."""
-        return [metrics.SparseCategoricalAccuracy(name="accuracy")]
+        if backend.backend() == "torch":
+            return [metrics.SparseCategoricalAccuracy(name="accuracy")]
+        return [metrics.CategoricalAccuracy(name="accuracy")]
 
 
 class SparseCategoricalMixin:

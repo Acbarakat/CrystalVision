@@ -22,3 +22,4 @@ per-file-ignores =
     */__init__.py: E501
     # Ignore undefined name 'cv2' in cv2 module
     cv2/__init__.py: F401
+    tests/*.py: F811

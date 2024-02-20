@@ -9,7 +9,6 @@ from keras_tuner.engine.tuner import maybe_distribute
 from keras_tuner.tuners import BayesianOptimization, Hyperband, RandomSearch
 
 from crystalvision.models import MODEL_DIR
-import tensorflow as tf
 
 
 class MyRandomSearch(RandomSearch):
@@ -159,7 +158,7 @@ class MyBayesianOptimization(BayesianOptimization):
             except Exception as err:
                 print(err)
                 print(trial)
-                tf.keras.backend.clear_session()
+                backend.clear_session()
 
         return models
 

@@ -17,7 +17,7 @@ from typing import Tuple, List, Any
 
 import pandas as pd
 from dogpile.cache import make_region
-from keras import layers
+from keras import layers, backend
 
 try:
     from .base import CARD_API_FILEPATH, DATA_DIR
@@ -25,13 +25,23 @@ except ImportError:
     from crystalvision.data.base import CARD_API_FILEPATH, DATA_DIR
 
 
-KERAS_BACKEND = os.environ.get("KERAS_BACKEND")
-if KERAS_BACKEND == "tensorflow":
+if backend.backend() == "tensorflow":
     from keras.src.utils.image_dataset_utils import (
         paths_and_labels_to_dataset as paths_and_labels_to_dataset_tf,
     )
     from keras.src.utils.module_utils import tensorflow as tf
-elif KERAS_BACKEND == "torch":
+
+    IterableDataset = object
+    gpus = tf.config.experimental.list_physical_devices("GPU")
+    try:
+        # Currently, memory growth needs to be the same across GPUs
+        for gpu in gpus:
+            tf.config.experimental.set_memory_growth(gpu, True)
+    except RuntimeError as err:
+        # Memory growth must be set before GPUs have been initialized
+        print(err)
+
+elif backend.backend() == "torch":
     import torch
     from torch import manual_seed
     from torch.utils.data import IterableDataset, DataLoader, ChainDataset
@@ -169,7 +179,9 @@ def extend_dataset_tf(
     brightness: float = 0.1,
     contrast: Tuple[float] | None = (0.80, 1.25),
     saturation: Tuple[float] | None = (0.65, 1.75),
-    hue: float = 0.025,
+    hue: float | None = 0.025,
+    additive: bool = True,
+    **kwargs,
 ) -> Any:
     """
     Preprocess and add any extra augmented entries to the dataset.
@@ -210,14 +222,13 @@ def extend_dataset_tf(
     """
     assert brightness >= 0.0, "brightness must be >= 0.0"
 
-    preprocess_layer = layers.Rescaling(1.0 / 255)
-    # preprocess_layer = layers.Rescaling(scale=1./127.5, offset=-1)
+    if not name:
+        name = "unknown"
 
-    if name:
-        ds.element_spec[0]._name = f"orig_{name}"  # pylint: disable=W0212
+    ds.element_spec[0]._name = f"orig_{name}"  # pylint: disable=W0212
 
     ds = ds.map(
-        tf.autograph.experimental.do_not_convert(lambda x, y: (preprocess_layer(x), y)),
+        lambda x, y: (layers.Rescaling(1.0 / 255)(x), y),
         name=name,
     )
     if flip_horizontal:
@@ -244,49 +255,63 @@ def extend_dataset_tf(
     effects = []
 
     if brightness:
-        ds = ds.map(
-            lambda x, y: (
-                tf.clip_by_value(
-                    tf.image.random_brightness(x, brightness, seed=seed), 0.0, 1.0
+        effects.append(
+            lambda ads: ads.map(
+                lambda x, y: (
+                    tf.clip_by_value(
+                        tf.image.random_brightness(x, brightness, seed=seed), 0.0, 1.0
+                    ),
+                    y,
                 ),
-                y,
-            ),
-            name=f"brightness_{name}",
+                name=f"brightness_{name}",
+            )
         )
 
     if contrast:
-        ds = ds.map(
-            lambda x, y: (
-                tf.clip_by_value(
-                    tf.image.random_contrast(x, *contrast, seed=seed), 0.0, 1.0
+        effects.append(
+            lambda ads: ads.map(
+                lambda x, y: (
+                    tf.clip_by_value(
+                        tf.image.random_contrast(x, *contrast, seed=seed), 0.0, 1.0
+                    ),
+                    y,
                 ),
-                y,
-            ),
-            name=f"contrast_{name}",
+                name=f"contrast_{name}",
+            )
         )
 
     if saturation:
-        ds = ds.map(
-            lambda x, y: (
-                tf.clip_by_value(
-                    tf.image.random_saturation(x, *saturation, seed=seed), 0.0, 1.0
+        effects.append(
+            lambda ads: ads.map(
+                lambda x, y: (
+                    tf.clip_by_value(
+                        tf.image.random_saturation(x, *saturation, seed=seed), 0.0, 1.0
+                    ),
+                    y,
                 ),
-                y,
-            ),
-            name=f"saturated_{name}",
+                name=f"saturated_{name}",
+            )
         )
 
     if hue:
-        ds = ds.map(
-            lambda x, y: (
-                tf.clip_by_value(tf.image.random_hue(x, hue, seed=seed), 0.0, 1.0),
-                y,
-            ),
-            name=f"hue_{name}",
+        effects.append(
+            lambda ads: ads.map(
+                lambda x, y: (
+                    tf.clip_by_value(tf.image.random_hue(x, hue, seed=seed), 0.0, 1.0),
+                    y,
+                ),
+                name=f"hue_{name}",
+            )
         )
 
+    if additive:
+        effects = [effect(ds) for effect in effects]
+
     for effect in effects:
-        ds = ds.concatenate(effect)
+        if additive:
+            ds = ds.concatenate(effect)
+        else:
+            ds = effect(ds)
 
     if shuffle:
         # buffer_size = batch_size * 2 if batch_size else ds.cardinality()
@@ -319,8 +344,14 @@ class CustomDataset(IterableDataset):
         size,
         labels,
         name="customdata",
-        interpolation=InterpolationMode.BILINEAR,
+        interpolation="bilinear",
     ):
+        interpolation = (
+            InterpolationMode[interpolation.upper()]
+            if isinstance(interpolation, str)
+            else interpolation
+        )
+
         self.paths = paths
         self.labels = labels
         self.name = name
@@ -357,7 +388,7 @@ class CustomDataset(IterableDataset):
         return DataLoader(
             self,
             batch_size=batch_size,
-            pin_memory=True,
+            pin_memory=batch_size < 256 if batch_size else True,
             num_workers=8,
             persistent_workers=True,
         )
@@ -387,14 +418,17 @@ def extend_dataset_torch(
     contrast: float | Tuple[float, float] | None = (0.80, 1.25),
     saturation: float | Tuple[float, float] | None = (0.65, 1.75),
     hue: float = 0.025,
-    perspective: float | None = 0.5,
+    perspective: float | None = None,
+    additive: bool = True,
     **kwargs,
 ):
     if seed:
         manual_seed(seed)
 
-    if name:
-        ds.name = f"orig_{name}"
+    if not name:
+        name = "unknown"
+
+    ds.name = f"orig_{name}"
 
     def append_transform(transform, tname=None, aug_ds=None):
         if aug_ds is None:
@@ -410,42 +444,34 @@ def extend_dataset_torch(
         return aug_ds
 
     if flip_horizontal:
-        ds += append_transform(
-            transforms.RandomHorizontalFlip(1.0), tname="fliph_{name}"
-        )
+        ds += append_transform(transforms.RandomHorizontalFlip(1.0), "fliph_{name}")
 
     if flip_vertical:
-        ds += append_transform(transforms.RandomVerticalFlip(1.0), tname="flipv_{name}")
+        ds += append_transform(transforms.RandomVerticalFlip(1.0), "flipv_{name}")
 
     augments = []
 
     if brightness is not None:
         augments.append(
-            append_transform(
-                transforms.ColorJitter(brightness=brightness), tname="bright_{name}"
-            )
+            (transforms.ColorJitter(brightness=brightness), "bright_{name}")
         )
 
     if contrast is not None:
-        augments.append(
-            append_transform(
-                transforms.ColorJitter(contrast=contrast), tname="contrast_{name}"
-            )
-        )
+        augments.append((transforms.ColorJitter(contrast=contrast), "contrast_{name}"))
 
     if saturation is not None:
         augments.append(
-            append_transform(
-                transforms.ColorJitter(saturation=saturation), tname="saturation_{name}"
-            )
+            (transforms.ColorJitter(saturation=saturation), "saturation_{name}")
         )
 
     if hue is not None:
-        augments.append(
-            append_transform(transforms.ColorJitter(hue=hue), tname="hue_{name}")
-        )
+        augments.append((transforms.ColorJitter(hue=hue), "hue_{name}"))
 
-    ds = ChainDataset([ds, *augments])
+    if additive:
+        ds = ChainDataset([ds, *(append_transform(*aug) for aug in augments)])
+    else:
+        for ads in ds.datasets:
+            ads.transform.transforms.extend([aug[0] for aug in augments])
 
     if perspective:
         ds += append_transform(
@@ -457,17 +483,17 @@ def extend_dataset_torch(
         ds,
         batch_size=batch_size,
         shuffle=shuffle,
-        pin_memory=True,
+        pin_memory=batch_size < 256 if batch_size else True,
         num_workers=8,
         persistent_workers=True,
     )
 
 
-if KERAS_BACKEND == "tensorflow":
+if backend.backend() == "tensorflow":
     paths_and_labels_to_dataset = paths_and_labels_to_dataset_tf
     extend_dataset = extend_dataset_tf
-elif KERAS_BACKEND == "torch":
+elif backend.backend() == "torch":
     paths_and_labels_to_dataset = paths_and_labels_to_dataset_torch
     extend_dataset = extend_dataset_torch
 else:
-    raise NotImplementedError(f"{KERAS_BACKEND} is not implemented")
+    raise NotImplementedError(f"{backend.backend()} is not implemented")

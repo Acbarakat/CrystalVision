@@ -206,7 +206,7 @@ class Multicard(BinaryMixin, RandomSearchTunerMixin, CardModel):
 
 
 class Icons(OneHotMeanIoUMixin, BayesianOptimizationTunerMixin, CardModel):
-    MAX_TRIALS: int = 10
+    MAX_TRIALS: int = 50
 
     def __init__(self, df: DataFrame, vdf: DataFrame) -> None:
         self.name: str = "icons"
@@ -347,4 +347,4 @@ if __name__ == "__main__":
 
     # tune_model(Exburst)
     # tune_model(Multicard)
-    tune_model(Icons)
+    tune_model(Icons, num=Icons.MAX_TRIALS, save_models=False)

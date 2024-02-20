@@ -18,7 +18,7 @@ from functools import partial
 import numpy as np
 from pandas import DataFrame
 from sklearn.model_selection import train_test_split
-from keras import callbacks, models, layers, optimizers
+from keras import callbacks, models, layers, optimizers, backend
 from keras_tuner import HyperModel, HyperParameters
 
 try:
@@ -28,7 +28,6 @@ try:
     from ..data.dataset import (
         extend_dataset,
         paths_and_labels_to_dataset,
-        KERAS_BACKEND,
     )
 except ImportError:
     from crystalvision.models import MODEL_DIR
@@ -37,7 +36,6 @@ except ImportError:
     from crystalvision.data.dataset import (
         extend_dataset,
         paths_and_labels_to_dataset,
-        KERAS_BACKEND,
     )
 
 
@@ -46,7 +44,7 @@ optimizers.Amsgrad = partial(optimizers.Adam, amsgrad=True)
 optimizers.Nesterov = partial(optimizers.SGD, nesterov=True)
 optimizers.RMSpropCentered = partial(optimizers.RMSprop, centered=True)
 
-if KERAS_BACKEND == "tensorflow":
+if backend.backend() == "tensorflow":
     from keras.src.utils.module_utils import tensorflow as tf
 
     ResourceExhaustedError = tf.errors.ResourceExhaustedError
@@ -138,7 +136,7 @@ class CardModel(HyperModel):
                 label_mode=self.LABEL_MODE,
                 num_classes=len(self.labels),
                 interpolation=interpolation,
-                data_format="channel_first",
+                data_format="channels_last",
             ),
             batch_size=batch_size,
         )
@@ -152,7 +150,7 @@ class CardModel(HyperModel):
                 label_mode=self.LABEL_MODE,
                 num_classes=len(self.labels),
                 interpolation=interpolation,
-                data_format="channel_first",
+                data_format="channels_last",
             ),
             batch_size=batch_size,
         )
@@ -173,7 +171,7 @@ class CardModel(HyperModel):
             label_mode=self.LABEL_MODE,
             num_classes=len(self.labels),
             interpolation=interpolation,
-            data_format="channel_first",
+            data_format="channels_last",
         )
 
         if batch_size:
