@@ -26,27 +26,6 @@ class Power(CategoricalMixin, BayesianOptimizationTunerMixin, CardModel):
 
         self.stratify_cols.extend(["element", "type_en"])
 
-    @staticmethod
-    def filter_dataframe(df: DataFrame) -> DataFrame:
-        """
-        Filter out data from test/train/validation dataframe.
-
-        Args:
-            df (DataFrame): Data to be filtered
-
-        Returns:
-            The DataFrame
-        """
-        # Ignore by language
-        # df.query("~filename.str.contains('_eg')", inplace=True)  # English
-        df.query("~filename.str.contains('_fr')", inplace=True)  # French
-        df.query("~filename.str.contains('_es')", inplace=True)  # Spanish
-        df.query("~filename.str.contains('_it')", inplace=True)  # Italian
-        df.query("~filename.str.contains('_de')", inplace=True)  # German
-        # df.query("~filename.str.contains('_jp')", inplace=True)  # Japanese
-
-        return df
-
     def build(self, hp: HyperParameters, seed: int | None = None) -> models.Sequential:
         """
         Build a model.
@@ -65,20 +44,15 @@ class Power(CategoricalMixin, BayesianOptimizationTunerMixin, CardModel):
                 layers.Conv2D(
                     32,
                     (3, 3),
-                    padding="same",
                     activation="relu",
                 ),
-                layers.MaxPooling2D(padding="same"),
-                layers.Conv2D(
-                    64, kernel_size=(3, 3), padding="same", activation="relu"
-                ),
-                layers.MaxPooling2D(padding="same"),
-                layers.Conv2D(
-                    128, kernel_size=(3, 3), padding="same", activation="relu"
-                ),
-                layers.MaxPooling2D(padding="same"),
-                layers.Dropout(0.2, seed=seed),
+                layers.MaxPooling2D((2, 2)),
+                layers.Conv2D(64, kernel_size=(3, 3), activation="relu"),
+                layers.MaxPooling2D((2, 2)),
+                layers.Conv2D(128, kernel_size=(3, 3), activation="relu"),
+                layers.MaxPooling2D((2, 2)),
                 layers.Flatten(),
+                layers.Dropout(0.2, seed=seed),
                 layers.Dense(
                     hp.Int("dense_units", min_value=128, max_value=512, step=128),
                     activation="relu",

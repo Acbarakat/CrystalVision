@@ -78,8 +78,11 @@ class OneHotMeanIoUMixin:
     LABEL_MODE = "binary"
 
     @cached_property
-    def loss(self) -> losses.BinaryCrossentropy:
+    def loss(self) -> losses.Loss:
         """The Binary Cross loss function."""
+        if backend.backend() == "torch":
+            # FIXME: Why isn't this working?
+            return losses.SparseCategoricalCrossentropy(from_logits=True)
         return losses.BinaryCrossentropy()
 
     @cached_property

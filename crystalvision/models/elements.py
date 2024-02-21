@@ -9,7 +9,7 @@ Todo:
 from typing import List
 
 from pandas import DataFrame
-from keras import layers, models, optimizers, callbacks
+from keras import layers, models, optimizers, callbacks, backend
 from keras_tuner import HyperParameters
 from sklearn.preprocessing import MultiLabelBinarizer
 
@@ -59,11 +59,11 @@ class Mono(BinaryMixin, RandomSearchTunerMixin, CardModel):
         """
         m = models.Sequential(
             layers=[
+                layers.Input(shape=self.IMAGE_SHAPE),
                 layers.Conv2D(
                     32,
                     kernel_size=(3, 3),
                     activation="relu",
-                    input_shape=self.IMAGE_SHAPE,
                 ),
                 layers.MaxPooling2D(),
                 layers.Conv2D(64, kernel_size=(3, 3), activation="relu"),
@@ -106,27 +106,6 @@ class Element(CategoricalMixin, BayesianOptimizationTunerMixin, CardModel):
 
         self.stratify_cols.extend(["type_en"])
 
-    @staticmethod
-    def filter_dataframe(df: DataFrame) -> DataFrame:
-        """
-        Filter out data from test/train/validation dataframe.
-
-        Args:
-            df (DataFrame): Data to be filtered
-
-        Returns:
-            The DataFrame
-        """
-        # Ignore by language
-        # df.query("~filename.str.contains('_eg')", inplace=True)  # English
-        df.query("~filename.str.contains('_fr')", inplace=True)  # French
-        df.query("~filename.str.contains('_es')", inplace=True)  # Spanish
-        df.query("~filename.str.contains('_it')", inplace=True)  # Italian
-        df.query("~filename.str.contains('_de')", inplace=True)  # German
-        # df.query("~filename.str.contains('_jp')", inplace=True)  # Japanese
-
-        return df
-
     def build(self, hp: HyperParameters, seed: int | None = None) -> models.Sequential:
         """
         Build a model.
@@ -137,29 +116,23 @@ class Element(CategoricalMixin, BayesianOptimizationTunerMixin, CardModel):
         Returns:
             A model instance.
         """
-        # pooling_type = hp.Choice('pooling', values=['max', 'avg'])
-        # if pooling_type == 'max':
-        #     pooling_layer = layers.MaxPooling2D
-        # else:
-        #     pooling_layer = layers.AveragePooling2D
 
         m = models.Sequential(
             layers=[
+                layers.Input(shape=self.IMAGE_SHAPE),
                 layers.Conv2D(
                     32,
                     (3, 3),
-                    padding="same",
                     activation="relu",
-                    input_shape=self.IMAGE_SHAPE,
                 ),
-                layers.AveragePooling2D(padding="same"),
-                layers.Conv2D(64, (3, 3), padding="same", activation="relu"),
-                layers.AveragePooling2D(padding="same"),
-                layers.Conv2D(128, (3, 3), padding="same", activation="relu"),
-                layers.AveragePooling2D(padding="same"),
-                layers.Conv2D(128, (3, 3), padding="same", activation="relu"),
-                layers.Dropout(0.2, seed=seed),
+                layers.AveragePooling2D((2, 2)),
+                layers.Conv2D(64, (3, 3), activation="relu"),
+                layers.AveragePooling2D((2, 2)),
+                layers.Conv2D(128, (3, 3), activation="relu"),
+                layers.AveragePooling2D((2, 2)),
+                layers.Conv2D(128, (3, 3), activation="relu"),
                 layers.Flatten(),
+                layers.Dropout(0.2, seed=seed),
                 # layers.Dense(hp.Int('dense_units', min_value=128, max_value=512, step=32), activation='relu'),
                 layers.Dense(
                     hp.Int("dense_units", min_value=64, max_value=1024, step=32),
@@ -218,27 +191,6 @@ class ElementV2(OneHotMeanIoUMixin, BayesianOptimizationTunerMixin, CardModel):
             StopOnValue(),
         ]
 
-    @staticmethod
-    def filter_dataframe(df: DataFrame) -> DataFrame:
-        """
-        Filter out data from test/train/validation dataframe.
-
-        Args:
-            df (DataFrame): Data to be filtered
-
-        Returns:
-            The DataFrame
-        """
-        # Ignore by language
-        # df.query("~filename.str.contains('_eg')", inplace=True)  # English
-        df.query("~filename.str.contains('_fr')", inplace=True)  # French
-        df.query("~filename.str.contains('_es')", inplace=True)  # Spanish
-        df.query("~filename.str.contains('_it')", inplace=True)  # Italian
-        df.query("~filename.str.contains('_de')", inplace=True)  # German
-        # df.query("~filename.str.contains('_jp')", inplace=True)  # Japanese
-
-        return df
-
     def build(self, hp: HyperParameters, seed: int | None = None) -> models.Sequential:
         """
         Build a model.
@@ -249,33 +201,29 @@ class ElementV2(OneHotMeanIoUMixin, BayesianOptimizationTunerMixin, CardModel):
         Returns:
             A model instance.
         """
-        batch_size = hp.Choice("batch_size", values=[16, 32, 64, 128, 256, 512])  # noqa
+        batch_size = hp.Choice("batch_size", values=[32, 64, 128, 256, 512])  # noqa
 
         m = models.Sequential(
             layers=[
+                layers.Input(shape=self.IMAGE_SHAPE, batch_size=batch_size),
                 layers.Conv2D(
                     32,
                     (3, 3),
-                    padding="same",
                     activation="relu",
-                    input_shape=self.IMAGE_SHAPE,
                 ),
-                layers.AveragePooling2D(padding="same"),
-                layers.Conv2D(64, (3, 3), padding="same", activation="relu"),
-                layers.AveragePooling2D(padding="same"),
-                layers.Conv2D(128, (3, 3), padding="same", activation="relu"),
-                layers.AveragePooling2D(padding="same"),
-                layers.Conv2D(128, (3, 3), padding="same", activation="relu"),
-                # layers.Dropout(0.2, seed=seed),
+                layers.AveragePooling2D((2, 2)),
+                layers.Conv2D(64, (3, 3), activation="relu"),
+                layers.AveragePooling2D((2, 2)),
+                layers.Conv2D(128, (3, 3), activation="relu"),
+                layers.AveragePooling2D((2, 2)),
+                layers.Conv2D(128, (3, 3), activation="relu"),
                 layers.Flatten(),
-                # layers.Dense(hp.Int('dense_units', min_value=128, max_value=512, step=32), activation='relu'),
+                # layers.Dropout(0.2, seed=seed),
                 layers.Dense(
                     hp.Int("dense_units", min_value=64, max_value=1024, step=32),
                     activation="relu",
                 ),
-                # layers.Dense(480, activation='relu'),
-                layers.Dense(len(self.labels), activation="sigmoid"),
-                # Threshold(0.95),
+                layers.Dense(len(self.labels), activation="sigmoid", name="result"),
             ],
             name=self.name,
         )
@@ -292,9 +240,14 @@ class ElementV2(OneHotMeanIoUMixin, BayesianOptimizationTunerMixin, CardModel):
         m.compile(
             optimizer=optimizers.Adam(learning_rate=learning_rate),
             loss=self.loss,
-            metrics=MyOneHotMeanIoU(
-                num_classes=len(self.labels), threshold=0.95, name="accuracy"
-            ),
+            metrics=[
+                MyOneHotMeanIoU(
+                    num_classes=len(self.labels),
+                    threshold=0.95,
+                    name="accuracy",
+                    sparse_y_pred=backend.backend() != "torch",
+                )
+            ],
         )
         return m
 

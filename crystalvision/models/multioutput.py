@@ -9,7 +9,7 @@ Todo:
 from typing import List
 
 from pandas import DataFrame
-from keras import layers, models, callbacks, metrics
+from keras import layers, models, callbacks, metrics, backend
 from keras_tuner import HyperParameters
 from sklearn.preprocessing import MultiLabelBinarizer
 
@@ -58,6 +58,7 @@ class MultiLabel(OneHotMeanIoUMixin, BayesianOptimizationTunerMixin, CardModel):
                     target_class_ids=list(range(idx, len(labels) + idx)),
                     threshold=0.95,
                     name=f"{fkey}_accuracy",
+                    sparse_y_pred=backend.backend() != "torch",
                 ),
                 # ignore_class
             )
@@ -125,17 +126,16 @@ class MultiLabel(OneHotMeanIoUMixin, BayesianOptimizationTunerMixin, CardModel):
                 layers.Conv2D(
                     32,
                     (3, 3),
-                    padding="same",
                     activation="relu",
                 ),
-                pl1(pool_size=(2, 2), padding="same"),
-                layers.Conv2D(64, (3, 3), padding="same", activation="relu"),
-                pl2(pool_size=(2, 2), padding="same"),
-                layers.Conv2D(128, (3, 3), padding="same", activation="relu"),
-                pl3(pool_size=(2, 2), padding="same"),
-                layers.Conv2D(128, (3, 3), padding="same", activation="relu"),
-                # layers.Dropout(0.2, seed=seed),
+                pl1(pool_size=(2, 2)),
+                layers.Conv2D(64, (3, 3), activation="relu"),
+                pl2(pool_size=(2, 2)),
+                layers.Conv2D(128, (3, 3), activation="relu"),
+                pl3(pool_size=(2, 2)),
+                layers.Conv2D(128, (3, 3), activation="relu"),
                 layers.Flatten(),
+                layers.Dropout(0.2, seed=seed),
                 layers.Dense(
                     hp.Int(
                         "dense_units1",
@@ -152,19 +152,6 @@ class MultiLabel(OneHotMeanIoUMixin, BayesianOptimizationTunerMixin, CardModel):
 
         optimizer = self._optimizer_choice("optimizer", hp)[1]
 
-        # optimizer = self._optimizer_choice(
-        #     "optimizer",
-        #     hp,
-        #     exclude={
-        #         "Adadelta",
-        #         "Adagrad",
-        #         "Adam",
-        #         "Amsgrad",
-        #         "Adamax",
-        #         "Ftrl",
-        #         "Nadam",
-        #     },
-        # )[1](
         #     momentum=hp.Float("mometum", min_value=0.0, max_value=0.9),
         #     learning_rate=hp.Float(
         #         "learning_rate", min_value=1.0e-7, max_value=0.9, sampling="LOG"
@@ -177,7 +164,10 @@ class MultiLabel(OneHotMeanIoUMixin, BayesianOptimizationTunerMixin, CardModel):
             metrics=self._metrics
             + [
                 MyOneHotMeanIoU(
-                    num_classes=len(self.labels), threshold=0.95, name="accuracy"
+                    num_classes=len(self.labels),
+                    threshold=0.95,
+                    name="accuracy",
+                    sparse_y_pred=backend.backend() != "torch",
                 ),
             ],
         )
