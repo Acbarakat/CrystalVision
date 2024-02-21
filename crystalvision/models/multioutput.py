@@ -42,8 +42,8 @@ class MultiLabel(OneHotMeanIoUMixin, BayesianOptimizationTunerMixin, CardModel):
         self.df: DataFrame = self.filter_dataframe(df.copy())
         self.vdf: DataFrame = self.filter_dataframe(vdf.copy())
 
-        self.feature_key: List[str] = ["type_en", "cost", "element"]
-        self.stratify_cols: List[str] = ["type_en", "cost", "element"]
+        self.feature_key: List[str] = ["type_en", "cost", "element", "power"]
+        self.stratify_cols: List[str] = ["type_en", "cost", "element", "power"]
 
         self.labels: List[str] = []
         for fkey in self.feature_key:
