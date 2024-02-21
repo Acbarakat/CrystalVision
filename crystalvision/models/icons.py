@@ -84,11 +84,11 @@ class Exburst(BinaryMixin, RandomSearchTunerMixin, CardModel):
         """
         m = models.Sequential(
             layers=[
+                layers.Input(shape=self.IMAGE_SHAPE),
                 layers.Conv2D(
                     32,
                     kernel_size=(3, 3),
                     activation="relu",
-                    input_shape=self.IMAGE_SHAPE,
                 ),
                 layers.MaxPooling2D(),
                 layers.Conv2D(64, kernel_size=(3, 3), activation="relu"),
@@ -164,11 +164,11 @@ class Multicard(BinaryMixin, RandomSearchTunerMixin, CardModel):
         """
         m = models.Sequential(
             layers=[
+                layers.Input(shape=self.IMAGE_SHAPE),
                 layers.Conv2D(
                     32,
                     kernel_size=(3, 3),
                     activation="relu",
-                    input_shape=self.IMAGE_SHAPE,
                 ),
                 layers.MaxPooling2D(),
                 layers.Conv2D(64, kernel_size=(3, 3), activation="relu"),
@@ -302,11 +302,11 @@ class Icons(OneHotMeanIoUMixin, BayesianOptimizationTunerMixin, CardModel):
 
         m = models.Sequential(
             layers=[
+                layers.Input(shape=self.IMAGE_SHAPE, batch_size=batch_size),
                 layers.Conv2D(
                     32,
                     (3, 3),
                     activation="relu",
-                    input_shape=self.IMAGE_SHAPE,
                 ),
                 pl1((2, 2)),
                 layers.Conv2D(64, (3, 3), activation="relu"),
