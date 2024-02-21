@@ -199,7 +199,7 @@ class CardModel(HyperModel):
         df.query("~filename.str.contains('_es')", inplace=True)  # Spanish
         df.query("~filename.str.contains('_it')", inplace=True)  # Italian
         df.query("~filename.str.contains('_de')", inplace=True)  # German
-        df.query("~filename.str.contains('_jp')", inplace=True)  # Japanese
+        # df.query("~filename.str.contains('_jp')", inplace=True)  # Japanese
 
         return df
 
@@ -392,13 +392,16 @@ class CardModel(HyperModel):
                 batch_size=batch_size,
                 epochs=epochs,
                 validation_data=validation_ds,
-                validation_batch_size=batch_size,
                 **kwargs,
             )
             test_metrics = model.evaluate(
                 testing_ds, batch_size=batch_size, return_dict=True
             )
-        except ResourceExhaustedError:
+        except (ResourceExhaustedError, RuntimeError) as err:
+            if isinstance(err, RuntimeError):
+                if "out of memory" not in str(err):
+                    raise err
+                print(str(err))
             return {
                 "loss": np.inf,
                 "accuracy": 0,
