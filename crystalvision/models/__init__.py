@@ -36,8 +36,8 @@ def tune_model(model: CardModel, num: int = 5, save_models: bool = True) -> None
         "--random-state", "-r", type=int, default=23, help="The random state number"
     )
     parser.add_argument(
-        "--disable-clear-cache",
-        "-d",
+        "--clear-cache",
+        "-c",
         action="store_true",
         help="Disable the clearing of the tuning cache",
     )
@@ -74,7 +74,7 @@ def tune_model(model: CardModel, num: int = 5, save_models: bool = True) -> None
         else:
             print(vdf.groupby(m.stratify_cols).count()["code"])
 
-    if not args.disable_clear_cache:
+    if args.clear_cache:
         m.clear_cache()
 
     m.tune_and_save(
