@@ -48,6 +48,7 @@ def tune_model(model: CardModel, num: int = 5, save_models: bool = True) -> None
     args = parser.parse_args()
 
     df = imagine_database(clear_extras=True)
+    df.attrs["seed"] = args.random_state
 
     vdf = pd.read_json(os.path.join(SRC_DIR, "testmodels.json"))
     vdf["filename"] = str(TEST_IMG_DIR) + os.sep + vdf["uri"].index.astype(str) + ".jpg"

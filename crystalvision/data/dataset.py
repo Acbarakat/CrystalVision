@@ -91,7 +91,8 @@ def make_database(clear_extras: bool = False) -> pd.DataFrame:
         df["multicard"].apply(lambda i: i == "\u25cb" or i == "1").astype(bool)
     )
     df["icons"] = df[["ex_burst", "multicard"]].apply(
-        lambda row: tuple(row[row].index), axis=1
+        lambda row: tuple(row[row].index) if not row[row].index.empty else ("no_icon",),
+        axis=1,
     )
     df["mono"] = df["element"].apply(lambda i: len(i) == 1 if i else True).astype(bool)
     df["element_v2"] = df["element"].apply(

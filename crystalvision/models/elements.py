@@ -6,39 +6,32 @@ Todo:
     * N/A
 
 """
-from typing import List
-
 from pandas import DataFrame
-from keras import layers, models, optimizers, callbacks, backend
+from keras import layers, models, optimizers, backend
 from keras_tuner import HyperParameters
-from sklearn.preprocessing import MultiLabelBinarizer
 
 try:
-    from . import CardModel
+    from .base import CardModel, MultiLabelCardModel
     from .mixins.compiles import (
         BinaryMixin,
         CategoricalMixin,
-        OneHotMeanIoUMixin,
     )
     from .mixins.tuners import (
         BayesianOptimizationTunerMixin,
         RandomSearchTunerMixin,
     )
     from .ext.metrics import MyOneHotMeanIoU
-    from .ext.callbacks import StopOnValue
 except ImportError:
-    from crystalvision.models import CardModel
+    from crystalvision.models.base import CardModel, MultiLabelCardModel
     from crystalvision.models.mixins.compiles import (
         BinaryMixin,
         CategoricalMixin,
-        OneHotMeanIoUMixin,
     )
     from crystalvision.models.mixins.tuners import (
         BayesianOptimizationTunerMixin,
         RandomSearchTunerMixin,
     )
     from crystalvision.models.ext.metrics import MyOneHotMeanIoU
-    from crystalvision.models.ext.callbacks import StopOnValue
 
 
 class Mono(BinaryMixin, RandomSearchTunerMixin, CardModel):
@@ -161,35 +154,11 @@ class Element(CategoricalMixin, BayesianOptimizationTunerMixin, CardModel):
         return m
 
 
-class ElementV2(OneHotMeanIoUMixin, BayesianOptimizationTunerMixin, CardModel):
+class ElementV2(BayesianOptimizationTunerMixin, MultiLabelCardModel):
+    """Multilabel protoype for Card's Element."""
+
     def __init__(self, df: DataFrame, vdf: DataFrame) -> None:
-        self.name = "element_v2"
-        self.tunable = True
-
-        self.df: DataFrame = self.filter_dataframe(df.copy())
-        self.vdf: DataFrame = self.filter_dataframe(vdf.copy())
-
-        self.feature_key: str = "element_v2"
-        self.stratify_cols: List[str] = ["element", "type_en"]
-
-        self.labels: List[str] = [
-            elem[0] for elem in self.df["element_v2"].unique() if len(elem) == 1
-        ]
-
-        self.mlb = MultiLabelBinarizer(classes=self.labels)
-
-        self.df_codes = self.mlb.fit_transform(self.df["element_v2"])
-        self.vdf_codes = self.mlb.transform(self.vdf["element_v2"])
-
-        self.callbacks = [
-            callbacks.EarlyStopping(
-                monitor="val_loss",
-                min_delta=0.005,
-                patience=5,
-                restore_best_weights=True,
-            ),
-            StopOnValue(),
-        ]
+        super().__init__("element_v2", df, vdf, "element_v2", ["element", "type_en"])
 
     def build(self, hp: HyperParameters, seed: int | None = None) -> models.Sequential:
         """

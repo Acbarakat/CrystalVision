@@ -6,43 +6,27 @@ Todo:
     * N/A
 
 """
-from functools import cached_property
-from typing import List
-
 from pandas import DataFrame
-from keras import layers, models, optimizers, callbacks, metrics
+from keras import layers, models, optimizers
 from keras_tuner import HyperParameters
-from sklearn.preprocessing import MultiLabelBinarizer
 
 try:
-    from . import CardModel
+    from .base import CardModel, MultiLabelCardModel
     from .mixins.compiles import (
         BinaryMixin,
-        OneHotMeanIoUMixin,
     )
-    from .mixins.tuners import (
-        BayesianOptimizationTunerMixin,
-        RandomSearchTunerMixin,
-    )
-    from .mixins.objective import WeightedMeanMultiObjective, Objective
+    from .mixins.tuners import RandomSearchTunerMixin, BayesianOptimizationTunerMixin
     from .ext.metrics import MyOneHotMeanIoU
-    from .ext.callbacks import StopOnValue
 except ImportError:
-    from crystalvision.models import CardModel
+    from crystalvision.models.base import CardModel, MultiLabelCardModel
     from crystalvision.models.mixins.compiles import (
         BinaryMixin,
-        OneHotMeanIoUMixin,
     )
     from crystalvision.models.mixins.tuners import (
-        BayesianOptimizationTunerMixin,
         RandomSearchTunerMixin,
-    )
-    from crystalvision.models.mixins.objective import (
-        WeightedMeanMultiObjective,
-        Objective,
+        BayesianOptimizationTunerMixin,
     )
     from crystalvision.models.ext.metrics import MyOneHotMeanIoU
-    from crystalvision.models.ext.callbacks import StopOnValue
 
 
 class Exburst(BinaryMixin, RandomSearchTunerMixin, CardModel):
@@ -50,27 +34,6 @@ class Exburst(BinaryMixin, RandomSearchTunerMixin, CardModel):
         super().__init__(df, vdf, "ex_burst", name="exburst")
 
         self.stratify_cols.extend(["element", "type_en"])
-
-    @staticmethod
-    def filter_dataframe(df: DataFrame) -> DataFrame:
-        """
-        Filter out data from test/train/validation dataframe.
-
-        Args:
-            df (DataFrame): Data to be filtered
-
-        Returns:
-            The DataFrame
-        """
-        # Ignore by language
-        # df.query("~filename.str.contains('_eg')", inplace=True)  # English
-        df.query("~filename.str.contains('_fr')", inplace=True)  # French
-        df.query("~filename.str.contains('_es')", inplace=True)  # Spanish
-        df.query("~filename.str.contains('_it')", inplace=True)  # Italian
-        df.query("~filename.str.contains('_de')", inplace=True)  # German
-        # df.query("~filename.str.contains('_jp')", inplace=True)  # Japanese
-
-        return df
 
     def build(self, hp: HyperParameters, seed: int | None = None) -> models.Sequential:
         """
@@ -131,27 +94,6 @@ class Multicard(BinaryMixin, RandomSearchTunerMixin, CardModel):
 
         self.stratify_cols.extend(["element", "type_en"])
 
-    @staticmethod
-    def filter_dataframe(df: DataFrame) -> DataFrame:
-        """
-        Filter out data from test/train/validation dataframe.
-
-        Args:
-            df (DataFrame): Data to be filtered
-
-        Returns:
-            The DataFrame
-        """
-        # Ignore by language
-        # df.query("~filename.str.contains('_eg')", inplace=True)  # English
-        df.query("~filename.str.contains('_fr')", inplace=True)  # French
-        df.query("~filename.str.contains('_es')", inplace=True)  # Spanish
-        df.query("~filename.str.contains('_it')", inplace=True)  # Italian
-        df.query("~filename.str.contains('_de')", inplace=True)  # German
-        # df.query("~filename.str.contains('_jp')", inplace=True)  # Japanese
-
-        return df
-
     def build(self, hp: HyperParameters, seed: int | None = None) -> models.Sequential:
         """
         Build a model.
@@ -205,83 +147,22 @@ class Multicard(BinaryMixin, RandomSearchTunerMixin, CardModel):
         return m
 
 
-class Icons(OneHotMeanIoUMixin, BayesianOptimizationTunerMixin, CardModel):
+class Icons(BayesianOptimizationTunerMixin, MultiLabelCardModel):
+    """Multilabel protoype for Card's Icons."""
+
     MAX_TRIALS: int = 50
 
     def __init__(self, df: DataFrame, vdf: DataFrame) -> None:
-        self.name: str = "icons"
-        self.tunable: bool = True
-
-        self._build = self.build
-        self.build = self._build_wrapper
-
-        self.df: DataFrame = self.filter_dataframe(df.copy())
-        self.vdf: DataFrame = self.filter_dataframe(vdf.copy())
-
-        self.feature_key: List[str] = "icons"  # ["ex_burst", "multicard"]
-        self.stratify_cols: List[str] = ["ex_burst", "multicard", "element", "type_en"]
-
-        self.labels: List[str] = [
-            elem[0] for elem in self.df["icons"].unique() if len(elem) == 1
-        ]
-
-        self._metrics: List[metrics.Metric] = []
-        # TODO: Resolve the error when there is only one target_class_ids
-        # for idx, fkey in enumerate(self.labels):
-        #     self._metrics.append(
-        #         MyOneHotIoU(
-        #             target_class_ids=[idx],
-        #             threshold=0.95,
-        #             name=f"{fkey}_accuracy",
-        #         )
-        #     )
-
-        self.mlb = MultiLabelBinarizer(classes=self.labels)
-
-        self.df_codes = self.mlb.fit_transform(self.df[self.feature_key])
-        self.vdf_codes = self.mlb.transform(self.vdf[self.feature_key])
-
-        self.callbacks = [
-            callbacks.EarlyStopping(
-                monitor="val_loss",
-                min_delta=0.005,
-                patience=5,
-                restore_best_weights=True,
-            ),
-            StopOnValue(),
-        ]
-
-    @cached_property
-    def objective(self) -> WeightedMeanMultiObjective:
-        return WeightedMeanMultiObjective(
-            [
-                Objective("accuracy", "max"),
-                Objective("val_accuracy", "max"),
-                Objective("test_accuracy", "max"),
-            ],
-            weights=[0.9, 2.0, 0.1],
+        super().__init__(
+            "icons",
+            df,
+            vdf,
+            "icons",
+            ["ex_burst", "multicard", "element", "type_en"],
+            generate_metrics=False,
         )
 
-    @staticmethod
-    def filter_dataframe(df: DataFrame) -> DataFrame:
-        """
-        Filter out data from test/train/validation dataframe.
-
-        Args:
-            df (DataFrame): Data to be filtered
-
-        Returns:
-            The DataFrame
-        """
-        # Ignore by language
-        # df.query("~filename.str.contains('_eg')", inplace=True)  # English
-        df.query("~filename.str.contains('_fr')", inplace=True)  # French
-        df.query("~filename.str.contains('_es')", inplace=True)  # Spanish
-        df.query("~filename.str.contains('_it')", inplace=True)  # Italian
-        df.query("~filename.str.contains('_de')", inplace=True)  # German
-        # df.query("~filename.str.contains('_jp')", inplace=True)  # Japanese
-
-        return df
+        # TODO: Resolve the error when there is only one target_class_ids
 
     def build(self, hp: HyperParameters, seed: int | None = None) -> models.Sequential:
         """

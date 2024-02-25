@@ -28,6 +28,7 @@ tensorflow = {url = "https://storage.googleapis.com/tensorflow/linux/gpu/tensorf
 
 [tool.poetry.group.tensorflow.dependencies]
 tensorrt = ">=8.6.1"
+tf2onnx = ">=1.16.1"
 # tensorflow-io = ">=0.31.0"
 # tensorflow = [
 #     {version = ">=2.11", platform="linux", extras=["and-cuda"]},
@@ -85,7 +86,10 @@ lapx = ">=0.5.2"
 
 
 [tool.poetry.group.accelerate.dependencies]
-accimage = {path = "accimage-0.2.0-cp310-cp310-win_amd64.whl"}
+accimage = [
+    {path = "./data/accimage-0.2.0-cp310-cp310-win_amd64.whl", platform="win32"},
+    {path = "./data/accimage-0.2.0-cp310-cp310-linux_x86_64.whl", platform="linu"}
+]
 
 [[tool.poetry.source]]
 name = "pytorch"

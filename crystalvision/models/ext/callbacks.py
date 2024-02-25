@@ -16,7 +16,9 @@ class StopOnValue(callbacks.Callback):
         super().__init__()
 
         self.monitor = monitor
-        self.monitor_op = monitor_op
+        self.monitor_op = (
+            monitor_op if callable(monitor_op) else getattr(np, monitor_op)
+        )
         self.value = value
 
     def on_epoch_end(self, epoch, logs=None) -> None:

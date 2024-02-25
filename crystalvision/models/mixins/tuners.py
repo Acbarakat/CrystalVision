@@ -1,9 +1,11 @@
 from functools import cached_property
 import os
+import gc
 import shutil
 
+import pandas as pd
+
 from keras import backend
-from keras_tuner import Objective
 from keras_tuner.src.engine.objective import MultiObjective
 from keras_tuner.engine.tuner import maybe_distribute
 from keras_tuner.tuners import BayesianOptimization, Hyperband, RandomSearch
@@ -40,19 +42,7 @@ class TunerMixin:
     """Base Tuner Mixin."""
 
     MAX_EXECUTIONS = 1
-
-    @cached_property
-    def objective(self) -> MultiObjective:
-        return MultiObjective(
-            [
-                Objective("val_accuracy", "max"),
-                Objective("test_accuracy", "max"),
-                Objective("accuracy", "max"),
-                # Objective("val_loss", "min"),
-                # Objective("test_loss", "min"),
-                # Objective("loss", "min"),
-            ]
-        )
+    MAX_CONSECUTIVE_FAILED_TRIALS = 3
 
     def clear_cache(self) -> None:
         """Delete the hypermodel cache."""
@@ -95,18 +85,79 @@ class RandomSearchTunerMixin(TunerMixin):
         )
 
 
+class MyHyperband(Hyperband):
+    """Variation of HyperBand algorithm."""
+
+    def run_trial(self, trial, *args, **kwargs):
+        result = super().run_trial(trial, *args, **kwargs)
+
+        if isinstance(result, list) and len(result) == 1:
+            result = result[0]
+
+        objective = self.oracle.objective
+        if isinstance(result, dict) and isinstance(objective, MultiObjective):
+            result[objective.name] = objective.get_value(result)
+
+        return result
+
+    def on_trial_end(self, trial):
+        """Called at the end of a trial.
+
+        Args:
+            trial: A `Trial` instance.
+        """
+        super().on_trial_end(trial)
+
+        # Write trial status to trial directory
+        trial_id = trial.trial_id
+        trial_dir = self.oracle._get_trial_dir(trial_id)
+
+        trials_csv = os.path.join(trial_dir, "..", "trials.csv")
+        if not os.path.exists(trials_csv):
+            kwargs = {
+                "mode": "w+",
+                "header": True,
+            }
+        else:
+            kwargs = {
+                "mode": "a",
+                "header": False,
+            }
+
+        data = dict(trial.hyperparameters.values)
+        if "tuner/trial_id" not in data:
+            data["tuner/trial_id"] = ""
+        data.update(
+            {
+                key: trial.metrics.get_last_value(key)
+                for key in trial.metrics.metrics.keys()
+            }
+        )
+        df = pd.DataFrame(data, index=[f"trial_{trial_id}"])
+        df.index.name = "name"
+
+        df.to_csv(trials_csv, index=True, **kwargs)
+
+
 class HyperbandTunerMixin(TunerMixin):
     """Hyperband Tuner Mixin."""
+
+    MAX_TRIALS = 100
+    MAX_CONSECUTIVE_FAILED_TRIALS = 5
+    FACTOR = 3
 
     @cached_property
     def tuner(self) -> RandomSearch:
         """Hyperband search tuner."""
-        return Hyperband(
+        return MyHyperband(
             self,
             objective=self.objective,
+            max_epochs=self.MAX_TRIALS,
+            factor=self.FACTOR,
             executions_per_trial=self.MAX_EXECUTIONS,
             directory=MODEL_DIR,
             project_name=self.name,
+            max_consecutive_failed_trials=self.MAX_CONSECUTIVE_FAILED_TRIALS,
         )
 
 
@@ -159,6 +210,7 @@ class MyBayesianOptimization(BayesianOptimization):
                 print(err)
                 print(trial)
                 backend.clear_session()
+                gc.collect()
 
         return models
 
@@ -173,6 +225,42 @@ class MyBayesianOptimization(BayesianOptimization):
             result[objective.name] = objective.get_value(result)
 
         return result
+
+    def on_trial_end(self, trial):
+        """Called at the end of a trial.
+
+        Args:
+            trial: A `Trial` instance.
+        """
+        super().on_trial_end(trial)
+
+        # Write trial status to trial directory
+        trial_id = trial.trial_id
+        trial_dir = self.oracle._get_trial_dir(trial_id)
+
+        trials_csv = os.path.join(trial_dir, "..", "trials.csv")
+        if not os.path.exists(trials_csv):
+            kwargs = {
+                "mode": "w+",
+                "header": True,
+            }
+        else:
+            kwargs = {
+                "mode": "a",
+                "header": False,
+            }
+
+        data = dict(trial.hyperparameters.values)
+        data.update(
+            {
+                key: trial.metrics.get_last_value(key)
+                for key in trial.metrics.metrics.keys()
+            }
+        )
+        df = pd.DataFrame(data, index=[f"trial_{trial_id}"])
+        df.index.name = "name"
+
+        df.to_csv(trials_csv, index=True, **kwargs)
 
 
 class BayesianOptimizationTunerMixin(RandomSearchTunerMixin):
