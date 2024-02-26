@@ -27,7 +27,9 @@ except ImportError:
     from crystalvision.data.dataset import imagine_database, make_database
 
 
-def tune_model(model: CardModel, num: int = 5, save_models: bool = True) -> None:
+def tune_model(
+    model: CardModel, num: int = 5, save_models: bool = True, clear_cache=False
+) -> None:
     parser = argparse.ArgumentParser(description="Model tuning command-line tool")
     parser.add_argument(
         "--num", "-n", type=int, default=num, help="The number of best models to keep"
@@ -75,7 +77,7 @@ def tune_model(model: CardModel, num: int = 5, save_models: bool = True) -> None
         else:
             print(vdf.groupby(m.stratify_cols).count()["code"])
 
-    if args.clear_cache:
+    if args.clear_cache or clear_cache:
         m.clear_cache()
 
     m.tune_and_save(
