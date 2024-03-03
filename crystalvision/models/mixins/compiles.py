@@ -80,10 +80,7 @@ class OneHotMeanIoUMixin:
     @cached_property
     def loss(self) -> losses.Loss:
         """The Binary Cross loss function."""
-        if backend.backend() == "torch":
-            # FIXME: Why isn't this working?
-            return losses.SparseCategoricalCrossentropy(from_logits=True)
-        return losses.BinaryCrossentropy()
+        return losses.MeanSquaredError()
 
     @cached_property
     def metrics(self) -> List[metrics.Metric]:

@@ -54,9 +54,11 @@ except ImportError:
 
 
 layers.MinPooling2D = MinPooling2D
-optimizers.Amsgrad = partial(optimizers.Adam, amsgrad=True)
-optimizers.Nesterov = partial(optimizers.SGD, nesterov=True)
-optimizers.RMSpropCentered = partial(optimizers.RMSprop, centered=True)
+optimizers.Amsgrad = partial(optimizers.Adam, amsgrad=True, name="amsgrad")
+optimizers.Nesterov = partial(optimizers.SGD, nesterov=True, name="nesterov")
+optimizers.RMSpropCentered = partial(
+    optimizers.RMSprop, centered=True, name="rmspropcentered"
+)
 
 if backend.backend() == "tensorflow":
     from keras.src.utils.module_utils import tensorflow as tf
@@ -86,6 +88,8 @@ class CardModel(HyperModel):
         feature_key: str,
         name: str = "unknown",
         tunable: bool = True,
+        test_size: float = 0.2,
+        **kwargs,
     ) -> None:
         """
         Init the base hypermodel, CardModel.
@@ -125,6 +129,7 @@ class CardModel(HyperModel):
             ),
             StopOnValue(),
         ]
+        self.test_size: float = test_size
 
     DEFAULT_BATCH_SIZE = 256
 
@@ -136,7 +141,7 @@ class CardModel(HyperModel):
                 Objective("val_accuracy", "max"),
                 Objective("test_accuracy", "max"),
             ],
-            weights=[0.85, 2.0, 0.15],
+            weights=[1.0 - self.test_size, 3.0, self.test_size],
         )
 
     def split_data(
@@ -316,15 +321,16 @@ class CardModel(HyperModel):
         if not save_models:
             return
 
-        best_models = self.tuner.get_best_models(
+        best_models = self.tuner.get_best_models(  # pylint: disable=E1101
             num_models=num_models
-        )  # pylint: disable=E1101
-        best_trials = self.tuner.oracle.get_best_trials(
+        )
+        best_trials = self.tuner.oracle.get_best_trials(  # pylint: disable=E1101
             num_trials=num_models
-        )  # pylint: disable=E1101
+        )
 
         for idx, (bm, bt) in enumerate(zip(best_models, best_trials)):
             print(bm.name, f"trial_{bt.trial_id}", bt.score)
+            print(bm.summary())
             if backend.backend() == "tensorflow":
                 bm.output_names = None
                 spec = (
@@ -385,7 +391,7 @@ class CardModel(HyperModel):
             batch_size = hp.values.get("batch_size", self.DEFAULT_BATCH_SIZE)
 
         train_ds, testing_ds = self.split_data(
-            test_size=0.15,
+            test_size=self.test_size,
             random_state=random_state,
             shuffle=True,
             batch_size=batch_size,
@@ -436,6 +442,9 @@ class CardModel(HyperModel):
         result["multi_objective"] = self.objective.get_value(result)
 
         return result
+
+    def save_multilabels(self) -> None:
+        pass
 
 
 class MyMultiLabelBinarizer(MultiLabelBinarizer):
@@ -492,6 +501,9 @@ class MultiLabelCardModel(  # pylint: disable=W0223
         stratify_cols: List[str],
         labels: List[str] | None = None,
         generate_metrics: bool = True,
+        test_size: float = 0.2,
+        one_hot_threshold: float = 0.95,
+        **kwargs,
     ) -> None:
         self.name: str = name
         self.tunable: bool = True
@@ -525,13 +537,28 @@ class MultiLabelCardModel(  # pylint: disable=W0223
                 self._metrics.append(
                     MyOneHotIoU(
                         target_class_ids=list(range(idx, len(labels) + idx)),
-                        threshold=0.95,
+                        threshold=one_hot_threshold,
                         name=f"{fkey}_accuracy",
                         sparse_y_pred=backend.backend() != "torch",
                     )
                 )
                 idx += len(labels)
 
+        self.save_multilabels()
+
+        self.callbacks = [
+            callbacks.EarlyStopping(
+                monitor="val_loss",
+                min_delta=0.005,
+                patience=5,
+                restore_best_weights=True,
+            ),
+            StopOnValue(),
+        ]
+        self.test_size: float = test_size
+        self.one_hot_threshold: float = one_hot_threshold
+
+    def save_multilabels(self) -> None:
         mlb_file = Path(MODEL_DIR / self.name / f"{self.name}_mlb.pkl")
         if not mlb_file.exists():
             mlb = MyMultiLabelBinarizer(classes=self.labels)
@@ -551,13 +578,3 @@ class MultiLabelCardModel(  # pylint: disable=W0223
         else:
             with mlb_file.open("rb") as f:
                 _, self.df_codes, self.vdf_codes = pickle.load(f)
-
-        self.callbacks = [
-            callbacks.EarlyStopping(
-                monitor="val_loss",
-                min_delta=0.005,
-                patience=5,
-                restore_best_weights=True,
-            ),
-            StopOnValue(),
-        ]

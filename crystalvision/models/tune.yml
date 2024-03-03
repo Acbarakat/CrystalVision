@@ -1,0 +1,20 @@
+test_size: 0.13
+one_hot_threshold: 1.00
+callbacks:
+  - early_stopping:
+      patience: 10
+      min_delta: 5e-06
+  - stop_on_value:
+      monitor: "val_loss"
+      monitor_op: "equal"
+      value: 0.0
+objectives:
+  - accuracy:
+      direction: "max"
+      weight: 0.87
+  - val_accuracy:
+      direction: "max"
+      weight: 3.0
+  - test_accuracy:
+      direction: "max"
+      weight: 0.13

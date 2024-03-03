@@ -13,7 +13,7 @@ def main(fname):
 
     acc_keys = ["accuracy", "val_accuracy", "test_accuracy"]
     # loss_keys = ["loss", "val_loss", "test_loss"]
-    weights = [0.85, 2, 0.15]
+    weights = [0.88, 3, 0.12]
 
     acc_df = df[acc_keys]
 
@@ -29,7 +29,7 @@ def main(fname):
         df[acc_keys] * weights, sense=["max", "max", "max"]
     )
 
-    # df.sort_values("score_mean_weighted", ascending=False, inplace=True)
+    df.sort_values("score_mean_weighted", ascending=False, inplace=True)
 
     print(df)
 

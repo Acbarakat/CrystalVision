@@ -8,6 +8,7 @@ Todo:
 """
 import os
 import argparse
+import yaml
 from pathlib import Path
 
 import pandas as pd
@@ -46,13 +47,35 @@ def tune_model(
     parser.add_argument(
         "--verbose", "-v", action="store_true", help="Enable verbose mode"
     )
+    parser.add_argument(
+        "--validation",
+        type=Path,
+        help="The validation data JSON file",
+        default=MODEL_DIR / ".." / "testmodels.json",
+    )
+    parser.add_argument(
+        "--tune",
+        type=Path,
+        help="The tuning YAML file",
+        default=SRC_DIR / "models" / "tune.yml",
+    )
 
     args = parser.parse_args()
+
+    if not args.validation.exists():
+        raise FileNotFoundError(str(args.validation))
+
+    if not args.tune.exists():
+        raise FileNotFoundError(str(args.tune))
+
+    with args.tune.open("r") as fp:
+        tune_data = yaml.safe_load(fp)
+        print(tune_data)
 
     df = imagine_database(clear_extras=True)
     df.attrs["seed"] = args.random_state
 
-    vdf = pd.read_json(os.path.join(SRC_DIR, "testmodels.json"))
+    vdf = pd.read_json(str(args.validation))
     vdf["filename"] = str(TEST_IMG_DIR) + os.sep + vdf["uri"].index.astype(str) + ".jpg"
     vdf.fillna({"full_art": 0, "foil": 1, "focal": 1}, inplace=True)
     vdf = vdf.merge(make_database(clear_extras=True), on="code", how="left", sort=False)
@@ -64,7 +87,11 @@ def tune_model(
         print(null_vdf)
         raise ValueError("There are null values in test dataset")
 
-    m = model(df, vdf)
+    m = model(df, vdf, **tune_data)
+
+    if args.clear_cache or clear_cache:
+        m.clear_cache()
+        m.save_multilabels()
 
     if args.verbose:
         print(vdf)
@@ -76,9 +103,6 @@ def tune_model(
             )
         else:
             print(vdf.groupby(m.stratify_cols).count()["code"])
-
-    if args.clear_cache or clear_cache:
-        m.clear_cache()
 
     m.tune_and_save(
         num_models=args.num, random_state=args.random_state, save_models=save_models

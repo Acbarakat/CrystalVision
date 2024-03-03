@@ -7,7 +7,7 @@ Todo:
 
 """
 from pandas import DataFrame
-from keras import layers, models, backend
+from keras import layers, models, backend, optimizers
 from keras_tuner import HyperParameters
 
 try:
@@ -23,17 +23,21 @@ except ImportError:
 class MultiLabel(HyperbandTunerMixin, MultiLabelCardModel):
     """Multilabel for all of a Card's labels."""
 
-    MAX_TRIALS: int = 30
+    MAX_TRIALS: int = 100
     DEFAULT_EPOCHS: int = 50
 
-    def __init__(self, df: DataFrame, vdf: DataFrame) -> None:
+    def __init__(self, df: DataFrame, vdf: DataFrame, **kwargs) -> None:
         super().__init__(
             "multilabel",
             df,
             vdf,
             ["type_en", "cost", "element_v2", "power", "icons"],
             ["type_en", "cost", "element", "power", "ex_burst", "multicard"],
+            **kwargs
         )
+
+        self.callbacks[0].min_delta = 5e-06
+        self.callbacks[0].patience = 10
 
     def build(self, hp: HyperParameters, seed: int | None = None) -> models.Sequential:
         """
@@ -45,17 +49,17 @@ class MultiLabel(HyperbandTunerMixin, MultiLabelCardModel):
         Returns:
             A model instance.
         """
-        batch_size = hp.Choice("batch_size", values=[32, 64, 128])  # noqa
+        batch_size = hp.Choice("batch_size", values=[32, 64])  # noqa
 
         pl1 = self._pooling2d_choice("pooling1", hp)[1]
-        pl2 = self._pooling2d_choice("pooling2", hp)[1]
-        pl3 = self._pooling2d_choice("pooling3", hp)[1]
+        pl2 = self._pooling2d_choice("pooling2", hp, exclude={"Min"})[1]
+        pl3 = self._pooling2d_choice("pooling3", hp, exclude={"Min"})[1]
 
         m = models.Sequential(
             layers=[
                 layers.Input(shape=self.IMAGE_SHAPE, batch_size=batch_size),
                 layers.Conv2D(
-                    32,
+                    64,
                     (3, 3),
                     activation="relu",
                 ),
@@ -64,15 +68,13 @@ class MultiLabel(HyperbandTunerMixin, MultiLabelCardModel):
                 pl2(pool_size=(2, 2)),
                 layers.Conv2D(128, (3, 3), activation="relu"),
                 pl3(pool_size=(2, 2)),
-                layers.Conv2D(128, (3, 3), activation="relu"),
+                layers.Conv2D(256, (3, 3), activation="relu"),
                 layers.Flatten(),
-                # layers.Dropout(0.1, seed=seed),
                 layers.Dense(
                     hp.Int(
                         "dense_units1",
-                        min_value=2**7,
-                        max_value=2**12,
-                        sampling="LOG",
+                        min_value=650,
+                        max_value=850,
                     ),
                     activation="relu",
                 ),
@@ -81,35 +83,18 @@ class MultiLabel(HyperbandTunerMixin, MultiLabelCardModel):
             name=self.name,
         )
 
-        optimizer = self._optimizer_choice(
-            "optimizer",
-            hp,
-            # exclude={
-            #     "Adadelta",
-            #     "Adagrad",
-            #     "Adam",
-            #     "Adamax",
-            #     "Ftrl",
-            #     "SGD",
-            #     "Nesterov",
-            #     "Nadam",
-            #     "RMSprop",
-            # }
-        )[1]
-
-        # momentum=hp.Float("mometum", min_value=0.0, max_value=0.9)
-        # learning_rate=hp.Float(
-        #     "learning_rate", min_value=1.0e-7, max_value=0.9, sampling="LOG"
+        # learning_rate = hp.Float(
+        #     "learning_rate", min_value=1.0e-7, max_value=0.01
         # )
 
         m.compile(
-            optimizer=optimizer(),
+            optimizer=optimizers.Adam(amsgrad=True, name="amsgrad"),
             loss=self.loss,
             metrics=self._metrics
             + [
                 MyOneHotMeanIoU(
                     num_classes=len(self.labels),
-                    threshold=0.95,
+                    threshold=self.one_hot_threshold,
                     name="accuracy",
                     sparse_y_pred=backend.backend() != "torch",
                 ),
@@ -122,4 +107,4 @@ class MultiLabel(HyperbandTunerMixin, MultiLabelCardModel):
 if __name__ == "__main__":
     from crystalvision.models import tune_model
 
-    tune_model(MultiLabel)
+    tune_model(MultiLabel, clear_cache=True)

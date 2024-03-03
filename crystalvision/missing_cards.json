@@ -448,5 +448,61 @@
                 "https://fftcg.cdn.sewest.net/images/cards/full/17-140S_FL_eg.jpg"
             ]
         }
+    },
+    {
+        "code": "6-018R",
+        "element": [
+            "\u706b"
+        ],
+        "rarity": "R",
+        "cost": "2",
+        "power": "0",
+        "category_1": "MOBIUS &middot; VII",
+        "category_2": "VII",
+        "multicard": "0",
+        "ex_burst": "0",
+        "name_en": "Neo Bahamut",
+        "set": "Opus VI",
+        "type_en": "Summon",
+        "job_en": "",
+        "text_en": "You can only cast Neo Bahamut during your Main Phase. Choose 1 Forward. Deal it 8000 damage. Discard all your hand.",
+        "name_de": "Neo Bahamut",
+        "type_de": "Beschw\u00f6rung",
+        "job_de": "",
+        "text_de": "",
+        "name_es": "Neo Bahamut",
+        "type_es": "Invocaci\u00f3n",
+        "job_es": "",
+        "text_es": "",
+        "name_fr": "Neo Bahamut",
+        "type_fr": "Invocation",
+        "job_fr": "",
+        "text_fr": "",
+        "name_it": "Neo Bahamut",
+        "type_it": "Evocazione",
+        "job_it": "",
+        "text_it": "",
+        "name_ja": "Neo\u30d0\u30cf\u30e0\u30fc\u30c8",
+        "type_ja": "Neo\u53ec\u559a\u7363",
+        "job_ja": "",
+        "text_ja": "",
+        "images": {
+            "thumbs": [
+                "https://fftcg.cdn.sewest.net/images/cards/thumbs/6-018R_eg.jpg",
+                "https://fftcg.cdn.sewest.net/images/cards/thumbs/6-018R_de.jpg",
+                "https://fftcg.cdn.sewest.net/images/cards/thumbs/6-018R_es.jpg",
+                "https://fftcg.cdn.sewest.net/images/cards/thumbs/6-018R_fr.jpg",
+                "https://fftcg.cdn.sewest.net/images/cards/thumbs/6-018R_it.jpg",
+                "http://www.square-enix-shop.com/jp/ff-tcg/card/cimg/thumb/6-018R_jp.jpg"
+            ],
+            "full": [
+                "https://fftcg.cdn.sewest.net/images/cards/full/6-018R_eg.jpg",
+                "https://fftcg.cdn.sewest.net/images/cards/full/6-018R_de.jpg",
+                "https://fftcg.cdn.sewest.net/images/cards/full/6-018R_es.jpg",
+                "https://fftcg.cdn.sewest.net/images/cards/full/6-018R_fr.jpg",
+                "https://fftcg.cdn.sewest.net/images/cards/full/6-018R_it.jpg",
+                "http://www.square-enix-shop.com/jp/ff-tcg/card/cimg/large/6-018R_jp.jpg"
+            ]
+        }
     }
 ]
