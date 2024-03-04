@@ -89,6 +89,7 @@ class CardModel(HyperModel):
         name: str = "unknown",
         tunable: bool = True,
         test_size: float = 0.2,
+        image_shape: Tuple[int, int, int] | None = None,
         **kwargs,
     ) -> None:
         """
@@ -130,6 +131,8 @@ class CardModel(HyperModel):
             StopOnValue(),
         ]
         self.test_size: float = test_size
+        if image_shape:
+            self.IMAGE_SHAPE = image_shape
 
     DEFAULT_BATCH_SIZE = 256
 
@@ -503,6 +506,7 @@ class MultiLabelCardModel(  # pylint: disable=W0223
         generate_metrics: bool = True,
         test_size: float = 0.2,
         one_hot_threshold: float = 0.95,
+        image_shape: Tuple[int, int, int] | None = None,
         **kwargs,
     ) -> None:
         self.name: str = name
@@ -557,6 +561,8 @@ class MultiLabelCardModel(  # pylint: disable=W0223
         ]
         self.test_size: float = test_size
         self.one_hot_threshold: float = one_hot_threshold
+        if image_shape:
+            self.IMAGE_SHAPE = image_shape
 
     def save_multilabels(self) -> None:
         mlb_file = Path(MODEL_DIR / self.name / f"{self.name}_mlb.pkl")

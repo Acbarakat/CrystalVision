@@ -8,9 +8,9 @@ Todo:
 """
 import os
 import argparse
-import yaml
 from pathlib import Path
 
+import yaml
 import pandas as pd
 from keras.models import load_model
 
@@ -70,9 +70,18 @@ def tune_model(
 
     with args.tune.open("r") as fp:
         tune_data = yaml.safe_load(fp)
-        print(tune_data)
+        if "image_shape" in tune_data:
+            img_shape = tune_data["image_shape"]
+            tune_data["image_shape"] = (
+                img_shape["height"],
+                img_shape["width"],
+                img_shape["dimesion"],
+            )
+    print(tune_data)
 
-    df = imagine_database(clear_extras=True)
+    df = imagine_database(
+        image=tune_data.get("image_type", "thumbs"), clear_extras=True
+    )
     df.attrs["seed"] = args.random_state
 
     vdf = pd.read_json(str(args.validation))
@@ -80,7 +89,8 @@ def tune_model(
     vdf.fillna({"full_art": 0, "foil": 1, "focal": 1}, inplace=True)
     vdf = vdf.merge(make_database(clear_extras=True), on="code", how="left", sort=False)
     vdf.drop(["thumbs", "images", "uri", "id"], axis=1, inplace=True)
-    vdf.query("full_art != 1 and focal == 1", inplace=True)
+    if vdf_query := tune_data.get("vdf_query"):
+        vdf.query(vdf_query, inplace=True)
 
     null_vdf = vdf[vdf["name_en"].isna()]
     if not null_vdf.empty:

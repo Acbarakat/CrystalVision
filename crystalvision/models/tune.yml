@@ -1,20 +1,26 @@
 test_size: 0.13
 one_hot_threshold: 1.00
+vdf_query: "full_art == 0 and focal == 1 and foil == 1"
+image_type2: "images"
+image_shape2:
+    height: 600
+    width: 490
+    dimesion: 3
 callbacks:
-  - early_stopping:
-      patience: 10
-      min_delta: 5e-06
-  - stop_on_value:
-      monitor: "val_loss"
-      monitor_op: "equal"
-      value: 0.0
+    - early_stopping:
+        patience: 10
+        min_delta: 5e-06
+    - stop_on_value:
+        monitor: "val_loss"
+        monitor_op: "equal"
+        value: 0.0
 objectives:
-  - accuracy:
-      direction: "max"
-      weight: 0.87
-  - val_accuracy:
-      direction: "max"
-      weight: 3.0
-  - test_accuracy:
-      direction: "max"
-      weight: 0.13
+    - accuracy:
+        direction: "max"
+        weight: 0.87
+    - val_accuracy:
+        direction: "max"
+        weight: 3.0
+    - test_accuracy:
+        direction: "max"
+        weight: 0.13
