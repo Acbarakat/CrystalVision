@@ -7,7 +7,6 @@ import pandas as pd
 
 from keras import backend
 from keras_tuner.src.engine.objective import MultiObjective
-from keras_tuner.engine.tuner import maybe_distribute
 from keras_tuner.tuners import BayesianOptimization, Hyperband, RandomSearch
 
 from crystalvision.models import MODEL_DIR
@@ -28,13 +27,8 @@ class MyRandomSearch(RandomSearch):
             trial: A `Trial` instance, the `Trial` corresponding to the model
                 to load.
         """
-        model = self._try_build(trial.hyperparameters)
-        # Reload best checkpoint.
-        # Only load weights to avoid loading `custom_objects`.
-        with maybe_distribute(self.distribution_strategy):
-            fname = self._get_checkpoint_fname(trial.trial_id)
-            model.load_weights(fname).expect_partial()
-            model._name += f"_trial{trial.trial_id}"
+        model = super().load_model(trial)
+        model.name += f"_trial{trial.trial_id}"
         return model
 
 
@@ -176,13 +170,8 @@ class MyBayesianOptimization(BayesianOptimization):
             trial: A `Trial` instance, the `Trial` corresponding to the model
                 to load.
         """
-        model = self._try_build(trial.hyperparameters)
-        # Reload best checkpoint.
-        # Only load weights to avoid loading `custom_objects`.
-        with maybe_distribute(self.distribution_strategy):
-            fname = self._get_checkpoint_fname(trial.trial_id)
-            model.load_weights(fname).expect_partial()
-            model._name += f"_trial{trial.trial_id}"
+        model = super().load_model(trial)
+        model.name += f"_trial{trial.trial_id}"
         return model
 
     def get_best_models(self, num_models=1):
@@ -211,6 +200,8 @@ class MyBayesianOptimization(BayesianOptimization):
                 print(trial)
                 backend.clear_session()
                 gc.collect()
+            finally:
+                raise
 
         return models
 

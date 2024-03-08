@@ -94,8 +94,8 @@ class Mono(BinaryMixin, RandomSearchTunerMixin, CardModel):
 
 
 class Element(CategoricalMixin, BayesianOptimizationTunerMixin, CardModel):
-    def __init__(self, df: DataFrame, vdf: DataFrame) -> None:
-        super().__init__(df, vdf, "element", name="element")
+    def __init__(self, df: DataFrame, vdf: DataFrame, **kwargs) -> None:
+        super().__init__(df, vdf, "element", name="element", **kwargs)
 
         self.stratify_cols.extend(["type_en"])
 
@@ -125,10 +125,10 @@ class Element(CategoricalMixin, BayesianOptimizationTunerMixin, CardModel):
                 layers.AveragePooling2D((2, 2)),
                 layers.Conv2D(128, (3, 3), activation="relu"),
                 layers.Flatten(),
-                layers.Dropout(0.2, seed=seed),
+                # layers.Dropout(0.2, seed=seed),
                 # layers.Dense(hp.Int('dense_units', min_value=128, max_value=512, step=32), activation='relu'),
                 layers.Dense(
-                    hp.Int("dense_units", min_value=64, max_value=1024, step=32),
+                    hp.Int("dense_units", min_value=64, max_value=1024),
                     activation="relu",
                 ),
                 # layers.Dense(480, activation='relu'),
@@ -157,8 +157,16 @@ class Element(CategoricalMixin, BayesianOptimizationTunerMixin, CardModel):
 class ElementV2(BayesianOptimizationTunerMixin, MultiLabelCardModel):
     """Multilabel protoype for Card's Element."""
 
-    def __init__(self, df: DataFrame, vdf: DataFrame) -> None:
-        super().__init__("element_v2", df, vdf, "element_v2", ["element", "type_en"])
+    MAX_TRIALS: int = 50
+    DEFAULT_EPOCHS: int = 100
+
+    def __init__(self, df: DataFrame, vdf: DataFrame, **kwargs) -> None:
+        super().__init__(
+            "element_v2", df, vdf, ["element_v2"], ["element", "type_en"], **kwargs
+        )
+
+        self.callbacks[0].min_delta = 5e-06
+        self.callbacks[0].patience = 10
 
     def build(self, hp: HyperParameters, seed: int | None = None) -> models.Sequential:
         """
@@ -170,7 +178,11 @@ class ElementV2(BayesianOptimizationTunerMixin, MultiLabelCardModel):
         Returns:
             A model instance.
         """
-        batch_size = hp.Choice("batch_size", values=[32, 64, 128, 256, 512])  # noqa
+        batch_size = hp.Choice("batch_size", values=[32, 64, 128])  # noqa
+
+        pl1 = self._pooling2d_choice("pooling1", hp)[1]
+        pl2 = self._pooling2d_choice("pooling2", hp, exclude={"Min"})[1]
+        pl3 = self._pooling2d_choice("pooling3", hp, exclude={"Min"})[1]
 
         m = models.Sequential(
             layers=[
@@ -180,16 +192,16 @@ class ElementV2(BayesianOptimizationTunerMixin, MultiLabelCardModel):
                     (3, 3),
                     activation="relu",
                 ),
-                layers.AveragePooling2D((2, 2)),
+                pl1(pool_size=(2, 2)),
                 layers.Conv2D(64, (3, 3), activation="relu"),
-                layers.AveragePooling2D((2, 2)),
+                pl2(pool_size=(2, 2)),
                 layers.Conv2D(128, (3, 3), activation="relu"),
-                layers.AveragePooling2D((2, 2)),
-                layers.Conv2D(128, (3, 3), activation="relu"),
+                pl3(pool_size=(2, 2)),
+                layers.Conv2D(256, (3, 3), activation="relu"),
                 layers.Flatten(),
                 # layers.Dropout(0.2, seed=seed),
                 layers.Dense(
-                    hp.Int("dense_units", min_value=64, max_value=1024, step=32),
+                    hp.Int("dense_units", min_value=64, max_value=1024),
                     activation="relu",
                 ),
                 layers.Dense(len(self.labels), activation="sigmoid", name="result"),
@@ -197,22 +209,24 @@ class ElementV2(BayesianOptimizationTunerMixin, MultiLabelCardModel):
             name=self.name,
         )
 
-        learning_rate = hp.Float(
-            "learning_rate",
-            # min_value=3.1e-4,
-            min_value=1.1e-4,
-            # max_value=3.5e-4,
-            max_value=5.5e-4,
-            sampling="LOG",
-        )
+        # learning_rate = hp.Float(
+        #     "learning_rate",
+        #     # min_value=3.1e-4,
+        #     min_value=1.1e-4,
+        #     # max_value=3.5e-4,
+        #     max_value=5.5e-4,
+        #     sampling="LOG",
+        # )
+
+        optimizer = self._optimizer_choice("optimizer", hp)[1]
 
         m.compile(
-            optimizer=optimizers.Adam(learning_rate=learning_rate),
+            optimizer=optimizer(),
             loss=self.loss,
             metrics=[
                 MyOneHotMeanIoU(
                     num_classes=len(self.labels),
-                    threshold=0.95,
+                    threshold=1.00,
                     name="accuracy",
                     sparse_y_pred=backend.backend() != "torch",
                 )
@@ -224,6 +238,6 @@ class ElementV2(BayesianOptimizationTunerMixin, MultiLabelCardModel):
 if __name__ == "__main__":
     from crystalvision.models import tune_model
 
-    # tune_model(Element)
+    tune_model(Element, clear_cache=False)
     # tune_model(Mono)
-    tune_model(ElementV2)
+    tune_model(ElementV2, clear_cache=False)

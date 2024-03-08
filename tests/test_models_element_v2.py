@@ -66,7 +66,7 @@ def image(card):
 
 @pytest.fixture(scope="module")
 def labels():
-    label_file = Path("./data/model/multilabel.json")
+    label_file = Path("./data/model/element_v2.json")
     with label_file.open("r") as lbfp:
         return json.load(lbfp)
 
@@ -75,34 +75,24 @@ def labels():
 def mlb():
     from crystalvision.models import MODEL_DIR
 
-    mlb_file = Path(MODEL_DIR / "multilabel" / "multilabel_mlb.pkl")
+    mlb_file = Path(MODEL_DIR / "element_v2" / "element_v2_mlb.pkl")
     with mlb_file.open("rb") as f:
         return pickle.load(f)[0]
 
 
 # Test to check specific ONNX models
 @pytest.mark.parametrize(
-    "key, start, end",
-    [
-        ("type_en", 0, 4),
-        ("cost", 4, 15),
-        ("power", 23, 34),
-        ("icons", 34, 37),
-        ("element_v2", 15, 23),
-    ],
-)
-@pytest.mark.parametrize(
     "model_file",
     [
-        "multilabel_1.onnx",
-        "multilabel_2.onnx",
-        "multilabel_3.onnx",
-        "multilabel_4.onnx",
-        "multilabel_5.onnx",
-        "multilabel_6.onnx",
+        "element_v2_1.onnx",
+        "element_v2_2.onnx",
+        "element_v2_3.onnx",
+        "element_v2_4.onnx",
+        "element_v2_5.onnx",
+        "element_v2_6.onnx",
     ],
 )
-def test_specific_onnx_model(key, start, end, model_file, cards, blobs, mlb):
+def test_specific_onnx_model(model_file, cards, blobs, mlb):
     model_path = Path("data/model") / model_file
     if not model_path.exists():
         pytest.skip(f"{model_path} does not exist.")
@@ -115,29 +105,19 @@ def test_specific_onnx_model(key, start, end, model_file, cards, blobs, mlb):
 
     # Forward pass
     output = pd.DataFrame(net.forward(), columns=mlb.classes)
-    print(output.iloc[:, start:end])
+    print(output)
 
-    output = output.map(lambda x: 1.0 if x >= 0.05 else 0.0)
+    output = output.map(lambda x: 1.0 if x > 0.01 else 0.0)
+    print(output)
     assert output.shape == (cards.shape[0], len(mlb.classes))
 
     print(mlb.inverse_transform(output.to_numpy()))
 
-    df = output.iloc[:, start:end]
-    print(df)
+    df = output
 
-    if key == "icons":
-        y_true = list(icons[0] for icons in cards[key].tolist())
-    elif key == "element_v2":
-        y_true = list(set(card["element_v2"]) for _, card in cards.iterrows())
-    else:
-        y_true = cards[key].tolist()
+    y_true = list(set(card["element_v2"]) for _, card in cards.iterrows())
 
-    if key == "element_v2":
-        y_pred = list(
-            set(card.index[card == 1.0].tolist()) for _, card in df.iterrows()
-        )
-    else:
-        y_pred = df.idxmax(axis=1).tolist()
+    y_pred = list(set(card.index[card == 1.0].tolist()) for _, card in df.iterrows())
 
     print("y_pred", y_pred)
     print("y_true", y_true)

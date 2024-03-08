@@ -20,6 +20,7 @@ from functools import partial, cached_property
 
 import numpy as np
 import scipy.sparse as sp
+import pandas as pd
 from pandas import DataFrame
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import MultiLabelBinarizer
@@ -75,6 +76,14 @@ else:
     InvalidArgumentError = ArithmeticError
 
 
+class MyEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, pd.Index):
+            return obj.to_list()
+        # If not a DataFrame, use default serialization
+        return super().default(self, obj)
+
+
 class CardModel(HyperModel):
     """Base hypermodel for Cards."""
 
@@ -125,7 +134,7 @@ class CardModel(HyperModel):
             callbacks.EarlyStopping(
                 monitor="val_accuracy",
                 min_delta=0.005,
-                patience=2,
+                patience=5,
                 restore_best_weights=True,
             ),
             StopOnValue(),
@@ -317,7 +326,7 @@ class CardModel(HyperModel):
         """
         # Save the labels
         with open(MODEL_DIR / f"{self.name}.json", "w+") as fp:
-            json.dump(self.labels, fp)
+            json.dump(self.labels, fp, cls=MyEncoder)
 
         self.search(random_state=random_state)  # pylint: disable=E1101
 
