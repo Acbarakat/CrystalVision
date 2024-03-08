@@ -198,10 +198,10 @@ class MyBayesianOptimization(BayesianOptimization):
             except Exception as err:
                 print(err)
                 print(trial)
+                raise err
+            finally:
                 backend.clear_session()
                 gc.collect()
-            finally:
-                raise
 
         return models
 
