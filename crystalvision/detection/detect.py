@@ -3,6 +3,7 @@ Detect FFTCG cards and show them via OpenCV.
 """
 import logging
 from pathlib import Path
+from functools import partial
 from typing import List
 
 import cv2.dnn
@@ -201,6 +202,26 @@ class DetectDNN(Detector):
 
 
 def main(args) -> None:
+    if args.plot == "dnn":
+        detector = DetectDNN
+    elif args.plot == "ultralytics":
+        detector = DetectYOLO
+
+    detector = partial(
+        detector, args.model, args.model_task, args.classes, threshold=args.threshold
+    )
+
+    if args.image is not None:
+        d = detector(None).detect(args.image)
+        cv2.imshow("detect", d)
+
+        # Wait until any key is pressed
+        cv2.waitKey(0)
+
+        # Close all OpenCV windows
+        cv2.destroyAllWindows()
+        return
+
     cap = cv2.VideoCapture(args.camera[3])
 
     if args.camera:
@@ -223,14 +244,7 @@ def main(args) -> None:
         log.error("Unable to open camera")
         exit()
 
-    if args.plot == "dnn":
-        detector = DetectDNN
-    elif args.plot == "ultralytics":
-        detector = DetectYOLO
-
-    detector(
-        args.model, args.model_task, args.classes, cap, threshold=args.threshold
-    ).run()
+    detector(cap).run()
 
 
 if __name__ == "__main__":
@@ -239,6 +253,9 @@ if __name__ == "__main__":
     logging.basicConfig()
 
     parser = argparse.ArgumentParser("detect")
+
+    group = parser.add_mutually_exclusive_group(required=True)
+
     parser.add_argument(
         "-m", "--model", required=True, type=Path, help="the YOLO model"
     )
@@ -259,13 +276,13 @@ if __name__ == "__main__":
         help="Use the model for image detection",
     )
     parser.add_argument("-c", "--classes", help="The yaml file containing the classes.")
-    parser.add_argument(
+    group.add_argument(
         "--camera",
         nargs=4,
         type=int,
-        required=True,
         help="use the camera with dimesions (W, H, FPS, Cam#)",
     )
+    group.add_argument("--image", type=Path, help="image path")
     parser.add_argument(
         "-v", "--verbose", action="store_true", help="Set logging to DEBUG"
     )
@@ -274,8 +291,9 @@ if __name__ == "__main__":
 
     if uargs.verbose:
         log.setLevel(logging.DEBUG)
-
         # print(cv2.getBuildInformation())
 
-    # TODO: Accept an image OR use the camera
+    if uargs.image:
+        uargs.image = cv2.imread(str(uargs.image))
+
     main(uargs)
