@@ -4,7 +4,7 @@ Detect FFTCG cards and show them via OpenCV.
 import logging
 from pathlib import Path
 from functools import partial
-from typing import List
+from typing import List, Tuple, Any
 
 import cv2.dnn
 import numpy as np
@@ -18,6 +18,9 @@ from ultralytics.utils.plotting import colors
 
 log = logging.getLogger("detector")
 log.setLevel(logging.INFO)
+
+pd.set_option("display.max_columns", None)
+pd.set_option("display.max_rows", None)
 
 
 class Detector:
@@ -59,7 +62,7 @@ class Detector:
                 cv2.imwrite("saved_frame.jpg", image)
                 break
 
-            image = self.detect(image, scale_w, scale_h)
+            image = self.detect(image, scale_w, scale_h)[0]
 
             cv2.imshow("image", image)
 
@@ -89,7 +92,9 @@ class DetectYOLO(Detector):
         log.debug("Loading the model (%s)", model_path)
         self.model: YOLO = YOLO(model_path, task=model_task)
 
-    def detect(self, frame: np.ndarray, *args) -> np.ndarray:  # pylint: disable=W0613
+    def detect(
+        self, frame: np.ndarray, *args, **kwargs
+    ) -> Tuple[np.ndarray, Any]:  # pylint: disable=W0613
         data = self.model.track(
             frame,
             persist=True,
@@ -99,7 +104,7 @@ class DetectYOLO(Detector):
             iou=self.iou,
         )
 
-        return cv2.resize(data[0].plot(), (0, 0), fx=0.5, fy=0.5)
+        return cv2.resize(data[0].plot(), (0, 0), fx=0.5, fy=0.5), data
 
     @property
     def can_augment(self) -> bool:
@@ -124,7 +129,9 @@ class DetectDNN(Detector):
         self.model.setPreferableBackend(cv2.dnn.DNN_BACKEND_CUDA)
         self.model.setPreferableTarget(cv2.dnn.DNN_TARGET_CUDA)
 
-    def detect(self, frame: np.ndarray, scale_w: float, scale_h: float) -> np.ndarray:
+    def detect(
+        self, frame: np.ndarray, scale_w: float = 1.0, scale_h: float = 1.0
+    ) -> Tuple[np.ndarray, Any]:
         # Preprocess the image and prepare blob for model
         blob = cv2.dnn.blobFromImage(
             frame, scalefactor=1.0 / 255, size=(640, 640), swapRB=True
@@ -138,7 +145,7 @@ class DetectDNN(Detector):
                 columns=["x0", "y0", "width", "height", *self.classes],
             )
             .query(
-                " or ".join([f"{cls_} >= {self.threshold}" for cls_ in self.classes])
+                " or ".join([f"{cls_} >= {self.threshold}" for cls_ in self.classes]),
             )
             .reset_index(drop=True)
         )
@@ -147,6 +154,9 @@ class DetectDNN(Detector):
         df["maxClass"] = df[self.classes].idxmax(axis=1)
         df["x0"] -= df["width"] * 0.5
         df["y0"] -= df["height"] * 0.5
+
+        if df.empty:
+            return cv2.resize(frame, (0, 0), fx=0.5, fy=0.5), df
 
         result_boxes = cv2.dnn.NMSBoxes(
             df[["x0", "y0", "width", "height"]].to_numpy(),
@@ -178,7 +188,7 @@ class DetectDNN(Detector):
         # Display the image with bounding boxes
         frame = cv2.resize(frame, (0, 0), fx=0.5, fy=0.5)
 
-        return frame
+        return frame, df
 
     def draw_bounding_box(self, img, class_name, confidence, x, y, x_plus_w, y_plus_h):
         """
@@ -212,11 +222,15 @@ def main(args) -> None:
     )
 
     if args.image is not None:
-        d = detector(None).detect(args.image)
+        scale_w = args.image.shape[1] / 640.0  # 640 is the standard YOLOv8 input shape
+        scale_h = args.image.shape[0] / 640.0  # 640 is the standard YOLOv8 input shape
+
+        d, data = detector(None).detect(args.image, scale_h=scale_h, scale_w=scale_w)
         cv2.imshow("detect", d)
 
         # Wait until any key is pressed
         cv2.waitKey(0)
+        print(data)
 
         # Close all OpenCV windows
         cv2.destroyAllWindows()
@@ -292,6 +306,7 @@ if __name__ == "__main__":
     if uargs.verbose:
         log.setLevel(logging.DEBUG)
         # print(cv2.getBuildInformation())
+        print(uargs)
 
     if uargs.image:
         uargs.image = cv2.imread(str(uargs.image))
