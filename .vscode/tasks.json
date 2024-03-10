@@ -71,6 +71,7 @@
                 "./crystalvision/detection/train.py",
                 "--task",
                 "tune-${config:crystalvision.task}",
+                "--batch=12"
             ],
             "problemMatcher": []
         },

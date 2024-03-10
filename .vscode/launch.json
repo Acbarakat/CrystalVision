@@ -17,7 +17,7 @@
                 "PYTHONPATH": "${python.pythonPath};${workspaceFolder}/crystalvision",
                 "KERAS_BACKEND": "torch",
                 "CUDA_LAUNCH_BLOCKING": "1",
-                // "CUDA_VISIBLE_DEVICES": "0",
+                "CUDA_VISIBLE_DEVICES": "0",
             }
         },
         {

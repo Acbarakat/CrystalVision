@@ -9,7 +9,6 @@ readme = "README.md"
 
 [tool.poetry.dependencies]
 python = ">=3.10,<3.11"
-opencv-contrib-python = ">=4.8.1.78"
 # keras = ">=3.0.0"
 keras-nightly = ">=3.1.0.dev2024021703"
 keras-tuner = ">=1.4.5"

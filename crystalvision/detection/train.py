@@ -10,8 +10,8 @@ from ultralytics import YOLO
 
 # See https://github.com/ultralytics/ultralytics?tab=readme-ov-file#models
 DEFAULT_MODEL: Dict[str, str] = {
-    "detect": "yolov8x.pt",
-    "tune-detect": "yolov8x.pt",
+    "detect": "yolov9e.pt",
+    "tune-detect": "yolov9e.pt",
     "segment": "yolov8x-seg.pt",
     "tune-segment": "yolov8x-seg.pt",
     "obb": "yolov8x-obb.pt",
@@ -33,25 +33,25 @@ def main(uargs: Namespace) -> None:
     model_kwargs: Dict[str, Any] = {
         "batch": uargs.batch,
         "epochs": uargs.epochs,
-        "device": 0,
         "fliplr": 0.0,
         "mosaic": 0.0,
         "close_mosaic": 0,
-        "freeze": 20,
+        "freeze": 20 if "v8" in uargs.model else 20,
         "pretrained": True,
         "scale": 0.25,
+        "patience": 25,
+        "exist_ok": True,
     }
 
     if uargs.task.startswith("tune"):
         return model.tune(
             data="./data/labeling/YOLODataset/dataset.yaml",
-            iterations=100,
-            optimizer="AdamW",
+            iterations=20,
+            optimizer="auto",
             plots=False,
             verbose=False,
             use_ray=False,
-            exist_ok=True,
-            resume=True,
+            resume=False,
             task=uargs.task.replace("tune-", ""),
             space={  # key: (min, max, gain(optional))
                 # 'optimizer': tune.choice(['SGD', 'Adam', 'AdamW', 'NAdam', 'RAdam', 'RMSProp']),
@@ -83,13 +83,13 @@ def main(uargs: Namespace) -> None:
 
     results = model.train(
         data="./data/labeling/YOLODataset/dataset.yaml",
-        optimizer="AdamW",
-        exist_ok=True,
         verbose=uargs.verbose,
         task=uargs.task.replace("tune-", ""),
         **model_kwargs,
         **uargs.hyperparams,
     )
+
+    # model = YOLO("./runs/detect/train/weights/best.pt")
 
     # Evaluate the model's performance on the validation set
     # results = model.val(max_det=116)
@@ -115,7 +115,7 @@ def main(uargs: Namespace) -> None:
         # assert result.names[int(result.boxes.cls.cpu()[0])] == cls_name, f"Object is '{result.names[int(result.boxes.cls.cpu()[0])]}'"
         # assert result.boxes.conf.cpu()[0] >= 0.5
 
-    success = model.export(format="onnx", opset=12, device=0, simplify=True)
+    success = model.export(format="onnx", device="0", simplify=True)
     print(success)
 
 

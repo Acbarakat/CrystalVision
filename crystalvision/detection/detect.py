@@ -4,12 +4,14 @@ Detect FFTCG cards and show them via OpenCV.
 import logging
 from pathlib import Path
 from functools import partial
-from typing import List, Tuple, Any
+from typing import List, Any
 
-import cv2.dnn
+import cv2
 import numpy as np
 import pandas as pd
-
+from qtpy import QtCore
+from qtpy import QtGui
+from qtpy import QtWidgets
 from ultralytics import YOLO
 from ultralytics.utils import yaml_load
 from ultralytics.utils.checks import check_yaml
@@ -23,7 +25,7 @@ pd.set_option("display.max_columns", None)
 pd.set_option("display.max_rows", None)
 
 
-class Detector:
+class Detector(QtWidgets.QMainWindow):
     """Base Detector Class"""
 
     def __init__(
@@ -33,6 +35,8 @@ class Detector:
         threshold: float = 0.5,
         iou: float = 0.75,
     ) -> None:
+        super().__init__()
+
         self.classes: List[str] = yaml_load(check_yaml(classes_path))["names"]
         log.info("Classes found: %s", self.classes)
 
@@ -40,38 +44,62 @@ class Detector:
         self.threshold: float = threshold
         self.iou: float = iou
 
-    def detect(self, frame: np.ndarray, scale_w: float, scale_h: float) -> np.ndarray:
+        self.setWindowTitle("CrystalVision")
+
+        # Create a QLabel to display the image
+        self.label = QtWidgets.QLabel(self)
+        # self.label.setGeometry(10, 10, 650, 650)
+
+        # Create a QTimer for updating the image
+        self.timer = QtCore.QTimer(self)
+        if camera:
+            self.timer.timeout.connect(self.run)
+            self.timer.start(100)  # Update every 100 milliseconds
+
+        self.setCentralWidget(self.label)
+
+    def detect(
+        self, frame: np.ndarray, scale_w: float = 1.0, scale_h: float = 1.0
+    ) -> Any:
+        raise NotImplementedError()
+
+    def render(
+        self, data: Any, frame: np.ndarray, scale_w: float = 1.0, scale_h: float = 1.0
+    ) -> np.ndarray:
         raise NotImplementedError()
 
     def run(self):
         ret, image = self.cap.read()
         if not ret:
-            raise RuntimeError("Failed to get first frame")
+            raise RuntimeError("Failed to get frame")
 
         scale_w = image.shape[1] / 640.0  # 640 is the standard YOLOv8 input shape
         scale_h = image.shape[0] / 640.0  # 640 is the standard YOLOv8 input shape
         log.debug("Scale factors: (%s, %s)", scale_w, scale_h)
 
-        while True:
-            # Capture frame-by-frame
-            ret, image = self.cap.read()
-            if not ret:
-                break
+        # if cv2.waitKey(1) & 0xFF == ord("s"):
+        # cv2.imwrite("saved_frame.jpg", image)
+        # break
 
-            if cv2.waitKey(1) & 0xFF == ord("s"):
-                cv2.imwrite("saved_frame.jpg", image)
-                break
+        data = self.detect(image, scale_w=scale_w, scale_h=scale_h)
+        image = self.render(data, image, scale_w=scale_w, scale_h=scale_h)
 
-            image = self.detect(image, scale_w, scale_h)[0]
+        self.update_image(image)
 
-            cv2.imshow("image", image)
+    IMAGE_FORMAT = QtGui.QImage.Format.Format_BGR888
 
-            # Break the loop if 'q' is pressed
-            if cv2.waitKey(1) & 0xFF == ord("q"):
-                break
+    def update_image(self, frame):
+        image = QtGui.QImage(frame, frame.shape[1], frame.shape[0], self.IMAGE_FORMAT)
 
-        self.cap.release()
-        cv2.destroyAllWindows()
+        self.label.setPixmap(QtGui.QPixmap(image))
+        self.label.setScaledContents(True)  # Fit the image to the label size
+
+    def closeEvent(self, event):
+        # Perform cleanup actions before closing the window
+        self.timer.stop()
+        if self.cap:
+            self.cap.release()  # Release the webcam
+        event.accept()
 
 
 class DetectYOLO(Detector):
@@ -94,8 +122,8 @@ class DetectYOLO(Detector):
 
     def detect(
         self, frame: np.ndarray, *args, **kwargs
-    ) -> Tuple[np.ndarray, Any]:  # pylint: disable=W0613
-        data = self.model.track(
+    ) -> Any:  # pylint: disable=W0613
+        return self.model.track(
             frame,
             persist=True,
             conf=self.threshold,
@@ -104,7 +132,8 @@ class DetectYOLO(Detector):
             iou=self.iou,
         )
 
-        return cv2.resize(data[0].plot(), (0, 0), fx=0.5, fy=0.5), data
+    def render(self, data, *args, **kwargs) -> np.ndarray:
+        return cv2.resize(data[0].plot(), (0, 0), fx=0.5, fy=0.5)
 
     @property
     def can_augment(self) -> bool:
@@ -131,10 +160,12 @@ class DetectDNN(Detector):
 
     def detect(
         self, frame: np.ndarray, scale_w: float = 1.0, scale_h: float = 1.0
-    ) -> Tuple[np.ndarray, Any]:
+    ) -> pd.DataFrame:
+        blob_height = (frame.shape[0] / frame.shape[1]) * 640
+
         # Preprocess the image and prepare blob for model
         blob = cv2.dnn.blobFromImage(
-            frame, scalefactor=1.0 / 255, size=(640, 640), swapRB=True
+            frame, scalefactor=1.0 / 255, size=(blob_height, 640), swapRB=True
         )
         self.model.setInput(blob)
 
@@ -155,8 +186,17 @@ class DetectDNN(Detector):
         df["x0"] -= df["width"] * 0.5
         df["y0"] -= df["height"] * 0.5
 
+        return df
+
+    def render(
+        self,
+        df: pd.DataFrame,
+        frame: np.ndarray,
+        scale_w: float = 1.0,
+        scale_h: float = 1.0,
+    ) -> np.ndarray:
         if df.empty:
-            return cv2.resize(frame, (0, 0), fx=0.5, fy=0.5), df
+            return cv2.resize(frame, (0, 0), fx=0.5, fy=0.5)
 
         result_boxes = cv2.dnn.NMSBoxes(
             df[["x0", "y0", "width", "height"]].to_numpy(),
@@ -186,9 +226,7 @@ class DetectDNN(Detector):
                 )
 
         # Display the image with bounding boxes
-        frame = cv2.resize(frame, (0, 0), fx=0.5, fy=0.5)
-
-        return frame, df
+        return cv2.resize(frame, (0, 0), fx=0.5, fy=0.5)
 
     def draw_bounding_box(self, img, class_name, confidence, x, y, x_plus_w, y_plus_h):
         """
@@ -225,16 +263,12 @@ def main(args) -> None:
         scale_w = args.image.shape[1] / 640.0  # 640 is the standard YOLOv8 input shape
         scale_h = args.image.shape[0] / 640.0  # 640 is the standard YOLOv8 input shape
 
-        d, data = detector(None).detect(args.image, scale_h=scale_h, scale_w=scale_w)
-        cv2.imshow("detect", d)
+        d = detector(None)
+        df = d.detect(args.image, scale_h=scale_h, scale_w=scale_w)
+        image = d.render(df, args.image)
+        d.update_image(image)
 
-        # Wait until any key is pressed
-        cv2.waitKey(0)
-        print(data)
-
-        # Close all OpenCV windows
-        cv2.destroyAllWindows()
-        return
+        return d
 
     cap = cv2.VideoCapture(args.camera[3])
 
@@ -258,10 +292,11 @@ def main(args) -> None:
         log.error("Unable to open camera")
         exit()
 
-    detector(cap).run()
+    return detector(cap)
 
 
 if __name__ == "__main__":
+    import sys
     import argparse
 
     logging.basicConfig()
@@ -311,4 +346,18 @@ if __name__ == "__main__":
     if uargs.image:
         uargs.image = cv2.imread(str(uargs.image))
 
-    main(uargs)
+    app = QtWidgets.QApplication(sys.argv)
+
+    app.setApplicationName("CrystalView")
+    # app.setWindowIcon(newIcon("icon"))
+    # app.installTranslator(translator)
+    win = main(uargs)
+
+    # if reset_config:
+    #     logger.info("Resetting Qt config: %s" % win.settings.fileName())
+    #     win.settings.clear()
+    #     sys.exit(0)
+
+    win.show()
+    win.raise_()
+    sys.exit(app.exec_())
