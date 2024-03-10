@@ -99,6 +99,7 @@
                 "./crystalvision/detection/detect.py",
                 "--model",
                 "runs/${config:crystalvision.task}/train/weights/best.onnx",
+                "--model_task=${config:crystalvision.task}",
                 "--classes",
                 "./data/labeling/YOLODataset/dataset.yaml",
                 "--plot=dnn",
@@ -107,6 +108,25 @@
                 "2160",
                 "30",
                 "0",
+                "-v"
+            ],
+            "problemMatcher": []
+        },
+        {
+            "label": "Image Detect: dnn",
+            "type": "shell",
+            "command": "poetry",
+            "args": [
+                "run",
+                "python",
+                "./crystalvision/detection/detect.py",
+                "--model",
+                "runs/${config:crystalvision.task}/train/weights/best.onnx",
+                "--model_task=${config:crystalvision.task}",
+                "--classes",
+                "./data/labeling/YOLODataset/dataset.yaml",
+                "--plot=dnn",
+                "--image=saved_frame.jpg",
                 "-v"
             ],
             "problemMatcher": []

@@ -1,15 +1,46 @@
 import os
 import yaml
+import json
+from pathlib import Path
 
 import numpy as np
 from labelme2yolo.l2y import Labelme2YOLO, extend_point_list, logger as log
 
 
 class MyLabelme2YOLO(Labelme2YOLO):
-    def __init__(self, json_dir, output_format, expand_flags=True):
-        super().__init__(json_dir, output_format, [])
-
+    def __init__(self, json_dir, output_format, label_list=None, expand_flags=True):
+        self._json_dir = Path(json_dir)
+        self._output_format = output_format
+        self._label_list = set()
+        self._label_id_map = {}
+        self._label_dir_path = ""
+        self._image_dir_path = ""
         self.expand_flags = expand_flags
+
+        if label_list:
+            self._label_list = label_list
+            self._label_id_map = {
+                label: label_id for label_id, label in enumerate(label_list)
+            }
+        else:
+            # get label list from json files for parallel processing
+            for json_file in self._json_dir.glob("**/*.json"):
+                with open(json_file, encoding="utf-8") as file:
+                    json_data = json.load(file)
+                    for shape in json_data["shapes"]:
+                        label = shape["label"]
+                        self._label_list.add(label)
+
+                        if expand_flags and shape["flags"]:
+                            for key, val in shape["flags"].items():
+                                if val:
+                                    label += f"_{key}"
+                                    self._label_list.add(label)
+
+            self._label_list = list(self._label_list)
+            self._label_id_map = {
+                label: label_id for label_id, label in enumerate(self._label_list)
+            }
 
     def _get_other_shape_yolo_object(self, shape, img_h, img_w):
         point_list = shape["points"]
@@ -33,8 +64,7 @@ class MyLabelme2YOLO(Labelme2YOLO):
                 for key, val in shape["flags"].items():
                     if val:
                         label += f"_{key}"
-            if label not in self._label_list:
-                self._update_id_map(label)
+            self._update_id_map(label)
             label_id = self._label_id_map[label]
 
             return label_id, points.tolist()
@@ -100,11 +130,16 @@ if __name__ == "__main__":
         ' However, you can choose to output in bbox format by specifying the "bbox" option.',
     )
     parser.add_argument(
+        "--label_list", type=set, nargs="+", help="A list or set of labels"
+    )
+    parser.add_argument(
         "-f", "--flags", action="store_true", help="Expand labels by their flags."
     )
 
     args = parser.parse_args()
 
-    convertor = MyLabelme2YOLO(args.json_dir, args.output_format, args.flags)
+    convertor = MyLabelme2YOLO(
+        args.json_dir, args.output_format, args.label_list, args.flags
+    )
 
     convertor.convert(val_size=args.val_size, test_size=args.test_size)

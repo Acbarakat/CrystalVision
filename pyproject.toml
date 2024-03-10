@@ -23,6 +23,7 @@ tqdm = ">=4.66.1"
 aiohttp = ">=3.8.6"
 aiofiles = ">=23.2.1"
 dogpile-cache = ">=1.3.1"
+opencv-contrib-python-headless = "^4.9.0.80"
 
 
 [tool.poetry.group.tensorflow.dependencies]
@@ -55,9 +56,9 @@ paretoset = ">=1.2.3"
 
 
 [tool.poetry.group.labeling.dependencies]
-pyqt5-qt5 = "<=5.15.10"
-labelme = ">=5.4.1"
+pyqt5-qt5 = "<5.15.11"
 pyqt5 = "^5.15.10"
+labelme = ">=5.4.1"
 labelme2yolo = ">=0.1.4"
 
 

@@ -10,8 +10,8 @@
     ],
     "cmake.configureOnOpen": false,
     "crystalvision": {
-        "task": "segment",
+        "task": "detect",
         "output_format": "polygon",
-        "flags": "",
+        "flags": "-f",
     },
 }
