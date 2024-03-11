@@ -168,7 +168,27 @@ class DetectYOLO(Detector):
         return result
 
     def render_segment(self, data, frame):
-        print(data)
+        blobs = []
+        indexes = []
+        for box, mask in zip(data[0].boxes, data[0].masks):
+            x_min, y_min, x_max, y_max = map(int, box.xyxy.cpu().numpy()[0])
+            indexes.append(box.id.cpu().numpy().astype(int)[0])
+
+            # Extract the sub-image within the bounding box
+            sub_mask = np.zeros(frame.shape, dtype=frame.dtype)
+            sub_mask = cv2.fillPoly(
+                sub_mask, np.array(mask.xy, dtype=np.int32), (255, 255, 255)
+            )
+            masked_image = cv2.bitwise_and(frame, sub_mask)[y_min:y_max, x_min:x_max]
+
+            cv2.imwrite(f"./runs/{self.model_task}/{indexes[-1]}.jpg", masked_image)
+
+            blob = cv2.dnn.blobFromImage(
+                masked_image, scalefactor=1.0 / 255, size=(250, 179), swapRB=True
+            )
+            blobs.append(np.transpose(blob, (0, 2, 3, 1)))
+
+        return self.forward_blobs(blobs, indexes)
 
     def render_obb(self, data, frame):
         blobs = []
@@ -176,7 +196,6 @@ class DetectYOLO(Detector):
         height, width = frame.shape[:2]
         for obb in data[0].obb:
             indexes.append(obb.id.cpu().numpy().astype(int)[0])
-            print(obb.xywhr.cpu().numpy()[0])
             xywhr = obb.xywhr.cpu().numpy()[0]
 
             # Get rotation matrix
