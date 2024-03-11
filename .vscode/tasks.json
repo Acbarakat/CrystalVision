@@ -71,7 +71,8 @@
                 "./crystalvision/detection/train.py",
                 "--task",
                 "tune-${config:crystalvision.task}",
-                "--batch=12"
+                "--batch=12",
+                "--patience=25",
             ],
             "problemMatcher": []
         },
@@ -87,7 +88,8 @@
                 "${config:crystalvision.task}",
                 "--hyperparams",
                 "./runs/${config:crystalvision.task}/tune/best_hyperparameters.yaml",
-                "--batch=12"
+                "--batch=12",
+                "--patience=100",
             ],
             "problemMatcher": []
         },
