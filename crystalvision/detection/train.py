@@ -39,7 +39,7 @@ def main(uargs: Namespace) -> None:
         "freeze": 20,
         "pretrained": True,
         "scale": 0.25,
-        "patience": 25,
+        "patience": uargs.patience,
         "exist_ok": True,
         "imgsz": [640, 640],
     }
@@ -115,10 +115,12 @@ def main(uargs: Namespace) -> None:
 
     for result, cls_name in zip(results, cls_match):
         if uargs.verbose:
-            print(result.boxes)
-        assert (
-            result.boxes.cls.shape[0] == 1
-        ), f"Found {result.boxes.cls.shape[0]} objects"
+            print(result)
+
+        if uargs.task.replace("tune-", "") == "detect":
+            assert (
+                result.boxes.cls.shape[0] == 1
+            ), f"Found {result.boxes.cls.shape[0]} objects"
         # assert result.names[int(result.boxes.cls.cpu()[0])] == cls_name, f"Object is '{result.names[int(result.boxes.cls.cpu()[0])]}'"
         # assert result.boxes.conf.cpu()[0] >= 0.5
 
@@ -141,6 +143,7 @@ if __name__ == "__main__":
     )
     parser.add_argument("--epochs", default=300, type=int, help="model epochs")
     parser.add_argument("--batch", default=-1, type=int, help="model batch")
+    parser.add_argument("--patience", default=25, type=int, help="model patience")
     parser.add_argument(
         "-mp", "--modelparams", type=Path, help="model parameters yaml file"
     )
