@@ -152,7 +152,7 @@ class DetectYOLO(Detector):
             cv2.imwrite(f"./runs/detect/{indexes[-1]}.jpg", sub_image)
 
             blob = cv2.dnn.blobFromImage(
-                sub_image, scalefactor=1.0 / 255, size=(250, 179), swapRB=False
+                sub_image, scalefactor=1.0 / 255, size=(250, 179), swapRB=True
             )
             blobs.append(np.transpose(blob, (0, 2, 3, 1)))
 
