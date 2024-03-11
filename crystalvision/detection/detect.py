@@ -140,28 +140,13 @@ class DetectYOLO(Detector):
             iou=self.iou,
         )
 
-    def render(self, data, frame, *args, **kwargs) -> np.ndarray:
-        blobs = []
-        indexes = []
-        for box in data[0].boxes:
-            x_min, y_min, x_max, y_max = map(int, box.xyxy.cpu().numpy()[0])
-            indexes.append(box.id.cpu().numpy().astype(int)[0])
-
-            # Extract the sub-image within the bounding box
-            sub_image = frame[y_min:y_max, x_min:x_max]
-            cv2.imwrite(f"./runs/detect/{indexes[-1]}.jpg", sub_image)
-
-            blob = cv2.dnn.blobFromImage(
-                sub_image, scalefactor=1.0 / 255, size=(250, 179), swapRB=True
-            )
-            blobs.append(np.transpose(blob, (0, 2, 3, 1)))
-
+    def forward_blobs(self, blobs, indexes):
         if len(blobs) > 1:
             self.card_model.setInput(np.concatenate(blobs))
         elif len(blobs) == 1:
             self.card_model.setInput(blobs[0])
         else:
-            return cv2.resize(data[0].plot(), (0, 0), fx=0.5, fy=0.5)
+            return pd.DataFrame(columns=self.labels)
 
         output = pd.DataFrame(self.card_model.forward(), columns=self.labels)
         output["index"] = indexes
@@ -180,6 +165,67 @@ class DetectYOLO(Detector):
         result = pd.DataFrame(result)
         result.index = output.index
         print(result)
+        return result
+
+    def render_segment(self, data, frame):
+        print(data)
+
+    def render_obb(self, data, frame):
+        blobs = []
+        indexes = []
+        height, width = frame.shape[:2]
+        for obb in data[0].obb:
+            indexes.append(obb.id.cpu().numpy().astype(int)[0])
+            print(obb.xywhr.cpu().numpy()[0])
+            xywhr = obb.xywhr.cpu().numpy()[0]
+
+            # Get rotation matrix
+            rotation_matrix = cv2.getRotationMatrix2D(
+                (xywhr[0], xywhr[1]), xywhr[4], 1.0
+            )
+
+            # Perform the rotation
+            rotated_image = cv2.warpAffine(frame, rotation_matrix, (width, height))
+
+            x_min = x_max = xywhr[0]
+            x_min -= xywhr[3] / 2
+            x_max += xywhr[3] / 2
+
+            y_min = y_max = xywhr[1]
+            y_min -= xywhr[2] / 2
+            y_max += xywhr[2] / 2
+
+            sub_image = rotated_image[int(y_min) : int(y_max), int(x_min) : int(x_max)]
+            cv2.imwrite(f"./runs/{self.model_task}/{indexes[-1]}.jpg", sub_image)
+
+            blob = cv2.dnn.blobFromImage(
+                sub_image, scalefactor=1.0 / 255, size=(250, 179), swapRB=True
+            )
+            blobs.append(np.transpose(blob, (0, 2, 3, 1)))
+
+        return self.forward_blobs(blobs, indexes)
+
+    def render_detect(self, data, frame):
+        blobs = []
+        indexes = []
+        for box in data[0].boxes:
+            x_min, y_min, x_max, y_max = map(int, box.xyxy.cpu().numpy()[0])
+            indexes.append(box.id.cpu().numpy().astype(int)[0])
+
+            # Extract the sub-image within the bounding box
+            sub_image = frame[y_min:y_max, x_min:x_max]
+            cv2.imwrite(f"./runs/{self.model_task}/{indexes[-1]}.jpg", sub_image)
+
+            blob = cv2.dnn.blobFromImage(
+                sub_image, scalefactor=1.0 / 255, size=(250, 179), swapRB=True
+            )
+            blobs.append(np.transpose(blob, (0, 2, 3, 1)))
+
+        return self.forward_blobs(blobs, indexes)
+
+    def render(self, data, frame, *args, **kwargs) -> np.ndarray:
+        if render_func := getattr(self, f"render_{self.model_task}"):
+            render_func(data, frame)
 
         return cv2.resize(data[0].plot(), (0, 0), fx=0.5, fy=0.5)
 
