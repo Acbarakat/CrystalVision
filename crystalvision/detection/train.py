@@ -36,15 +36,16 @@ def main(uargs: Namespace) -> None:
         "fliplr": 0.0,
         "mosaic": 0.0,
         "close_mosaic": 0,
-        "freeze": 20 if "v8" in uargs.model else 20,
+        "freeze": 20,
         "pretrained": True,
         "scale": 0.25,
         "patience": 25,
         "exist_ok": True,
+        "imgsz": [640, 640],
     }
 
     if uargs.task.startswith("tune"):
-        return model.tune(
+        results = model.tune(
             data="./data/labeling/YOLODataset/dataset.yaml",
             iterations=20,
             optimizer="auto",
@@ -81,6 +82,14 @@ def main(uargs: Namespace) -> None:
             **model_kwargs,
         )
 
+        model = YOLO(f"./runs/{uargs.task.replace('tune-', '')}/tune/weights/best.pt")
+
+        return model.export(format="onnx", device="0", simplify=True, imgsz=(640, 640))
+
+    # model = YOLO("./runs/detect/train/weights/best.pt")
+    # model = YOLO(f"./runs/{uargs.task.replace('tune-', '')}/tune/weights/best.pt")
+    # return model.export(format="onnx", device="0", simplify=True)
+
     results = model.train(
         data="./data/labeling/YOLODataset/dataset.yaml",
         verbose=uargs.verbose,
@@ -88,8 +97,6 @@ def main(uargs: Namespace) -> None:
         **model_kwargs,
         **uargs.hyperparams,
     )
-
-    # model = YOLO("./runs/detect/train/weights/best.pt")
 
     # Evaluate the model's performance on the validation set
     # results = model.val(max_det=116)
@@ -115,8 +122,7 @@ def main(uargs: Namespace) -> None:
         # assert result.names[int(result.boxes.cls.cpu()[0])] == cls_name, f"Object is '{result.names[int(result.boxes.cls.cpu()[0])]}'"
         # assert result.boxes.conf.cpu()[0] >= 0.5
 
-    success = model.export(format="onnx", device="0", simplify=True)
-    print(success)
+    return model.export(format="onnx", device="0", simplify=True, imgsz=(640, 640))
 
 
 if __name__ == "__main__":

@@ -12,6 +12,6 @@
     "crystalvision": {
         "task": "detect",
         "output_format": "polygon",
-        "flags": "-f",
+        "flags": "",
     },
 }

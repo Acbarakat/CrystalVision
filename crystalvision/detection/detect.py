@@ -1,6 +1,7 @@
 """
 Detect FFTCG cards and show them via OpenCV.
 """
+import json
 import logging
 from pathlib import Path
 from functools import partial
@@ -31,6 +32,7 @@ class Detector(QtWidgets.QMainWindow):
     def __init__(
         self,
         classes_path: str | Path,
+        card_model: str | Path,
         camera: cv2.VideoCapture,
         threshold: float = 0.5,
         iou: float = 0.75,
@@ -57,6 +59,11 @@ class Detector(QtWidgets.QMainWindow):
             self.timer.start(100)  # Update every 100 milliseconds
 
         self.setCentralWidget(self.label)
+
+        self.card_model: cv2.dnn.Net = cv2.dnn.readNetFromONNX(str(card_model))
+
+        with Path("./data/model/multilabel.json").open("r") as lbfp:
+            self.labels = json.load(lbfp)
 
     def detect(
         self, frame: np.ndarray, scale_w: float = 1.0, scale_h: float = 1.0
@@ -108,11 +115,12 @@ class DetectYOLO(Detector):
         model_path: str | Path,
         model_task: str,
         classes_path: str | Path,
+        card_model: str | Path,
         camera: cv2.VideoCapture,
         threshold: float = 0.5,
         iou: float = 0.45,
     ) -> None:
-        super().__init__(classes_path, camera, threshold, iou)
+        super().__init__(classes_path, card_model, camera, threshold, iou)
 
         self.model_task = model_task
 
@@ -132,7 +140,47 @@ class DetectYOLO(Detector):
             iou=self.iou,
         )
 
-    def render(self, data, *args, **kwargs) -> np.ndarray:
+    def render(self, data, frame, *args, **kwargs) -> np.ndarray:
+        blobs = []
+        indexes = []
+        for box in data[0].boxes:
+            x_min, y_min, x_max, y_max = map(int, box.xyxy.cpu().numpy()[0])
+            indexes.append(box.id.cpu().numpy().astype(int)[0])
+
+            # Extract the sub-image within the bounding box
+            sub_image = frame[y_min:y_max, x_min:x_max]
+            cv2.imwrite(f"./runs/detect/{indexes[-1]}.jpg", sub_image)
+
+            blob = cv2.dnn.blobFromImage(
+                sub_image, scalefactor=1.0 / 255, size=(250, 179), swapRB=False
+            )
+            blobs.append(np.transpose(blob, (0, 2, 3, 1)))
+
+        if len(blobs) > 1:
+            self.card_model.setInput(np.concatenate(blobs))
+        elif len(blobs) == 1:
+            self.card_model.setInput(blobs[0])
+        else:
+            return cv2.resize(data[0].plot(), (0, 0), fx=0.5, fy=0.5)
+
+        output = pd.DataFrame(self.card_model.forward(), columns=self.labels)
+        output["index"] = indexes
+        output.set_index("index", inplace=True)
+
+        result = {}
+        for key, start, end in [
+            ("type_en", 0, 4),
+            ("cost", 4, 15),
+            ("power", 23, 34),
+            ("icons", 34, 37),
+            ("element_v2", 15, 23),
+        ]:
+            result[key] = output.iloc[:, start:end].idxmax(axis=1)
+
+        result = pd.DataFrame(result)
+        result.index = output.index
+        print(result)
+
         return cv2.resize(data[0].plot(), (0, 0), fx=0.5, fy=0.5)
 
     @property
@@ -146,40 +194,53 @@ class DetectDNN(Detector):
         model_path: str | Path,
         model_task: str,
         classes_path: str | Path,
+        card_model: str | Path,
         camera: cv2.VideoCapture,
         threshold: float = 0.5,
         iou: float = 0.45,
     ) -> None:
-        super().__init__(classes_path, camera, threshold, iou)
+        super().__init__(classes_path, card_model, camera, threshold, iou)
 
         # Load the ONNX model
         log.debug("Loading the model (%s)", model_path)
+        # self.model = cv2.dnn.readNetFromTorch(str(model_path.with_suffix(".pt")))
         self.model: cv2.dnn.Net = cv2.dnn.readNetFromONNX(str(model_path))
-        self.model.setPreferableBackend(cv2.dnn.DNN_BACKEND_CUDA)
-        self.model.setPreferableTarget(cv2.dnn.DNN_TARGET_CUDA)
+        # self.model.setPreferableBackend(cv2.dnn.DNN_BACKEND_CUDA)
+        # self.model.setPreferableTarget(cv2.dnn.DNN_TARGET_CUDA)
 
     def detect(
-        self, frame: np.ndarray, scale_w: float = 1.0, scale_h: float = 1.0
+        self, frame: np.ndarray, scale_w: float = 1.0, scale_h: float = 1.0, imgsz=640
     ) -> pd.DataFrame:
-        blob_height = (frame.shape[0] / frame.shape[1]) * 640
+        # if frame.shape[1] > frame.shape[0]:
+        #     blob_height = ((frame.shape[0] / frame.shape[1]) * imgsz)
+        #     blob_width = imgsz
+        # else:
+        #     blob_height = imgsz
+        #     blob_width = ((frame.shape[1] / frame.shape[0]) * imgsz)
+        # f = imgsz / max(frame.shape)
+
+        # blob = cv2.resize(frame, (0, 0), fy=f, fx=f)
+        # blob = cv2.copyMakeBorder(blob, 0, int(imgsz - blob_height), 0, int(imgsz - blob_width), cv2.BORDER_CONSTANT, value=(0, 0, 0))
+        # print(frame.shape, blob.shape, (scale_w, scale_h))
 
         # Preprocess the image and prepare blob for model
         blob = cv2.dnn.blobFromImage(
-            frame, scalefactor=1.0 / 255, size=(blob_height, 640), swapRB=True
+            frame, scalefactor=1.0 / 255, size=(imgsz, imgsz), swapRB=False
         )
         self.model.setInput(blob)
 
         # Perform inference
-        df: pd.DataFrame = (
-            pd.DataFrame(
-                self.model.forward()[0].T,
-                columns=["x0", "y0", "width", "height", *self.classes],
-            )
-            .query(
-                " or ".join([f"{cls_} >= {self.threshold}" for cls_ in self.classes]),
-            )
-            .reset_index(drop=True)
+        df: pd.DataFrame = pd.DataFrame(
+            self.model.forward()[0].T,
+            columns=["x0", "y0", "width", "height", *self.classes],
         )
+        print(df.sort_values("card").tail(10))
+
+        df.query(
+            " or ".join([f"{cls_} >= {self.threshold}" for cls_ in self.classes]),
+            inplace=True,
+        )
+        df.reset_index(drop=True, inplace=True)
 
         df["maxScore"] = df[self.classes].max(axis=1)
         df["maxClass"] = df[self.classes].idxmax(axis=1)
@@ -256,16 +317,22 @@ def main(args) -> None:
         detector = DetectYOLO
 
     detector = partial(
-        detector, args.model, args.model_task, args.classes, threshold=args.threshold
+        detector,
+        args.model,
+        args.model_task,
+        args.classes,
+        args.card_model,
+        threshold=args.threshold,
     )
 
     if args.image is not None:
+        # scale_w = scale_h = 1.0
         scale_w = args.image.shape[1] / 640.0  # 640 is the standard YOLOv8 input shape
         scale_h = args.image.shape[0] / 640.0  # 640 is the standard YOLOv8 input shape
 
         d = detector(None)
         df = d.detect(args.image, scale_h=scale_h, scale_w=scale_w)
-        image = d.render(df, args.image)
+        image = d.render(df, args.image, scale_h=scale_h, scale_w=scale_w)
         d.update_image(image)
 
         return d
@@ -307,6 +374,9 @@ if __name__ == "__main__":
 
     parser.add_argument(
         "-m", "--model", required=True, type=Path, help="the YOLO model"
+    )
+    parser.add_argument(
+        "-cm", "--card-model", required=True, type=Path, help="The custom card model"
     )
     parser.add_argument(
         "-mt",

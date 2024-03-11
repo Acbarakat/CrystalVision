@@ -1559,13 +1559,13 @@ files = [
 
 [[package]]
 name = "keras-nightly"
-version = "3.1.0.dev2024030903"
+version = "3.1.0.dev2024031003"
 description = "Multi-backend Keras."
 optional = false
 python-versions = ">=3.9"
 files = [
-    {file = "keras-nightly-3.1.0.dev2024030903.tar.gz", hash = "sha256:1337a0f6f2b1b5a3789d2b9ec65aecbaf333be970acf9730b64cbd19baf5128d"},
-    {file = "keras_nightly-3.1.0.dev2024030903-py3-none-any.whl", hash = "sha256:e462f78768d8616f34fc3ffc519ce0d95dbf9294806c53eef4f87558b5254e0c"},
+    {file = "keras-nightly-3.1.0.dev2024031003.tar.gz", hash = "sha256:4916de71f209fb2090498f9d913c5eae2d58fd3729ce97399bcb6ca8e5ead150"},
+    {file = "keras_nightly-3.1.0.dev2024031003-py3-none-any.whl", hash = "sha256:5abbcde18d05b5e979538faa095c600c2ccb1e4fd6c27450b36c57a1066c35b5"},
 ]
 
 [package.dependencies]
@@ -2332,6 +2332,17 @@ files = [
 ]
 
 [[package]]
+name = "nvidia-cublas-cu11"
+version = "11.11.3.6"
+description = "CUBLAS native runtime libraries"
+optional = false
+python-versions = ">=3"
+files = [
+    {file = "nvidia_cublas_cu11-11.11.3.6-py3-none-manylinux1_x86_64.whl", hash = "sha256:39fb40e8f486dd8a2ddb8fdeefe1d5b28f5b99df01c87ab3676f057a74a5a6f3"},
+    {file = "nvidia_cublas_cu11-11.11.3.6-py3-none-win_amd64.whl", hash = "sha256:6ab12b1302bef8ac1ff4414edd1c059e57f4833abef9151683fb8f4de25900be"},
+]
+
+[[package]]
 name = "nvidia-cublas-cu12"
 version = "12.1.3.1"
 description = "CUBLAS native runtime libraries"
@@ -2354,6 +2365,17 @@ files = [
 ]
 
 [[package]]
+name = "nvidia-cuda-nvrtc-cu11"
+version = "11.8.89"
+description = "NVRTC native runtime libraries"
+optional = false
+python-versions = ">=3"
+files = [
+    {file = "nvidia_cuda_nvrtc_cu11-11.8.89-py3-none-manylinux1_x86_64.whl", hash = "sha256:1f27d67b0f72902e9065ae568b4f6268dfe49ba3ed269c9a3da99bb86d1d2008"},
+    {file = "nvidia_cuda_nvrtc_cu11-11.8.89-py3-none-win_amd64.whl", hash = "sha256:e18a23a8f4064664a6f1c4a64f38c581cbebfb5935280e94a4943ea8ae3791b1"},
+]
+
+[[package]]
 name = "nvidia-cuda-nvrtc-cu12"
 version = "12.1.105"
 description = "NVRTC native runtime libraries"
@@ -2362,6 +2384,17 @@ python-versions = ">=3"
 files = [
     {file = "nvidia_cuda_nvrtc_cu12-12.1.105-py3-none-manylinux1_x86_64.whl", hash = "sha256:339b385f50c309763ca65456ec75e17bbefcbbf2893f462cb8b90584cd27a1c2"},
     {file = "nvidia_cuda_nvrtc_cu12-12.1.105-py3-none-win_amd64.whl", hash = "sha256:0a98a522d9ff138b96c010a65e145dc1b4850e9ecb75a0172371793752fd46ed"},
+]
+
+[[package]]
+name = "nvidia-cuda-runtime-cu11"
+version = "11.8.89"
+description = "CUDA Runtime native Libraries"
+optional = false
+python-versions = ">=3"
+files = [
+    {file = "nvidia_cuda_runtime_cu11-11.8.89-py3-none-manylinux1_x86_64.whl", hash = "sha256:f587bd726eb2f7612cf77ce38a2c1e65cf23251ff49437f6161ce0d647f64f7c"},
+    {file = "nvidia_cuda_runtime_cu11-11.8.89-py3-none-win_amd64.whl", hash = "sha256:f60c9fdaed8065b38de8097867240efc5556a8a710007146daeb9082334a6e63"},
 ]
 
 [[package]]
@@ -2374,6 +2407,20 @@ files = [
     {file = "nvidia_cuda_runtime_cu12-12.1.105-py3-none-manylinux1_x86_64.whl", hash = "sha256:6e258468ddf5796e25f1dc591a31029fa317d97a0a94ed93468fc86301d61e40"},
     {file = "nvidia_cuda_runtime_cu12-12.1.105-py3-none-win_amd64.whl", hash = "sha256:dfb46ef84d73fababab44cf03e3b83f80700d27ca300e537f85f636fac474344"},
 ]
+
+[[package]]
+name = "nvidia-cudnn-cu11"
+version = "8.9.6.50"
+description = "cuDNN runtime libraries"
+optional = false
+python-versions = ">=3"
+files = [
+    {file = "nvidia_cudnn_cu11-8.9.6.50-py3-none-manylinux1_x86_64.whl", hash = "sha256:319a8f7ca3d65139f1b69998595c7076ae0e4271a325e5dfde50a3ca31f55584"},
+]
+
+[package.dependencies]
+nvidia-cublas-cu11 = "*"
+nvidia-cuda-nvrtc-cu11 = "*"
 
 [[package]]
 name = "nvidia-cudnn-cu12"
@@ -2471,6 +2518,19 @@ files = [
     {file = "nvidia_nvtx_cu12-12.1.105-py3-none-manylinux1_x86_64.whl", hash = "sha256:dc21cf308ca5691e7c04d962e213f8a4aa9bbfa23d95412f452254c2caeb09e5"},
     {file = "nvidia_nvtx_cu12-12.1.105-py3-none-win_amd64.whl", hash = "sha256:65f4d98982b31b60026e0e6de73fbdfc09d08a96f4656dd3665ca616a11e1e82"},
 ]
+
+[[package]]
+name = "nvidia-tensorrt"
+version = "99.0.0"
+description = "A high performance deep learning inference library"
+optional = false
+python-versions = "*"
+files = [
+    {file = "nvidia_tensorrt-99.0.0-py3-none-manylinux_2_17_x86_64.whl", hash = "sha256:053115ecd0bfba191370c764af842a78388619972d164b2bd77b28ed0302cc02"},
+]
+
+[package.dependencies]
+tensorrt = "*"
 
 [[package]]
 name = "oauthlib"
@@ -2690,13 +2750,13 @@ tests = ["pytest", "pytest-cov", "pytest-pep8"]
 
 [[package]]
 name = "packaging"
-version = "23.2"
+version = "24.0"
 description = "Core utilities for Python packages"
 optional = false
 python-versions = ">=3.7"
 files = [
-    {file = "packaging-23.2-py3-none-any.whl", hash = "sha256:8c491190033a9af7e1d931d0b5dacc2ef47509b34dd0de67ed209b5203fc88c7"},
-    {file = "packaging-23.2.tar.gz", hash = "sha256:048fb0e9405036518eaaf48a55953c750c11e1a1b68e0dd1a9d62ed0c092cfc5"},
+    {file = "packaging-24.0-py3-none-any.whl", hash = "sha256:2ddfb553fdf02fb784c234c7ba6ccc288296ceabec964ad2eae3777778130bc5"},
+    {file = "packaging-24.0.tar.gz", hash = "sha256:eb82c5e3e56209074766e6885bb04b8c38a0c015d0a30036ebe7ece34c9989e9"},
 ]
 
 [[package]]
@@ -3609,13 +3669,13 @@ use-chardet-on-py3 = ["chardet (>=3.0.2,<6)"]
 
 [[package]]
 name = "requests-oauthlib"
-version = "1.3.1"
+version = "1.4.0"
 description = "OAuthlib authentication support for Requests."
 optional = false
 python-versions = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*"
 files = [
-    {file = "requests-oauthlib-1.3.1.tar.gz", hash = "sha256:75beac4a47881eeb94d5ea5d6ad31ef88856affe2332b9aafb52c6452ccf0d7a"},
-    {file = "requests_oauthlib-1.3.1-py2.py3-none-any.whl", hash = "sha256:2577c501a2fb8d05a304c09d090d6e47c306fef15809d102b327cf8364bddab5"},
+    {file = "requests-oauthlib-1.4.0.tar.gz", hash = "sha256:acee623221e4a39abcbb919312c8ff04bd44e7e417087fb4bd5e2a2f53d5e79a"},
+    {file = "requests_oauthlib-1.4.0-py2.py3-none-any.whl", hash = "sha256:7a3130d94a17520169e38db6c8d75f2c974643788465ecc2e4b36d288bf13033"},
 ]
 
 [package.dependencies]
@@ -4439,13 +4499,13 @@ files = [
 
 [[package]]
 name = "ultralytics"
-version = "8.1.25"
+version = "8.1.26"
 description = "Ultralytics YOLOv8 for SOTA object detection, multi-object tracking, instance segmentation, pose estimation and image classification."
 optional = false
 python-versions = ">=3.8"
 files = [
-    {file = "ultralytics-8.1.25-py3-none-any.whl", hash = "sha256:80b391e66cc56e66331836b93f9b7a89a59e68a82cc6d89b412c51ff9a9607d8"},
-    {file = "ultralytics-8.1.25.tar.gz", hash = "sha256:7f1f7c54897781281a7d3ef23c512abfd6d90bbde4fcfd2b76875d4342556057"},
+    {file = "ultralytics-8.1.26-py3-none-any.whl", hash = "sha256:75a248b240d695954df17ca5f693f17f3364c69b135dd36f54fe8cdb3e2525e5"},
+    {file = "ultralytics-8.1.26.tar.gz", hash = "sha256:88048ce58a682e8196b757d22f9eb1491cab4e6e5440351476bc53e25f26dd0e"},
 ]
 
 [package.dependencies]
@@ -4739,4 +4799,4 @@ multidict = ">=4.0"
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.10,<3.11"
-content-hash = "3ab9516ea633a59baae2f360d51ee3673f5403a04ced9bfda3f6a0a0f0d332f9"
+content-hash = "5465c2d68ced7a19095ef3fc5a65482b5997643b26346473cc10c1c3e9c06724"
