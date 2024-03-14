@@ -62,6 +62,15 @@
             }
         },
         {
+            "label": "Tune Model",
+            "dependsOrder": "sequence",
+            "dependsOn": ["LabelMe2YOLO", "Train Model: tune"],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            }
+        },
+        {
             "label": "Train Model: tune",
             "type": "shell",
             "command": "poetry",
@@ -173,7 +182,8 @@
                 "./crystalvision/detection/detect.py",
                 "--threshold=0.75",
                 "--model",
-                "runs/${config:crystalvision.task}/train/weights/best.pt",
+                // "runs/${config:crystalvision.task}/train/weights/best.pt",
+                "runs/${config:crystalvision.task}/tune/weights/best.pt",
                 "--card-model=./data/model/multilabel_1.onnx",
                 "--model_task=${config:crystalvision.task}",
                 "--classes",
