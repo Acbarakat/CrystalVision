@@ -84,9 +84,7 @@ class Detector(QtWidgets.QMainWindow):
         scale_h = image.shape[0] / 640.0  # 640 is the standard YOLOv8 input shape
         log.debug("Scale factors: (%s, %s)", scale_w, scale_h)
 
-        # if cv2.waitKey(1) & 0xFF == ord("s"):
         # cv2.imwrite("saved_frame.jpg", image)
-        # break
 
         data = self.detect(image, scale_w=scale_w, scale_h=scale_h)
         image = self.render(data, image, scale_w=scale_w, scale_h=scale_h)
@@ -180,11 +178,12 @@ class DetectYOLO(Detector):
                 sub_mask, np.array(mask.xy, dtype=np.int32), (255, 255, 255)
             )
             masked_image = cv2.bitwise_and(frame, sub_mask)[y_min:y_max, x_min:x_max]
+            masked_image = cv2.resize(masked_image, (179, 250))
 
-            cv2.imwrite(f"./runs/{self.model_task}/{indexes[-1]}.jpg", masked_image)
+            # cv2.imwrite(f"./runs/{self.model_task}/{indexes[-1]}.jpg", masked_image)
 
             blob = cv2.dnn.blobFromImage(
-                masked_image, scalefactor=1.0 / 255, size=(250, 179), swapRB=True
+                masked_image, scalefactor=1.0 / 255, swapRB=True
             )
             blobs.append(np.transpose(blob, (0, 2, 3, 1)))
 
@@ -215,11 +214,11 @@ class DetectYOLO(Detector):
             y_max += xywhr[2] / 2
 
             sub_image = rotated_image[int(y_min) : int(y_max), int(x_min) : int(x_max)]
-            cv2.imwrite(f"./runs/{self.model_task}/{indexes[-1]}.jpg", sub_image)
+            sub_image = cv2.resize(sub_image, (179, 250))
 
-            blob = cv2.dnn.blobFromImage(
-                sub_image, scalefactor=1.0 / 255, size=(250, 179), swapRB=True
-            )
+            # cv2.imwrite(f"./runs/{self.model_task}/{indexes[-1]}.jpg", sub_image)
+
+            blob = cv2.dnn.blobFromImage(sub_image, scalefactor=1.0 / 255, swapRB=True)
             blobs.append(np.transpose(blob, (0, 2, 3, 1)))
 
         return self.forward_blobs(blobs, indexes)
@@ -233,11 +232,11 @@ class DetectYOLO(Detector):
 
             # Extract the sub-image within the bounding box
             sub_image = frame[y_min:y_max, x_min:x_max]
-            cv2.imwrite(f"./runs/{self.model_task}/{indexes[-1]}.jpg", sub_image)
+            sub_image = cv2.resize(sub_image, (179, 250))
 
-            blob = cv2.dnn.blobFromImage(
-                sub_image, scalefactor=1.0 / 255, size=(250, 179), swapRB=True
-            )
+            # cv2.imwrite(f"./runs/{self.model_task}/{indexes[-1]}.jpg", sub_image)
+
+            blob = cv2.dnn.blobFromImage(sub_image, scalefactor=1.0 / 255, swapRB=True)
             blobs.append(np.transpose(blob, (0, 2, 3, 1)))
 
         return self.forward_blobs(blobs, indexes)
@@ -268,10 +267,9 @@ class DetectDNN(Detector):
 
         # Load the ONNX model
         log.debug("Loading the model (%s)", model_path)
-        # self.model = cv2.dnn.readNetFromTorch(str(model_path.with_suffix(".pt")))
         self.model: cv2.dnn.Net = cv2.dnn.readNetFromONNX(str(model_path))
-        # self.model.setPreferableBackend(cv2.dnn.DNN_BACKEND_CUDA)
-        # self.model.setPreferableTarget(cv2.dnn.DNN_TARGET_CUDA)
+        self.model.setPreferableBackend(cv2.dnn.DNN_BACKEND_CUDA)
+        self.model.setPreferableTarget(cv2.dnn.DNN_TARGET_CUDA)
 
     def detect(
         self, frame: np.ndarray, scale_w: float = 1.0, scale_h: float = 1.0, imgsz=640
