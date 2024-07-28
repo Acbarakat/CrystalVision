@@ -28,6 +28,7 @@ nvidia-cuda-runtime-cu12 = {version=">=12.1.105", source="nvidia"}
 nvidia-cudnn-cu12 = {version=">=9.1.0.70", source="pytorch"}
 # nvidia-cudnn-cu12 = {version=">=9.1.1.17", source="nvidia"}
 nvidia-nvjitlink-cu12 = {version=">=12.3.101", source="nvidia"}
+gradio = "^4.39.0"
 
 [tool.poetry.group.tensorflow]
 optional = true
