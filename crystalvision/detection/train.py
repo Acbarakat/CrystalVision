@@ -10,8 +10,8 @@ from ultralytics import YOLO
 
 # See https://github.com/ultralytics/ultralytics?tab=readme-ov-file#models
 DEFAULT_MODEL: Dict[str, str] = {
-    "detect": "yolov9e.pt",
-    "tune-detect": "yolov9e.pt",
+    "detect": "yolov10x.pt",
+    "tune-detect": "yolov10x.pt",
     "segment": "yolov8x-seg.pt",
     "tune-segment": "yolov8x-seg.pt",
     "obb": "yolov8x-obb.pt",
