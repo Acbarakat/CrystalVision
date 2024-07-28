@@ -52,7 +52,9 @@ def download_and_save() -> dict:
         "Accept-Encoding": "identity",
         "Content-Type": "application/x-www-form-urlencoded",
     }
-    with requests.post("https://fftcg.square-enix-games.com/en/get-cards", data, headers=headers) as url:
+    with requests.post(
+        "https://fftcg.square-enix-games.com/en/get-cards", data, headers=headers
+    ) as url:
         if url.status_code == 403:
             raise Exception("Cannot download card data")
         data = url.json()
