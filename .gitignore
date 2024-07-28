@@ -136,3 +136,4 @@ frozen_models/
 runs/
 cards.json
 yolo*.pt
+cuda*.deb
