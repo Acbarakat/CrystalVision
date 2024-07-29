@@ -2430,6 +2430,17 @@ files = [
 ]
 
 [[package]]
+name = "nvidia-cublas-cu11"
+version = "11.11.3.6"
+description = "CUBLAS native runtime libraries"
+optional = true
+python-versions = ">=3"
+files = [
+    {file = "nvidia_cublas_cu11-11.11.3.6-py3-none-manylinux1_x86_64.whl", hash = "sha256:39fb40e8f486dd8a2ddb8fdeefe1d5b28f5b99df01c87ab3676f057a74a5a6f3"},
+    {file = "nvidia_cublas_cu11-11.11.3.6-py3-none-win_amd64.whl", hash = "sha256:6ab12b1302bef8ac1ff4414edd1c059e57f4833abef9151683fb8f4de25900be"},
+]
+
+[[package]]
 name = "nvidia-cublas-cu12"
 version = "12.4.2.65"
 description = "CUBLAS native runtime libraries"
@@ -2476,6 +2487,17 @@ url = "https://pypi.nvidia.com"
 reference = "nvidia"
 
 [[package]]
+name = "nvidia-cuda-runtime-cu11"
+version = "11.8.89"
+description = "CUDA Runtime native Libraries"
+optional = true
+python-versions = ">=3"
+files = [
+    {file = "nvidia_cuda_runtime_cu11-11.8.89-py3-none-manylinux1_x86_64.whl", hash = "sha256:f587bd726eb2f7612cf77ce38a2c1e65cf23251ff49437f6161ce0d647f64f7c"},
+    {file = "nvidia_cuda_runtime_cu11-11.8.89-py3-none-win_amd64.whl", hash = "sha256:f60c9fdaed8065b38de8097867240efc5556a8a710007146daeb9082334a6e63"},
+]
+
+[[package]]
 name = "nvidia-cuda-runtime-cu12"
 version = "12.4.99"
 description = "CUDA Runtime native Libraries"
@@ -2491,6 +2513,20 @@ files = [
 type = "legacy"
 url = "https://pypi.nvidia.com"
 reference = "nvidia"
+
+[[package]]
+name = "nvidia-cudnn-cu11"
+version = "9.2.1.18"
+description = "cuDNN runtime libraries"
+optional = true
+python-versions = ">=3"
+files = [
+    {file = "nvidia_cudnn_cu11-9.2.1.18-py3-none-manylinux2014_x86_64.whl", hash = "sha256:e8e6f2c03fb36a59dd4e8463023d2905ee29f45b22c2b346059a435b36de9665"},
+    {file = "nvidia_cudnn_cu11-9.2.1.18-py3-none-win_amd64.whl", hash = "sha256:1a09fb46b5ed488bddf26ef90d3a94807a2cb9c300382a1363815fa3528523ee"},
+]
+
+[package.dependencies]
+nvidia-cublas-cu11 = "*"
 
 [[package]]
 name = "nvidia-cudnn-cu12"
@@ -2604,6 +2640,33 @@ files = [
     {file = "nvidia_nvtx_cu12-12.4.99-py3-none-manylinux2014_x86_64.whl", hash = "sha256:d2a2d331e0c233b53f72c6940814d492177a3c17d268bde278cf41bdda95b054"},
     {file = "nvidia_nvtx_cu12-12.4.99-py3-none-win_amd64.whl", hash = "sha256:b9cb750590c542283badf6b421f2dca82c113770e46786f74c8f91bd8b44b103"},
 ]
+
+[[package]]
+name = "nvidia-tensorrt"
+version = "8.4.3.1"
+description = "A high performance deep learning inference library"
+optional = true
+python-versions = "*"
+files = [
+    {file = "nvidia_tensorrt-8.4.3.1-cp310-none-linux_x86_64.whl", hash = "sha256:e21a4ad0972ea49ef9d415b529b36c75648d1432f4652ec375bb0335a89eb0d6"},
+    {file = "nvidia_tensorrt-8.4.3.1-cp36-none-linux_x86_64.whl", hash = "sha256:ffd22bace137ae9426f2a917ffa8bf4b8743bc298f3a23a01cff951257c93730"},
+    {file = "nvidia_tensorrt-8.4.3.1-cp37-none-linux_x86_64.whl", hash = "sha256:cd76666954f6e4f5bfe323ba152d5cc151534655dfb9ba6700ed7a8dcf2ba366"},
+    {file = "nvidia_tensorrt-8.4.3.1-cp38-none-linux_x86_64.whl", hash = "sha256:1d5130a07b7f1c450862f316cf3a508c4e6df2ebcb422688bfc647e172a23dac"},
+    {file = "nvidia_tensorrt-8.4.3.1-cp39-none-linux_x86_64.whl", hash = "sha256:05bb03b14fd4847d7d3bd4decc04309c31142c8bb0eecbb73f241b8bc79c344d"},
+]
+
+[package.dependencies]
+nvidia-cublas-cu11 = "*"
+nvidia-cuda-runtime-cu11 = "*"
+nvidia-cudnn-cu11 = "*"
+
+[package.extras]
+numpy = ["numpy"]
+
+[package.source]
+type = "legacy"
+url = "https://pypi.nvidia.com"
+reference = "nvidia"
 
 [[package]]
 name = "onnx"
@@ -4434,6 +4497,37 @@ files = [
 ]
 
 [[package]]
+name = "tensorrt"
+version = "10.2.0.post1"
+description = "TensorRT Metapackage"
+optional = true
+python-versions = "*"
+files = [
+    {file = "tensorrt-10.2.0.post1.tar.gz", hash = "sha256:ac5336eea871b812047f6ec8bbeed9ae343a539ba02ff86513b04bd081c14738"},
+]
+
+[package.dependencies]
+tensorrt-cu12 = "10.2.0.post1"
+
+[package.source]
+type = "legacy"
+url = "https://pypi.nvidia.com"
+reference = "nvidia"
+
+[[package]]
+name = "tensorrt-cu12"
+version = "10.2.0.post1"
+description = "A high performance deep learning inference library"
+optional = true
+python-versions = ">=3.6"
+files = [
+    {file = "tensorrt-cu12-10.2.0.post1.tar.gz", hash = "sha256:9663446e2872113d619ad5010766cccc1f023d693cb43c3f8f2496563028badc"},
+]
+
+[package.extras]
+numpy = ["numpy"]
+
+[[package]]
 name = "termcolor"
 version = "2.4.0"
 description = "ANSI color formatting for output in terminal"
@@ -5106,4 +5200,4 @@ tensorflow = []
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.11,<3.13"
-content-hash = "a63499584e700d06de3bc2bcc09a63a6b92025989c573915533f4a82eb8b5f7c"
+content-hash = "fae391fdad5b01c60ab5cf8c68ce3478382edb5978c2f517501acdaaa3cb8e91"

@@ -34,11 +34,11 @@ gradio = "^4.39.0"
 optional = true
 
 [tool.poetry.group.tensorflow.dependencies]
-# tensorrt = {version=">=8.6.1", source="nvidia", optional = true}
+tensorrt = {version=">=8.6.1", source="nvidia", optional = true}
 # tensorrt-cu12 = {version=">=10.2.0.post1", source="nvidia"}
 # tensorrt-cu12-libs = {version=">=10.2.0.post1", source="nvidia"}
 # tensorrt-cu12-bindings = {version=">=10.2.0.post1", source="nvidia"}
-# nvidia-tensorrt = {version=">=8.4.3.1", source="nvidia", optional = true}
+nvidia-tensorrt = {version=">=8.4.3.1", source="nvidia", optional = true}
 # tf2onnx = {version=">=1.16.1", optional = true}
 # tensorflow = {extras=["and-cuda"], version=">=2.16.1", optional = true} #{url = "https://storage.googleapis.com/tensorflow/linux/gpu/tensorflow-2.15.0-cp310-cp310-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", platform="linux"}
 # tensorflow-io = {version=">=0.31.0", optional = true}
