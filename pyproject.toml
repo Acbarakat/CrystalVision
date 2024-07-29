@@ -79,6 +79,7 @@ labelme2yolo = ">=0.1.4"
 ultralytics = ">=8.1.11"
 onnx = ">=1.12.0"
 onnxsim = ">=0.4.33"
+onnxslim = ">=0.1.31"
 onnxruntime-gpu = {version=">=1.18.1", source="onnx-gpu"}
 onnx-graphsurgeon = {version=">=0.5.2", source="nvidia"}
 lapx = ">=0.5.2"
