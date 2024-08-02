@@ -536,6 +536,7 @@ class MultiLabelCardModel(  # pylint: disable=W0223
             self.labels: List[str] = []
             for fkey in self.feature_key:
                 labels = self.df[fkey].explode().unique()
+                labels = np.insert(labels, 0, f"null_{fkey}")
                 assert False not in [
                     isinstance(sub_label, str) for sub_label in labels
                 ], f"{labels} {[isinstance(sub_label, str) for sub_label in labels]}"
@@ -547,6 +548,7 @@ class MultiLabelCardModel(  # pylint: disable=W0223
             idx: int = 0
             for fkey in self.feature_key:
                 labels = self.df[fkey].unique()
+                labels = np.insert(labels, 0, f"null_{fkey}")
                 self._metrics.append(
                     MyOneHotIoU(
                         target_class_ids=list(range(idx, len(labels) + idx)),
@@ -574,7 +576,7 @@ class MultiLabelCardModel(  # pylint: disable=W0223
             self.IMAGE_SHAPE = image_shape
 
     def save_multilabels(self) -> None:
-        mlb_file = Path(MODEL_DIR / self.name / f"{self.name}_mlb.pkl")
+        mlb_file = Path(MODEL_DIR / self.name / f"{self.name}_mlb.pkl").resolve()
         if not mlb_file.exists():
             mlb = MyMultiLabelBinarizer(classes=self.labels)
 
@@ -586,7 +588,7 @@ class MultiLabelCardModel(  # pylint: disable=W0223
             )
 
             if not mlb_file.parent.exists():
-                mlb_file.parent.mkdir()
+                mlb_file.parent.mkdir(parents=True)
 
             with mlb_file.open("wb+") as f:
                 pickle.dump((mlb, self.df_codes, self.vdf_codes), f)
