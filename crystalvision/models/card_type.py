@@ -21,8 +21,8 @@ except ImportError:
 
 
 class CardTyping(CategoricalMixin, BayesianOptimizationTunerMixin, CardModel):
-    def __init__(self, df: DataFrame, vdf: DataFrame) -> None:
-        super().__init__(df, vdf, "type_en", name="type_en")
+    def __init__(self, df: DataFrame, vdf: DataFrame, **kwargs) -> None:
+        super().__init__(df, vdf, "type_en", name="type_en", **kwargs)
 
         self.stratify_cols.extend(["element"])
 
