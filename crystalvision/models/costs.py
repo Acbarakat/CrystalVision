@@ -21,8 +21,8 @@ except ImportError:
 
 
 class Cost(CategoricalMixin, BayesianOptimizationTunerMixin, CardModel):
-    def __init__(self, df: DataFrame, vdf: DataFrame) -> None:
-        super().__init__(df, vdf, "cost", name="cost")
+    def __init__(self, df: DataFrame, vdf: DataFrame, **kwargs) -> None:
+        super().__init__(df, vdf, "cost", name="cost", **kwargs)
 
         self.stratify_cols.extend(["element", "type_en"])
 
