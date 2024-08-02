@@ -51,6 +51,8 @@ class MyOneHotMeanIoU(metrics.OneHotMeanIoU):
             Update op.
         """
         y_pred = ops.where(ops.greater_equal(y_pred, self.threshold), 1.0, y_pred)
+        # if not self.sparse_y_true:
+        #     y_true = ops.argmax(y_true, axis=self.axis)
         if not self.sparse_y_pred:
             y_pred = ops.argmax(y_pred, axis=self.axis)
 
@@ -120,8 +122,12 @@ class MyOneHotIoU(_IoUBase):
 
     def result(self):
         """Compute the intersection-over-union via the confusion matrix."""
-        sum_over_row = ops.cast(ops.sum(self.total_cm, axis=0), dtype=self.dtype)
-        sum_over_col = ops.cast(ops.sum(self.total_cm, axis=1), dtype=self.dtype)
+        sum_over_row = ops.cast(
+            ops.sum(self.total_cm, axis=0), dtype=self.dtype
+        )
+        sum_over_col = ops.cast(
+            ops.sum(self.total_cm, axis=1), dtype=self.dtype
+        )
         true_positives = ops.cast(ops.diag(self.total_cm), dtype=self.dtype)
 
         # sum_over_row + sum_over_col =
@@ -139,11 +145,6 @@ class MyOneHotIoU(_IoUBase):
         # denominator = ops.take_along_axis(
         #     denominator, target_class_ids, axis=-1
         # )
-
-        # If the denominator is 0, we need to ignore the class.
-        num_valid_entries = ops.sum(
-            ops.cast(ops.not_equal(denominator, 0), dtype=self._dtype)
-        )
 
         # If the denominator is 0, we need to ignore the class.
         num_valid_entries = ops.sum(
@@ -182,6 +183,8 @@ class MyOneHotIoU(_IoUBase):
             Update op.
         """
         y_pred = ops.where(ops.greater_equal(y_pred, self.threshold), 1.0, y_pred)
+        # if not self.sparse_y_true:
+        #     y_true = ops.argmax(y_true, axis=self.axis)
         if not self.sparse_y_pred:
             y_pred = ops.argmax(y_pred, axis=self.axis)
 
