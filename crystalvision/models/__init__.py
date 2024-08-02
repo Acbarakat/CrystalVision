@@ -61,12 +61,14 @@ def tune_model(
     )
 
     args = parser.parse_args()
+    args.validation = args.validation.resolve()
+    args.tune = args.tune.resolve()
 
     if not args.validation.exists():
-        raise FileNotFoundError(str(args.validation))
+        raise FileNotFoundError(str(args.validation.resolve()))
 
     if not args.tune.exists():
-        raise FileNotFoundError(str(args.tune))
+        raise FileNotFoundError(str(args.tune.resolve()))
 
     with args.tune.open("r") as fp:
         tune_data = yaml.safe_load(fp)
