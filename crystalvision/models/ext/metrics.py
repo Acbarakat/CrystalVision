@@ -66,15 +66,13 @@ class MyOneHotMeanIoU(metrics.OneHotMeanIoU):
         if len(y_true.shape) > 1:
             y_true = ops.reshape(y_true, [-1])
 
-        if sample_weight is None:
-            sample_weight = 1
+        if sample_weight is not None:
+            sample_weight = ops.convert_to_tensor(sample_weight, dtype=self.dtype)
 
-        sample_weight = ops.convert_to_tensor(sample_weight, dtype=self.dtype)
+            if len(sample_weight.shape) > 1:
+                sample_weight = ops.reshape(sample_weight, [-1])
 
-        if len(sample_weight.shape) > 1:
-            sample_weight = ops.reshape(sample_weight, [-1])
-
-        sample_weight = ops.broadcast_to(sample_weight, ops.shape(y_true))
+            sample_weight = ops.broadcast_to(sample_weight, ops.shape(y_true))
 
         if self.ignore_class is not None:
             ignore_class = ops.convert_to_tensor(self.ignore_class, y_true.dtype)
@@ -86,7 +84,8 @@ class MyOneHotMeanIoU(metrics.OneHotMeanIoU):
 
         y_pred = ops.cast(y_pred, dtype=self.dtype)
         y_true = ops.cast(y_true, dtype=self.dtype)
-        sample_weight = ops.cast(sample_weight, dtype=self.dtype)
+        if sample_weight is not None:
+            sample_weight = ops.cast(sample_weight, dtype=self.dtype)
 
         current_cm = confusion_matrix(
             y_true,
@@ -201,15 +200,13 @@ class MyOneHotIoU(_IoUBase):
         if len(y_true.shape) > 1:
             y_true = ops.reshape(y_true, [-1])
 
-        if sample_weight is None:
-            sample_weight = 1
+        if sample_weight is not None:
+            sample_weight = ops.convert_to_tensor(sample_weight, dtype=self.dtype)
 
-        sample_weight = ops.convert_to_tensor(sample_weight, dtype=self.dtype)
+            if len(sample_weight.shape) > 1:
+                sample_weight = ops.reshape(sample_weight, [-1])
 
-        if len(sample_weight.shape) > 1:
-            sample_weight = ops.reshape(sample_weight, [-1])
-
-        sample_weight = ops.broadcast_to(sample_weight, ops.shape(y_true))
+            sample_weight = ops.broadcast_to(sample_weight, ops.shape(y_true))
 
         if self.ignore_class is not None:
             ignore_class = ops.convert_to_tensor(self.ignore_class, y_true.dtype)
@@ -221,7 +218,8 @@ class MyOneHotIoU(_IoUBase):
 
         y_pred = ops.cast(y_pred, dtype=self.dtype)
         y_true = ops.cast(y_true, dtype=self.dtype)
-        sample_weight = ops.cast(sample_weight, dtype=self.dtype)
+        if sample_weight is not None:
+            sample_weight = ops.cast(sample_weight, dtype=self.dtype)
 
         # Accumulate the prediction to current confusion matrix.
         current_cm = confusion_matrix(
