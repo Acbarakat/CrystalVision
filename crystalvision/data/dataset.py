@@ -231,13 +231,15 @@ def extend_dataset_tf(
     ds = ds.map(
         lambda x, y: (layers.Rescaling(1.0 / 255)(x), y),
         name=name,
+        num_parallel_calls=tf.data.AUTOTUNE,
     )
     if flip_horizontal:
         raise NotImplementedError("flip_horizontal")
 
     if flip_vertical:
         vertical_ds = ds.map(
-            lambda x, y: (tf.image.flip_up_down(x), y), name=f"vertical_{name}"
+            lambda x, y: (tf.image.flip_up_down(x), y), name=f"vertical_{name}",
+            num_parallel_calls=tf.data.AUTOTUNE,
         )
         cardinality = ds.cardinality() * 2
         # ds = ds.concatenate(veritcal_ds)
@@ -265,6 +267,7 @@ def extend_dataset_tf(
                     y,
                 ),
                 name=f"brightness_{name}",
+                num_parallel_calls=tf.data.AUTOTUNE,
             )
         )
 
@@ -278,6 +281,7 @@ def extend_dataset_tf(
                     y,
                 ),
                 name=f"contrast_{name}",
+                num_parallel_calls=tf.data.AUTOTUNE,
             )
         )
 
@@ -291,6 +295,7 @@ def extend_dataset_tf(
                     y,
                 ),
                 name=f"saturated_{name}",
+                num_parallel_calls=tf.data.AUTOTUNE,
             )
         )
 
@@ -302,6 +307,7 @@ def extend_dataset_tf(
                     y,
                 ),
                 name=f"hue_{name}",
+                num_parallel_calls=tf.data.AUTOTUNE,
             )
         )
 
@@ -324,7 +330,11 @@ def extend_dataset_tf(
         )
 
     if batch_size:
-        ds = ds.batch(batch_size, name=f"batch_{name}")
+        ds = ds.batch(
+            batch_size,
+            name=f"batch_{name}",
+            num_parallel_calls=tf.data.AUTOTUNE,
+        )
 
     ds = ds.prefetch(tf.data.AUTOTUNE)
 
