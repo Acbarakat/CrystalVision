@@ -7,9 +7,9 @@ license = "MIT License"
 readme = "README.md"
 
 [tool.poetry.dependencies]
-python = ">=3.11,<3.13"
-# keras = ">=3.0.0"
-keras-nightly = ">=3.1.0.dev2024021703"
+python = "^3.12"
+keras = ">=3.4.1"
+# keras-nightly = ">=3.1.0.dev2024021703"
 keras-tuner = ">=1.4.5"
 scikit-learn = ">=1.3.0"
 scikit-image = ">=0.22.0"
@@ -89,8 +89,9 @@ lapx = ">=0.5.2"
 
 [tool.poetry.group.accelerate.dependencies]
 accimage = [
-    {path = "./data/accimage-0.2.0-cp310-cp310-win_amd64.whl", platform="win32"},
-    {path = "./data/accimage-0.2.0-cp310-cp310-linux_x86_64.whl", platform="linux"}
+    # {path = "./data/accimage-0.2.0-cp310-cp310-win_amd64.whl", platform="win32", python = "^3.10"},
+    # {path = "./data/accimage-0.2.0-cp310-cp310-linux_x86_64.whl", platform="linux", python = "^3.10"},
+    {path = "./data/accimage-0.2.0-cp312-cp312-linux_x86_64.whl", platform="linux", python = "^3.12"}
 ]
 
 [tool.poetry.extras]
