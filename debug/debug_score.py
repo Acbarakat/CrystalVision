@@ -9,11 +9,11 @@ pd.set_option("display.max_rows", None)
 
 
 def main(fname):
-    df = pd.read_json(MODEL_DIR / fname)
+    df = pd.read_csv(MODEL_DIR / fname)
 
     acc_keys = ["accuracy", "val_accuracy", "test_accuracy"]
     # loss_keys = ["loss", "val_loss", "test_loss"]
-    weights = [0.9, 2, 0.1]
+    weights = [0.88, 3, 0.12]
 
     acc_df = df[acc_keys]
 
@@ -29,11 +29,10 @@ def main(fname):
         df[acc_keys] * weights, sense=["max", "max", "max"]
     )
 
-    # df.sort_values("score_mean_weighted", ascending=False, inplace=True)
+    df.sort_values("score_mean_weighted", ascending=False, inplace=True)
 
     print(df)
 
 
 if __name__ == "__main__":
-    main("multilabel_best.json")
-    # main("icons_best.json")
+    main("./multilabel/trials.csv")

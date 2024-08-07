@@ -1,0 +1,60 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Python: Current File (pytorch)",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${file}",
+            // "cwd": "${workspaceFolder}\\src",
+            "console": "integratedTerminal",
+            "justMyCode": true,
+            "env": {
+                "PYTHONPATH": "${python.pythonPath};${workspaceFolder}/crystalvision",
+                "KERAS_BACKEND": "torch",
+                "CUDA_LAUNCH_BLOCKING": "0",
+                "CUDA_VISIBLE_DEVICES": "0",
+                "TORCH_DS_PERSISTENT_WORKS": "0",
+            }
+        },
+        {
+            "name": "Python: Current File (pytorch bottlneck)",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "-m",
+            // "cwd": "${workspaceFolder}\\src",
+            "console": "integratedTerminal",
+            "justMyCode": true,
+            "env": {
+                "PYTHONPATH": "${python.pythonPath};${workspaceFolder}/crystalvision",
+                "KERAS_BACKEND": "torch",
+                "CUDA_LAUNCH_BLOCKING": "0",
+                "CUDA_VISIBLE_DEVICES": "0",
+                "TORCH_DS_PERSISTENT_WORKS": "0",
+            },
+            "args": [
+                "torch.utils.bottleneck",
+                "${file}"
+            ]
+        },
+        {
+            "name": "Python: Current File (tensorflow)",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal",
+            "justMyCode": true,
+            "env": {
+                "PYTHONPATH": "${python.pythonPath};${workspaceFolder}/crystalvision",
+                "KERAS_BACKEND": "tensorflow",
+                "TF_CPP_MIN_LOG_LEVEL": "2",
+                "TF_FORCE_GPU_ALLOW_GROWTH": "true",
+                "TF_FORCE_UNIFIED_MEMORY": "1",
+                // "XLA_FLAGS": "--xla_disabled_backends=cpu,gpu"
+            },
+        }
+    ]
+}

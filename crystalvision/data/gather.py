@@ -44,7 +44,19 @@ def download_and_save() -> dict:
     Returns:
         dict: a json/dict of FFTCG Card API
     """
-    with requests.get("https://fftcg.square-enix-games.com/en/get-cards") as url:
+    data = '{"language":"en","text":"","type":[],"element":[],"cost":[],"rarity":[],"power":[],"category_1":[],"set":[],"multicard":"","ex_burst":"","code":"","special":"","exactmatch":0}'
+    headers = {
+        "Referer": "https://fftcg.square-enix-games.com/en/card-browser",
+        "Origin": "https://fftcg.square-enix-games.com",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
+        "Accept-Encoding": "identity",
+        "Content-Type": "application/x-www-form-urlencoded",
+    }
+    with requests.post(
+        "https://fftcg.square-enix-games.com/en/get-cards", data, headers=headers
+    ) as url:
+        if url.status_code == 403:
+            raise Exception("Cannot download card data")
         data = url.json()
 
     with open(MISSING_CARDS_FILEPATH) as fp:
@@ -148,7 +160,7 @@ async def download_image(
     return dst
 
 
-async def main() -> None:
+async def main(pargs) -> None:
     """Download FFTCG API data and download any missing card images."""
     data = download_and_save()
 
@@ -247,7 +259,7 @@ async def main() -> None:
     images = await tqdm.gather(*images, desc="JP card images", unit="cards")
 
     # Download testdata images
-    df = pd.read_json(os.path.join(os.path.dirname(__file__), "..", "testmodels.json"))
+    df = pd.read_json(pargs.file)
 
     images = [
         download_image(row["uri"], "test", f"{idx}.jpg") for idx, row in df.iterrows()
@@ -256,4 +268,21 @@ async def main() -> None:
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    import argparse
+    from pathlib import Path
+
+    parser = argparse.ArgumentParser(description="Gather all assets")
+    parser.add_argument(
+        "-f",
+        "--file",
+        type=Path,
+        required=True,
+        help="Path to the JSON validation assets file.",
+    )
+
+    args = parser.parse_args()
+
+    if not args.file.exists():
+        raise FileNotFoundError(str(args.file))
+
+    asyncio.run(main(args))

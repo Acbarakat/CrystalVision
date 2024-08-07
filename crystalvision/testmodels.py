@@ -43,14 +43,16 @@ CATEGORIES: Tuple[str] = (
     "power",
     "ex_burst",
     "multicard",
+    "limit_break",
     "mono",
 )
-IMAGE_DF: pd.DataFrame = pd.read_json(os.path.join(os.path.dirname(__file__),
-                                                   "testmodels.json"))
+IMAGE_DF: pd.DataFrame = pd.read_json(
+    os.path.join(os.path.dirname(__file__), "testmodels.json")
+)
 # print(IMAGE_DF)
 
-def load_image(url: str,
-               img_fname: str = '') -> np.ndarray:
+
+def load_image(url: str, img_fname: str = "") -> np.ndarray:
     """
     Load image (and cache it).
 
@@ -73,7 +75,7 @@ def load_image(url: str,
     dst = os.path.join(dst, img_fname)
     if os.path.exists(dst):
         data = imread(dst)[:, :, :3]
-        return data * (1. / 255)
+        return data * (1.0 / 255)
 
     if url.startswith("blob:"):
         url = url[5:]
@@ -83,7 +85,7 @@ def load_image(url: str,
     else:
         Image.fromarray(data).save(dst)
 
-    return data[:, :, :3] * (1. / 255)
+    return data[:, :, :3] * (1.0 / 255)
 
 
 def find_threshold(X, y_true, labels, method="nelder-mead"):
@@ -129,7 +131,7 @@ def test_models() -> pd.DataFrame:
     Returns:
         ImageData dataframe with yhat(s)
     """
-    df: pd.DataFrame = IMAGE_DF.copy().set_index('code')
+    df: pd.DataFrame = IMAGE_DF.copy().set_index("code")
     cols = [
         "name_en",
         "element",
@@ -138,20 +140,18 @@ def test_models() -> pd.DataFrame:
         "power",
         "ex_burst",
         "multicard",
+        "limit_break",
     ]
-    mdf: pd.DataFrame = make_database().set_index('code')[cols]
-    df = df.merge(mdf, on="code", how='left', sort=False)
+    mdf: pd.DataFrame = make_database().set_index("code")[cols]
+    df = df.merge(mdf, on="code", how="left", sort=False)
     # df['ex_burst'] = df['ex_burst'].astype('uint8')
     # df['multicard'] = df['multicard'].astype('uint8')
     # df["mono"] = df["element"].apply(lambda i: len(i) == 1 if i else True).astype(bool)
 
     df["uid"] = range(df.shape[0])
     df["images"] = df.apply(
-        lambda x: tf.image.resize(
-            load_image(x["uri"], f"{x['uid']}.jpg"),
-            (250, 179)
-        ),
-        axis=1
+        lambda x: tf.image.resize(load_image(x["uri"], f"{x['uid']}.jpg"), (250, 179)),
+        axis=1,
     )
 
     df.query("full_art != 1 and focal == 1", inplace=True)
@@ -173,9 +173,11 @@ def test_models() -> pd.DataFrame:
             labels = json.load(fp)
 
         models = [
-            load_model(mpath) for mpath in iglob(str(MODEL_DIR) + os.sep + f"{category}_*.h5") if "_model" not in mpath
+            load_model(mpath)
+            for mpath in iglob(str(MODEL_DIR) + os.sep + f"{category}_*.h5")
+            if "_model" not in mpath
         ]
-        ensemble_path = os.path.join(MODEL_DIR, f"{category}_ensemble.h5")
+        # ensemble_path = os.path.join(MODEL_DIR, f"{category}_ensemble.h5")
         if len(models) > 1:
             # if os.path.exists(ensemble_path):
             #   model = tf.keras.models.load_model(ensemble_path)
@@ -184,13 +186,13 @@ def test_models() -> pd.DataFrame:
             #       x = [labels[y] for y in x]
             # else:
             if category in ("ex_burst", "multicard", "mono"):
-                voting = MyEnsembleVoteClassifier(models,
-                                                  labels=labels,
-                                                  activation=hard_activation,
-                                                  activation_kwargs={
-                                                      'threshold': 0.0
-                                                  })
-                x = voting.predict(IMAGES, 'uint8')
+                voting = MyEnsembleVoteClassifier(
+                    models,
+                    labels=labels,
+                    activation=hard_activation,
+                    activation_kwargs={"threshold": 0.0},
+                )
+                x = voting.predict(IMAGES, "uint8")
                 print(voting.find_activation(IMAGES, df[category]))
             else:
                 voting = MyEnsembleVoteClassifier(models, labels=labels)
@@ -205,8 +207,8 @@ def test_models() -> pd.DataFrame:
             # voting.save_model(ensemble_path)
             x = x.to_numpy()
         else:
-            #print(models[0].summary())
-            #print(models[0](IMAGES, training=False))
+            # print(models[0].summary())
+            # print(models[0](IMAGES, training=False))
             x = models[0].predict(IMAGES)
             # print(x)
             df[f"{category}_yhat"] = x
@@ -217,7 +219,7 @@ def test_models() -> pd.DataFrame:
             print(data)
             threshold = find_threshold(data[f"{category}_yhat"], data[category], labels)
             print(threshold)
-            #x = [labels[np.argmax(y)] for y in x]
+            # x = [labels[np.argmax(y)] for y in x]
             x = [labels[y[0]] for y in hard_activation(x, threshold=threshold)]
 
         df[f"{category}_yhat"] = x
@@ -245,5 +247,5 @@ def main() -> None:
     print(df)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

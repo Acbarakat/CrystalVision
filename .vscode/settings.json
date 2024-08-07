@@ -1,0 +1,18 @@
+{
+    "python.testing.pytestArgs": [
+        "tests"
+    ],
+    "python.testing.unittestEnabled": false,
+    "python.testing.pytestEnabled": true,
+    "python.analysis.extraPaths": [
+        "${config:python.analysis.extraPaths}",
+        "${workspaceFolder}/src"
+    ],
+    "cmake.configureOnOpen": false,
+    "crystalvision": {
+        "task": "detect",
+        "output_format": "polygon",
+        "flags": "",
+    },
+    "python.analysis.autoImportCompletions": true,
+}

@@ -1,9 +1,7 @@
-import tensorflow as tf
-from keras import losses, metrics
-
-
 from functools import cached_property
 from typing import List
+
+from keras import losses, metrics, backend
 
 
 class BinaryMixin:
@@ -19,7 +17,7 @@ class BinaryMixin:
     @cached_property
     def metrics(self) -> List[metrics.Metric]:
         """A list of Binary Metrics."""
-        return [tf.keras.metrics.BinaryAccuracy(name="accuracy")]
+        return [metrics.BinaryAccuracy(name="accuracy")]
 
 
 class BinaryCrossMixin:
@@ -35,7 +33,7 @@ class BinaryCrossMixin:
     @cached_property
     def metrics(self) -> List[metrics.Metric]:
         """A list of Binary Metrics."""
-        return [tf.keras.metrics.BinaryCrossentropy(name="accuracy")]
+        return [metrics.BinaryCrossentropy(name="accuracy")]
 
 
 class CategoricalMixin:
@@ -44,14 +42,18 @@ class CategoricalMixin:
     LABEL_MODE = "categorical"
 
     @cached_property
-    def loss(self) -> losses.CategoricalCrossentropy:
+    def loss(self) -> losses.Loss:
         """The Categorical loss function."""
+        if backend.backend() == "torch":
+            return losses.SparseCategoricalCrossentropy()
         return losses.CategoricalCrossentropy()
 
     @cached_property
     def metrics(self) -> List[metrics.Metric]:
         """A list of Categorical Metrics."""
-        return [tf.keras.metrics.CategoricalAccuracy(name="accuracy")]
+        if backend.backend() == "torch":
+            return [metrics.SparseCategoricalAccuracy(name="accuracy")]
+        return [metrics.CategoricalAccuracy(name="accuracy")]
 
 
 class SparseCategoricalMixin:
@@ -67,7 +69,7 @@ class SparseCategoricalMixin:
     @cached_property
     def metrics(self) -> List[metrics.Metric]:
         """A list of Sparse Categorical Metrics."""
-        return [tf.keras.metrics.SparseCategoricalCrossentropy(name="accuracy")]
+        return [metrics.SparseCategoricalCrossentropy(name="accuracy")]
 
 
 class OneHotMeanIoUMixin:
@@ -76,15 +78,11 @@ class OneHotMeanIoUMixin:
     LABEL_MODE = "binary"
 
     @cached_property
-    def loss(self) -> losses.BinaryCrossentropy:
+    def loss(self) -> losses.Loss:
         """The Binary Cross loss function."""
-        return losses.BinaryCrossentropy()
+        return losses.MeanSquaredError()
 
     @cached_property
     def metrics(self) -> List[metrics.Metric]:
         """A list of OneHotMeanIoUl Metrics."""
-        return [
-            tf.keras.metrics.OneHotMeanIoU(
-                num_classes=len(self.labels), name="accuracy"
-            )
-        ]
+        return [metrics.OneHotMeanIoU(num_classes=len(self.labels), name="accuracy")]

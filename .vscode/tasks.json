@@ -1,0 +1,198 @@
+{
+    // See https://go.microsoft.com/fwlink/?LinkId=733558
+    // for the documentation about the tasks.json format
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Gather Assets",
+            "type": "shell",
+            "command": "poetry",
+            "args": [
+                "run",
+                "python",
+                "./crystalvision/data/gather.py",
+                "-f=./data/testmodels.json"
+            ],
+            "problemMatcher": []
+        },
+        {
+            "label": "Annotate Images",
+            "type": "shell",
+            "command": "poetry",
+            "args": [
+                "run",
+                "labelme",
+                "./data/labeling",
+                "--flags",
+                "./data/labeling/_flags.yaml",
+                "--labelflags",
+                "./data/labeling/_label_flags.yaml",
+                "--autosave",
+                "--nodata"
+            ],
+            "problemMatcher": []
+        },
+        {
+            "label": "LabelMe2YOLO",
+            "type": "shell",
+            "command": "poetry",
+            "args": [
+                "run",
+                "python",
+                "./crystalvision/detection/labelconvert.py",
+                "--json_dir",
+                "./data/labeling",
+                "--output_format",
+                "${config:crystalvision.output_format}",
+                "--test_size",
+                "0.0",
+                "--val_size",
+                "0.1",
+                "${config:crystalvision.flags}",
+            ],
+            "problemMatcher": []
+        },
+        {
+            "label": "Build Model",
+            "dependsOrder": "sequence",
+            "dependsOn": ["LabelMe2YOLO", "Train Model"],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            }
+        },
+        {
+            "label": "Tune Model",
+            "dependsOrder": "sequence",
+            "dependsOn": ["LabelMe2YOLO", "Train Model: tune"],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            }
+        },
+        {
+            "label": "Train Model: tune",
+            "type": "shell",
+            "command": "poetry",
+            "args": [
+                "run",
+                "python",
+                "./crystalvision/detection/train.py",
+                "--task",
+                "tune-${config:crystalvision.task}",
+                "--batch=12",
+                "--patience=25",
+            ],
+            "problemMatcher": []
+        },
+        {
+            "label": "Train Model",
+            "type": "shell",
+            "command": "poetry",
+            "args": [
+                "run",
+                "python",
+                "./crystalvision/detection/train.py",
+                "--task",
+                "${config:crystalvision.task}",
+                "--hyperparams",
+                "./runs/${config:crystalvision.task}/tune/best_hyperparameters.yaml",
+                "--batch=12",
+                "--patience=100",
+            ],
+            "problemMatcher": []
+        },
+        {
+            "label": "Camera Detect: dnn",
+            "type": "shell",
+            "command": "poetry",
+            "args": [
+                "run",
+                "python",
+                "./crystalvision/detection/detect.py",
+                "--model",
+                "runs/${config:crystalvision.task}/train/weights/best.onnx",
+                "--card-model=./data/model/multilabel_1.onnx",
+                "--model_task=${config:crystalvision.task}",
+                "--classes",
+                "./data/labeling/YOLODataset/dataset.yaml",
+                "--plot=dnn",
+                "--camera",
+                "3840",
+                "2160",
+                "30",
+                "0",
+                "-v"
+            ],
+            "problemMatcher": []
+        },
+        {
+            "label": "Image Detect: dnn",
+            "type": "shell",
+            "command": "poetry",
+            "args": [
+                "run",
+                "python",
+                "./crystalvision/detection/detect.py",
+                "--model",
+                "runs/${config:crystalvision.task}/train/weights/best.onnx",
+                //"runs/${config:crystalvision.task}/tune/weights/best.onnx",
+                "--card-model=./data/model/multilabel_1.onnx",
+                "--model_task=${config:crystalvision.task}",
+                "--classes",
+                "./data/labeling/YOLODataset/dataset.yaml",
+                "--plot=dnn",
+                "--image=saved_frame.jpg",
+                "-v"
+            ],
+            "problemMatcher": []
+        },
+        {
+            "label": "Camera Detect: ultralytics",
+            "type": "shell",
+            "command": "poetry",
+            "args": [
+                "run",
+                "python",
+                "./crystalvision/detection/detect.py",
+                "--threshold=0.75",
+                "--model",
+                "runs/${config:crystalvision.task}/train/weights/best.pt",
+                "--card-model=./data/model/multilabel_1.onnx",
+                "--model_task=${config:crystalvision.task}",
+                "--classes",
+                "./data/labeling/YOLODataset/dataset.yaml",
+                "--plot=ultralytics",
+                "--camera",
+                "3840",
+                "2160",
+                "30",
+                "0",
+                "-v"
+            ],
+            "problemMatcher": []
+        },
+        {
+            "label": "Image Detect: ultralytics",
+            "type": "shell",
+            "command": "poetry",
+            "args": [
+                "run",
+                "python",
+                "./crystalvision/detection/detect.py",
+                "--threshold=0.75",
+                "--model",
+                // "runs/${config:crystalvision.task}/train/weights/best.pt",
+                "runs/${config:crystalvision.task}/tune/weights/best.pt",
+                "--card-model=./data/model/multilabel_1.onnx",
+                "--model_task=${config:crystalvision.task}",
+                "--classes",
+                "./data/labeling/YOLODataset/dataset.yaml",
+                "--plot=ultralytics",
+                "--image=saved_frame.jpg",
+                "-v"
+            ],
+            "problemMatcher": []
+        },
+    ]
+}

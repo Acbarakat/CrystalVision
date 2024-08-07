@@ -10,7 +10,7 @@ import os
 import argparse
 from pathlib import Path
 
-import tensorflow as tf
+import yaml
 import pandas as pd
 from keras.models import load_model
 
@@ -28,18 +28,9 @@ except ImportError:
     from crystalvision.data.dataset import imagine_database, make_database
 
 
-gpus = tf.config.experimental.list_physical_devices("GPU")
-if gpus:
-    try:
-        # Currently, memory growth needs to be the same across GPUs
-        for gpu in gpus:
-            tf.config.experimental.set_memory_growth(gpu, True)
-    except RuntimeError as e:
-        # Memory growth must be set before GPUs have been initialized
-        print(e)
-
-
-def tune_model(model: CardModel, num: int = 5, save_models: bool = True) -> None:
+def tune_model(
+    model: CardModel, num: int = 5, save_models: bool = True, clear_cache=False
+) -> None:
     parser = argparse.ArgumentParser(description="Model tuning command-line tool")
     parser.add_argument(
         "--num", "-n", type=int, default=num, help="The number of best models to keep"
@@ -48,32 +39,71 @@ def tune_model(model: CardModel, num: int = 5, save_models: bool = True) -> None
         "--random-state", "-r", type=int, default=23, help="The random state number"
     )
     parser.add_argument(
-        "--disable-clear-cache",
-        "-d",
+        "--clear-cache",
+        "-c",
         action="store_true",
         help="Disable the clearing of the tuning cache",
     )
     parser.add_argument(
         "--verbose", "-v", action="store_true", help="Enable verbose mode"
     )
+    parser.add_argument(
+        "--validation",
+        type=Path,
+        help="The validation data JSON file",
+        default=MODEL_DIR / ".." / "testmodels.json",
+    )
+    parser.add_argument(
+        "--tune",
+        type=Path,
+        help="The tuning YAML file",
+        default=SRC_DIR / "models" / "tune.yml",
+    )
 
     args = parser.parse_args()
+    args.validation = args.validation.resolve()
+    args.tune = args.tune.resolve()
 
-    df = imagine_database(clear_extras=True)
+    if not args.validation.exists():
+        raise FileNotFoundError(str(args.validation.resolve()))
 
-    vdf = pd.read_json(os.path.join(SRC_DIR, "testmodels.json"))
+    if not args.tune.exists():
+        raise FileNotFoundError(str(args.tune.resolve()))
+
+    with args.tune.open("r") as fp:
+        tune_data = yaml.safe_load(fp)
+        if "image_shape" in tune_data:
+            img_shape = tune_data["image_shape"]
+            tune_data["image_shape"] = (
+                img_shape["height"],
+                img_shape["width"],
+                img_shape["dimesion"],
+            )
+    print(tune_data)
+
+    df = imagine_database(
+        image=tune_data.get("image_type", "thumbs"), clear_extras=True
+    )
+    df.attrs["seed"] = args.random_state
+
+    vdf = pd.read_json(str(args.validation))
     vdf["filename"] = str(TEST_IMG_DIR) + os.sep + vdf["uri"].index.astype(str) + ".jpg"
     vdf.fillna({"full_art": 0, "foil": 1, "focal": 1}, inplace=True)
     vdf = vdf.merge(make_database(clear_extras=True), on="code", how="left", sort=False)
     vdf.drop(["thumbs", "images", "uri", "id"], axis=1, inplace=True)
-    vdf.query("full_art != 1 and focal == 1", inplace=True)
+    if vdf_query := tune_data.get("vdf_query"):
+        vdf.query(vdf_query, inplace=True)
 
     null_vdf = vdf[vdf["name_en"].isna()]
     if not null_vdf.empty:
         print(null_vdf)
         raise ValueError("There are null values in test dataset")
 
-    m = model(df, vdf)
+    m = model(df, vdf, **tune_data)
+
+    if args.clear_cache or clear_cache:
+        m.clear_cache()
+        m.save_multilabels()
 
     if args.verbose:
         print(vdf)
@@ -85,9 +115,6 @@ def tune_model(model: CardModel, num: int = 5, save_models: bool = True) -> None
             )
         else:
             print(vdf.groupby(m.stratify_cols).count()["code"])
-
-    if not args.disable_clear_cache:
-        m.clear_cache()
 
     m.tune_and_save(
         num_models=args.num, random_state=args.random_state, save_models=save_models

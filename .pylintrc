@@ -1,6 +1,13 @@
 [BASIC]
+max-line-length = 100
 
 # Good variable names which should always be accepted, separated by a comma.
 good-names=i, j, k, df, fp, x, X, y, Y, z, Z
 generated-members=db.session.*
 ignored-classes=JsonReader
+
+extension-pkg-whitelist=cv2
+
+[TYPECHECK]
+generated-members=cv2
+ignored-argument-names=args,kwargs
