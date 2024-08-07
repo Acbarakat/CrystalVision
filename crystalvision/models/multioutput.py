@@ -102,4 +102,4 @@ class MultiLabel(HyperbandTunerMixin, MultiLabelCardModel):
 if __name__ == "__main__":
     from crystalvision.models import tune_model
 
-    tune_model(MultiLabel, clear_cache=True)
+    tune_model(MultiLabel, clear_cache=False)
