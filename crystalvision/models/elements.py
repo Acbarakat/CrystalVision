@@ -178,7 +178,7 @@ class ElementV2(BayesianOptimizationTunerMixin, MultiLabelCardModel):
         Returns:
             A model instance.
         """
-        batch_size = hp.Choice("batch_size", values=[32, 64, 128])  # noqa
+        batch_size = hp.Choice("batch_size", values=[16, 32, 64])  # noqa
 
         pl1 = self._pooling2d_choice("pooling1", hp)[1]
         pl2 = self._pooling2d_choice("pooling2", hp, exclude={"Min"})[1]
@@ -232,12 +232,14 @@ class ElementV2(BayesianOptimizationTunerMixin, MultiLabelCardModel):
                 )
             ],
         )
+        print(m.summary(expand_nested=True))
+        print(backend.backend())
         return m
 
 
 if __name__ == "__main__":
     from crystalvision.models import tune_model
 
-    tune_model(Element, clear_cache=False)
+    # tune_model(Element, clear_cache=False)
     # tune_model(Mono)
-    tune_model(ElementV2, clear_cache=False)
+    tune_model(ElementV2, clear_cache=True)

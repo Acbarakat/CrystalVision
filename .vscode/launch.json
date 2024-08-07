@@ -18,6 +18,7 @@
                 "KERAS_BACKEND": "torch",
                 "CUDA_LAUNCH_BLOCKING": "1",
                 "CUDA_VISIBLE_DEVICES": "0",
+                "TORCH_DS_PERSISTENT_WORKS": "0",
             }
         },
         {
@@ -31,6 +32,9 @@
                 "PYTHONPATH": "${python.pythonPath};${workspaceFolder}/crystalvision",
                 "KERAS_BACKEND": "tensorflow",
                 "TF_CPP_MIN_LOG_LEVEL": "2",
+                "TF_FORCE_GPU_ALLOW_GROWTH": "true",
+                "TF_FORCE_UNIFIED_MEMORY": "1",
+                // "XLA_FLAGS": "--xla_disabled_backends=cpu,gpu"
             },
         }
     ]

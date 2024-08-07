@@ -14,4 +14,5 @@
         "output_format": "polygon",
         "flags": "",
     },
+    "python.analysis.autoImportCompletions": true,
 }

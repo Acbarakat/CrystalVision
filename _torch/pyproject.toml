@@ -1,15 +1,15 @@
 [tool.poetry]
 name = "crystalvision"
-version = "0.3.0"
+version = "0.3.1"
 description = "FFTCG Image Classification and Detection."
 authors = ["Allonte <angelosheltie@gmail.com>"]
 license = "MIT License"
-readme = "README.md"
+readme = "../README.md"
+packages = [{include = "crystalvision", from=".."}]
 
 [tool.poetry.dependencies]
-python = "^3.12"
+python = "3.12.*"
 keras = ">3.4.0"
-# keras-nightly = ">=3.1.0.dev2024021703"
 keras-tuner = ">=1.4.5"
 scikit-learn = ">=1.3.0"
 scikit-image = ">=0.22.0"
@@ -22,32 +22,23 @@ aiohttp = ">=3.8.6"
 aiofiles = ">=23.2.1"
 dogpile-cache = ">=1.3.1"
 opencv-contrib-python-headless = ">=4.9.0.80"
+gradio = "^4.39.0"
+
+[tool.poetry.group.torch.dependencies]
 nvidia-cublas-cu12 = {version=">=12.1.3.1", source="nvidia"}
 nvidia-cuda-nvrtc-cu12 = {version=">=12.1.105", source="nvidia"}
 nvidia-cuda-runtime-cu12 = {version=">=12.1.105", source="nvidia"}
-nvidia-cudnn-cu12 = {version=">=9.1.0.70", source="pytorch"}
 # nvidia-cudnn-cu12 = {version=">=9.1.1.17", source="nvidia"}
+nvidia-cudnn-cu12 = {version=">=9.1.0.70", source="pytorch"}
 nvidia-nvjitlink-cu12 = {version=">=12.3.101", source="nvidia"}
-gradio = "^4.39.0"
-
-[tool.poetry.group.tensorflow]
-optional = true
-
-[tool.poetry.group.tensorflow.dependencies]
-tensorrt = {version=">=8.6.1", source="nvidia", optional = true}
-# tensorrt-cu12 = {version=">=10.2.0.post1", source="nvidia"}
-# tensorrt-cu12-libs = {version=">=10.2.0.post1", source="nvidia"}
-# tensorrt-cu12-bindings = {version=">=10.2.0.post1", source="nvidia"}
-nvidia-tensorrt = {version=">=8.4.3.1", source="nvidia", optional = true}
-# tf2onnx = {version=">=1.16.1", optional = true}
-# tensorflow = {extras=["and-cuda"], version=">=2.16.1", optional = true} #{url = "https://storage.googleapis.com/tensorflow/linux/gpu/tensorflow-2.15.0-cp310-cp310-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", platform="linux"}
-# tensorflow-io = {version=">=0.31.0", optional = true}
-
-
-[tool.poetry.group.torch.dependencies]
 torch = {version=">=2.4.0+cu124", source="pytorch"}
 torchvision = {version=">=0.19.0+cu124", source="pytorch"}
-
+accimage = [
+    {path = "../data/accimage-0.2.0-cp310-cp310-win_amd64.whl", platform="win32", python = "3.10.*"},
+    {path = "../data/accimage-0.2.0-cp310-cp310-linux_x86_64.whl", platform="linux", python = "3.10.*"},
+    {path = "../data/accimage-0.2.0-cp311-cp311-linux_x86_64.whl", platform="linux", python = "3.11.*"},
+    {path = "../data/accimage-0.2.0-cp312-cp312-linux_x86_64.whl", platform="linux", python = "3.12.*"}
+]
 
 [tool.poetry.group.dev.dependencies]
 pycodestyle = ">=2.11.1"
@@ -61,17 +52,14 @@ ruff = ">=0.1.14"
 pytest = ">=8.0.0"
 pytest-xdist = ">=3.5.0"
 
-
 [tool.poetry.group.debug.dependencies]
 paretoset = ">=1.2.3"
-
 
 [tool.poetry.group.labeling.dependencies]
 pyqt5-qt5 = "<5.15.11"
 pyqt5 = "^5.15.10"
 labelme = ">=5.4.1"
 labelme2yolo = ">=0.1.4"
-
 
 [tool.poetry.group.detection.dependencies]
 ultralytics = ">=8.1.11"
@@ -84,17 +72,6 @@ lapx = ">=0.5.2"
 # ray = {extras = ["tune"], version = ">=2.9.2"}
 
 
-
-[tool.poetry.group.accelerate.dependencies]
-accimage = [
-    # {path = "./data/accimage-0.2.0-cp310-cp310-win_amd64.whl", platform="win32", python = "^3.10"},
-    # {path = "./data/accimage-0.2.0-cp310-cp310-linux_x86_64.whl", platform="linux", python = "^3.10"},
-    {path = "./data/accimage-0.2.0-cp312-cp312-linux_x86_64.whl", platform="linux", python = "^3.12"}
-]
-
-[tool.poetry.extras]
-tensorflow = ["tensorrt", "nvidia-tensorrt", "tf2onnx", "tensorflow", "tensorflow-io"]
-
 [[tool.poetry.source]]
 name = "pytorch"
 url = "https://download.pytorch.org/whl/cu124"
@@ -106,8 +83,8 @@ url = "https://download.pytorch.org/whl/nightly/cu124"
 priority = "supplemental"
 
 [[tool.poetry.source]]
-name = "tensorflow"
-url = "https://storage.googleapis.com/tensorflow"
+name = "pytorch-base"
+url = "https://download.pytorch.org/whl"
 priority = "supplemental"
 
 [[tool.poetry.source]]
@@ -119,6 +96,7 @@ priority = "supplemental"
 name = "onnx-gpu"
 url = "https://aiinfra.pkgs.visualstudio.com/PublicPackages/_packaging/onnxruntime-cuda-12/pypi/simple/"
 priority = "supplemental"
+
 
 [build-system]
 requires = ["poetry-core"]

@@ -53,8 +53,8 @@ class MyOneHotMeanIoU(metrics.OneHotMeanIoU):
         y_pred = ops.where(ops.greater_equal(y_pred, self.threshold), 1.0, y_pred)
         # if not self.sparse_y_true:
         #     y_true = ops.argmax(y_true, axis=self.axis)
-        if not self.sparse_y_pred:
-            y_pred = ops.argmax(y_pred, axis=self.axis)
+        # if not self.sparse_y_pred:
+        #     y_pred = ops.argmax(y_pred, axis=self.axis)
 
         y_true = ops.convert_to_tensor(y_true, dtype=self.dtype)
         y_pred = ops.convert_to_tensor(y_pred, dtype=self.dtype)

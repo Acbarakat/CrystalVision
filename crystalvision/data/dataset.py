@@ -16,8 +16,9 @@ from copy import deepcopy
 from typing import Tuple, List, Any
 
 import pandas as pd
+import numpy as np
 from dogpile.cache import make_region
-from keras import layers, backend
+from keras import layers, backend, ops
 
 try:
     from .base import CARD_API_FILEPATH, DATA_DIR
@@ -32,14 +33,7 @@ if backend.backend() == "tensorflow":
     from keras.src.utils.module_utils import tensorflow as tf
 
     IterableDataset = object
-    gpus = tf.config.experimental.list_physical_devices("GPU")
-    try:
-        # Currently, memory growth needs to be the same across GPUs
-        for gpu in gpus:
-            tf.config.experimental.set_memory_growth(gpu, True)
-    except RuntimeError as err:
-        # Memory growth must be set before GPUs have been initialized
-        print(err)
+
 
 elif backend.backend() == "torch":
     import torch
@@ -364,7 +358,7 @@ class CustomDataset(IterableDataset):
         )
 
         self.paths = paths
-        self.labels = labels
+        self.labels = np.array(labels)
         self.name = name
         self.transform = transforms.Compose(
             [
@@ -401,7 +395,7 @@ class CustomDataset(IterableDataset):
             batch_size=batch_size,
             pin_memory=batch_size < 256 if batch_size else True,
             num_workers=8,
-            persistent_workers=True,
+            persistent_workers=os.environ.get("TORCH_DS_PERSISTENT_WORKS", "0") == "1",
         )
 
 
@@ -496,7 +490,7 @@ def extend_dataset_torch(
         shuffle=shuffle,
         pin_memory=batch_size < 256 if batch_size else True,
         num_workers=8,
-        persistent_workers=True,
+        persistent_workers=os.environ.get("TORCH_DS_PERSISTENT_WORKS", "0") == "1",
     )
 
 
