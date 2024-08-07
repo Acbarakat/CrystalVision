@@ -232,8 +232,6 @@ class ElementV2(BayesianOptimizationTunerMixin, MultiLabelCardModel):
                 )
             ],
         )
-        print(m.summary(expand_nested=True))
-        print(backend.backend())
         return m
 
 
