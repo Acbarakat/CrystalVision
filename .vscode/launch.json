@@ -16,7 +16,7 @@
             "env": {
                 "PYTHONPATH": "${python.pythonPath};${workspaceFolder}/crystalvision",
                 "KERAS_BACKEND": "torch",
-                "CUDA_LAUNCH_BLOCKING": "1",
+                "CUDA_LAUNCH_BLOCKING": "0",
                 "CUDA_VISIBLE_DEVICES": "0",
                 "TORCH_DS_PERSISTENT_WORKS": "0",
             }
