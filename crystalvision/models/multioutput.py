@@ -7,16 +7,14 @@ Todo:
 
 """
 from pandas import DataFrame
-from keras import layers, models, backend, optimizers
+from keras import layers, models, optimizers, metrics
 from keras_tuner import HyperParameters
 
 try:
     from .base import MultiLabelCardModel
-    from .ext.metrics import MyOneHotMeanIoU
     from .mixins.tuners import HyperbandTunerMixin
 except ImportError:
     from crystalvision.models.base import MultiLabelCardModel
-    from crystalvision.models.ext.metrics import MyOneHotMeanIoU
     from crystalvision.models.mixins.tuners import HyperbandTunerMixin
 
 
@@ -78,7 +76,7 @@ class MultiLabel(HyperbandTunerMixin, MultiLabelCardModel):
                     ),
                     activation="relu",
                 ),
-                layers.Dense(len(self.labels), activation="sigmoid"),
+                layers.Dense(len(self.labels), activation="sigmoid", name="result"),
             ],
             name=self.name,
         )
@@ -92,12 +90,9 @@ class MultiLabel(HyperbandTunerMixin, MultiLabelCardModel):
             loss=self.loss,
             metrics=self._metrics
             + [
-                MyOneHotMeanIoU(
-                    num_classes=len(self.labels),
-                    threshold=self.one_hot_threshold,
-                    name="accuracy",
-                    sparse_y_pred=backend.backend() != "torch",
-                ),
+                metrics.BinaryAccuracy(
+                    name="accuracy", threshold=self.one_hot_threshold
+                )
             ],
         )
 
@@ -107,4 +102,4 @@ class MultiLabel(HyperbandTunerMixin, MultiLabelCardModel):
 if __name__ == "__main__":
     from crystalvision.models import tune_model
 
-    tune_model(MultiLabel, clear_cache=False)
+    tune_model(MultiLabel, clear_cache=True)

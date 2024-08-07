@@ -18,7 +18,7 @@ from typing import Tuple, List, Any
 import pandas as pd
 import numpy as np
 from dogpile.cache import make_region
-from keras import layers, backend, ops
+from keras import layers, backend
 
 try:
     from .base import CARD_API_FILEPATH, DATA_DIR
@@ -84,7 +84,8 @@ def make_database(clear_extras: bool = False) -> pd.DataFrame:
     df["multicard"] = (
         df["multicard"].apply(lambda i: i == "\u25cb" or i == "1").astype(bool)
     )
-    df["icons"] = df[["ex_burst", "multicard"]].apply(
+    df["limit_break"] = df["text_en"].str.contains("Limit Break --")
+    df["icons"] = df[["ex_burst", "multicard", "limit_break"]].apply(
         lambda row: tuple(row[row].index) if not row[row].index.empty else ("no_icon",),
         axis=1,
     )
@@ -232,7 +233,8 @@ def extend_dataset_tf(
 
     if flip_vertical:
         vertical_ds = ds.map(
-            lambda x, y: (tf.image.flip_up_down(x), y), name=f"vertical_{name}",
+            lambda x, y: (tf.image.flip_up_down(x), y),
+            name=f"vertical_{name}",
             num_parallel_calls=tf.data.AUTOTUNE,
         )
         cardinality = ds.cardinality() * 2

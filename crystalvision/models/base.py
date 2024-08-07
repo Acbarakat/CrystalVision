@@ -27,11 +27,12 @@ from sklearn.preprocessing import MultiLabelBinarizer
 from keras import callbacks, models, layers, optimizers, backend, metrics
 from keras_tuner import HyperModel, HyperParameters
 
+
 try:
     from . import MODEL_DIR
     from .ext.callbacks import StopOnValue
     from .ext.layers import MinPooling2D
-    from .ext.metrics import MyOneHotIoU
+    from .ext.metrics import MyBinaryAccuracy
     from ..data.dataset import (
         extend_dataset,
         paths_and_labels_to_dataset,
@@ -46,7 +47,7 @@ except ImportError:
         extend_dataset,
         paths_and_labels_to_dataset,
     )
-    from crystalvision.models.ext.metrics import MyOneHotIoU
+    from crystalvision.models.ext.metrics import MyBinaryAccuracy
     from crystalvision.models.mixins.objective import (
         WeightedMeanMultiObjective,
         Objective,
@@ -547,14 +548,13 @@ class MultiLabelCardModel(  # pylint: disable=W0223
         if generate_metrics:
             idx: int = 0
             for fkey in self.feature_key:
-                labels = self.df[fkey].unique()
+                labels = self.df[fkey].explode().unique()
                 labels = np.insert(labels, 0, f"null_{fkey}")
                 self._metrics.append(
-                    MyOneHotIoU(
+                    MyBinaryAccuracy(
                         target_class_ids=list(range(idx, len(labels) + idx)),
                         threshold=one_hot_threshold,
                         name=f"{fkey}_accuracy",
-                        sparse_y_pred=backend.backend() != "torch",
                     )
                 )
                 idx += len(labels)

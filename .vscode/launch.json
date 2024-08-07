@@ -4,7 +4,6 @@
     // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
     "version": "0.2.0",
     "configurations": [
-
         {
             "name": "Python: Current File (pytorch)",
             "type": "debugpy",
@@ -20,6 +19,26 @@
                 "CUDA_VISIBLE_DEVICES": "0",
                 "TORCH_DS_PERSISTENT_WORKS": "0",
             }
+        },
+        {
+            "name": "Python: Current File (pytorch bottlneck)",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "-m",
+            // "cwd": "${workspaceFolder}\\src",
+            "console": "integratedTerminal",
+            "justMyCode": true,
+            "env": {
+                "PYTHONPATH": "${python.pythonPath};${workspaceFolder}/crystalvision",
+                "KERAS_BACKEND": "torch",
+                "CUDA_LAUNCH_BLOCKING": "0",
+                "CUDA_VISIBLE_DEVICES": "0",
+                "TORCH_DS_PERSISTENT_WORKS": "0",
+            },
+            "args": [
+                "torch.utils.bottleneck",
+                "${file}"
+            ]
         },
         {
             "name": "Python: Current File (tensorflow)",

@@ -1,5 +1,5 @@
 test_size: 0.13
-one_hot_threshold: 1.00
+one_hot_threshold: 0.98
 vdf_query: "full_art == 0 and focal == 1 and foil == 1"
 # image_type: "images"
 # image_shape:

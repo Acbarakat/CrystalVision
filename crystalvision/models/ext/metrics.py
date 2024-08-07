@@ -2,7 +2,53 @@ from typing import Optional, Union, List, Tuple
 
 from keras import metrics, ops, backend
 from keras.src.metrics.iou_metrics import _IoUBase
+from keras.src.metrics.reduction_metrics import MeanMetricWrapper
+from keras.src.metrics.accuracy_metrics import binary_accuracy
 from keras.src.metrics.metrics_utils import confusion_matrix
+
+
+class MyBinaryAccuracy(MeanMetricWrapper):
+    def __init__(
+        self,
+        name="binary_accuracy",
+        dtype=None,
+        threshold=0.5,
+        target_class_ids: Union[List[int], Tuple[int, ...]] = [],
+    ):
+        if threshold is not None and (threshold <= 0 or threshold >= 1):
+            raise ValueError(
+                "Invalid value for argument `threshold`. "
+                "Expected a value in interval (0, 1). "
+                f"Received: threshold={threshold}"
+            )
+        assert len(target_class_ids) > 0, "No target_class_ids provided"
+        super().__init__(
+            fn=self.binary_accuracy, name=name, dtype=dtype, threshold=threshold
+        )
+        self.threshold = threshold
+        # Metric should be maximized during optimization.
+        self._direction = "up"
+        self.target_class_ids = target_class_ids
+
+    def __repr__(self):
+        return f"<{self.__class__.__name__} name={self.name} threshold={self.threshold} target_class_ids={self.target_class_ids}>"
+
+    def get_config(self):
+        return {
+            "name": self.name,
+            "dtype": self.dtype,
+            "threshold": self.threshold,
+            "target_class_ids": self.target_class_ids,
+        }
+
+    def binary_accuracy(self, y_true, y_pred, threshold=None):
+        if threshold is None:
+            threshold = self.threshold
+
+        y_true = ops.take(y_true, self.target_class_ids, axis=1)
+        y_pred = ops.take(y_pred, self.target_class_ids, axis=1)
+
+        return binary_accuracy(y_true, y_pred, threshold)
 
 
 class MyOneHotMeanIoU(metrics.OneHotMeanIoU):
@@ -56,8 +102,8 @@ class MyOneHotMeanIoU(metrics.OneHotMeanIoU):
         # if not self.sparse_y_pred:
         #     y_pred = ops.argmax(y_pred, axis=self.axis)
 
-        y_true = ops.convert_to_tensor(y_true, dtype=self.dtype)
-        y_pred = ops.convert_to_tensor(y_pred, dtype=self.dtype)
+        # y_true = ops.convert_to_tensor(y_true, dtype=self.dtype)
+        # y_pred = ops.convert_to_tensor(y_pred, dtype=self.dtype)
 
         # Flatten the input if its rank > 1.
         if len(y_pred.shape) > 1:
@@ -82,8 +128,8 @@ class MyOneHotMeanIoU(metrics.OneHotMeanIoU):
             if sample_weight is not None:
                 sample_weight = sample_weight[valid_mask]
 
-        y_pred = ops.cast(y_pred, dtype=self.dtype)
-        y_true = ops.cast(y_true, dtype=self.dtype)
+        # y_pred = ops.cast(y_pred, dtype=self.dtype)
+        # y_true = ops.cast(y_true, dtype=self.dtype)
         if sample_weight is not None:
             sample_weight = ops.cast(sample_weight, dtype=self.dtype)
 
@@ -119,14 +165,13 @@ class MyOneHotIoU(_IoUBase):
         self.threshold = threshold
         self.target_class_ids = target_class_ids
 
+    def __repr__(self):
+        return f"<{self.__class__.__name__} name={self.name} threshold={self.threshold} target_class_ids={self.target_class_ids}>"
+
     def result(self):
         """Compute the intersection-over-union via the confusion matrix."""
-        sum_over_row = ops.cast(
-            ops.sum(self.total_cm, axis=0), dtype=self.dtype
-        )
-        sum_over_col = ops.cast(
-            ops.sum(self.total_cm, axis=1), dtype=self.dtype
-        )
+        sum_over_row = ops.cast(ops.sum(self.total_cm, axis=0), dtype=self.dtype)
+        sum_over_col = ops.cast(ops.sum(self.total_cm, axis=1), dtype=self.dtype)
         true_positives = ops.cast(ops.diag(self.total_cm), dtype=self.dtype)
 
         # sum_over_row + sum_over_col =
@@ -181,17 +226,17 @@ class MyOneHotIoU(_IoUBase):
         Returns:
             Update op.
         """
+        y_true = ops.take(y_true, self.target_class_ids, axis=1)
+        y_pred = ops.take(y_pred, self.target_class_ids, axis=1)
+
         y_pred = ops.where(ops.greater_equal(y_pred, self.threshold), 1.0, y_pred)
         # if not self.sparse_y_true:
         #     y_true = ops.argmax(y_true, axis=self.axis)
-        if not self.sparse_y_pred:
-            y_pred = ops.argmax(y_pred, axis=self.axis)
+        # if not self.sparse_y_pred:
+        #     y_pred = ops.argmax(y_pred, axis=self.axis)
 
-        y_true = ops.convert_to_tensor(y_true, dtype=self.dtype)
-        y_pred = ops.convert_to_tensor(y_pred, dtype=self.dtype)
-
-        y_true = ops.take(y_true, self.target_class_ids, axis=1)
-        y_pred = ops.take(y_pred, self.target_class_ids, axis=1)
+        # y_true = ops.convert_to_tensor(y_true, dtype=self.dtype)
+        # y_pred = ops.convert_to_tensor(y_pred, dtype=self.dtype)
 
         # Flatten the input if its rank > 1.
         if len(y_pred.shape) > 1:
@@ -216,8 +261,8 @@ class MyOneHotIoU(_IoUBase):
             if sample_weight is not None:
                 sample_weight = sample_weight[valid_mask]
 
-        y_pred = ops.cast(y_pred, dtype=self.dtype)
-        y_true = ops.cast(y_true, dtype=self.dtype)
+        # y_pred = ops.cast(y_pred, dtype=self.dtype)
+        # y_true = ops.cast(y_true, dtype=self.dtype)
         if sample_weight is not None:
             sample_weight = ops.cast(sample_weight, dtype=self.dtype)
 
