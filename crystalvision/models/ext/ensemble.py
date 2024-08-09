@@ -1,14 +1,13 @@
 import warnings
-from typing import Any, Callable, List, Iterable
+import logging
+from typing import Any, Callable, List, Iterable, Tuple
 
-import numpy as np
 import pandas as pd
-import tensorflow as tf
 from scipy.optimize import minimize
-from keras import backend as K
+from keras import ops, KerasTensor, activations
 from keras.layers import Activation, Flatten, Input, Layer
 from keras.models import Model
-from keras.utils.generic_utils import get_custom_objects
+from keras.saving import get_custom_objects
 from mlxtend.classifier import EnsembleVoteClassifier
 from mlxtend.externals.name_estimators import _name_estimators
 from sklearn.metrics import accuracy_score
@@ -16,6 +15,9 @@ from sklearn.preprocessing import normalize
 from sklearn.base import clone
 from sklearn.preprocessing import LabelEncoder
 from sklearn.model_selection import train_test_split
+
+
+log = logging.getLogger("ensemble")
 
 
 class MyEnsembleVoteClassifier(EnsembleVoteClassifier):
@@ -58,38 +60,51 @@ class MyEnsembleVoteClassifier(EnsembleVoteClassifier):
         super().__init__(
             clfs, voting, weights, verbose, use_clones, fit_base_estimators
         )
+        assert self.voting in ("soft", "hard"), f"Unknown voting: {self.voting}"
         self.clfs_ = clfs
-        self.activation = tf.keras.activations.linear
+        self.activation = activations.linear
         if activation is not None:
             self.activation = activation
         self.activation_kwargs = {}
         if activation_kwargs is not None:
             self.activation_kwargs = activation_kwargs
-        if self.weights is None:
-            self.weights = np.ones(len(clfs))
+        self.weights = (
+            ops.ones(len(clfs))
+            if self.weights is None
+            else ops.convert_to_tensor(self.weights)
+        )
+        self.weights /= ops.sum(self.weights)
         self.labels = labels
 
-    def _predict(self, X: np.ndarray) -> np.ndarray:
+    def _predict(self, X: KerasTensor) -> KerasTensor:
         """Collect results from clf.predict calls."""
         if not self.fit_base_estimators:
-            predictions = np.asarray([clf(X) for clf in self.clfs_]).T
-            # print(predictions.shape)
-            if predictions.shape[0] == 1:
+            log.info("Collection predictions from %s", self.clfs_)
+            predictions = ops.stack(clf.predict(X) for clf in self.clfs_)
+
+            if predictions.shape[2] == 1:
+                raise NotImplementedError(predictions, predictions.shape)
                 return self.activation(predictions[0], **self.activation_kwargs)
 
-            predictions = np.array([np.argmax(p, axis=1) for p in predictions.T])
-            return self.activation(predictions.T, **self.activation_kwargs)
+            predictions = ops.transpose(
+                ops.vectorized_map(lambda x: ops.argmax(x, axis=1), predictions),
+            )
 
-        return np.asarray([self.le_.transform(clf(X)) for clf in self.clfs_]).T
+            return self.activation(predictions, **self.activation_kwargs)
 
-    def _predict_probas(self, X) -> np.ndarray:
+        log.info("Collection predictions from %s w/ fit_base_estimators", self.clfs_)
+        return ops.transpose([self.le_.transform(clf.predict(X)) for clf in self.clfs_])
+
+    def _predict_probas(self, X) -> KerasTensor:
         """Collect results from clf.predict_proba calls."""
         probas = [clf(X, training=False) for clf in self.clfs_]
-        probas = [np.dot(c, w) for c, w in zip(probas, self.weights)]
-        probas = np.sum(probas, axis=0) / len(self.clfs_)
+        probas = [ops.dot(c, w) for c, w in zip(probas, self.weights)]
+        probas = ops.divide(ops.sum(probas, axis=0), len(self.clfs_))
         return normalize(probas, axis=1, norm="l1")
 
-    def predict(self, X: np.ndarray, dtype: str = "") -> np.ndarray:
+    def predict(
+        self, X: KerasTensor, dtype: str = "", with_Y=False
+    ) -> KerasTensor | Tuple[KerasTensor, KerasTensor]:
         """
         Predict class labels for X.
 
@@ -106,34 +121,33 @@ class MyEnsembleVoteClassifier(EnsembleVoteClassifier):
 
         """
         predictions = self.transform(X)
-        if hasattr(predictions, "numpy"):
-            predictions = predictions.numpy()
         if dtype:
-            predictions = predictions.astype(dtype)
+            predictions = ops.cast(predictions, dtype=dtype)
 
         if self.voting == "soft":
+            raise NotImplementedError("soft")
             print(predictions)
-            print(np.dot(predictions, self.weights))
-            maj = np.argmax(predictions, axis=1)
-
-        else:  # 'hard' voting
-            predictions = predictions.astype("int64")
-            maj = np.apply_along_axis(
-                lambda x: np.argmax(np.bincount(x, weights=self.weights)),
-                axis=1,
-                arr=predictions,
+            print(ops.dot(predictions, self.weights))
+            maj = ops.argmax(predictions, axis=1)
+        elif self.voting == "hard":
+            maj = ops.vectorized_map(
+                lambda x: ops.argmax(ops.bincount(x, minlength=predictions.shape[1])),
+                predictions,
             )
 
         if self.fit_base_estimators:
             maj = self.le_.inverse_transform(maj)
 
-        maj = pd.Series(maj)
+        maj = pd.Series(maj.cpu())
         if self.labels:
             maj.replace(dict(enumerate(self.labels)), inplace=True)
 
+        if with_Y:
+            return maj, predictions
+
         return maj
 
-    def scores(self, X, y, sample_weight=None) -> pd.Series:
+    def score(self, X, y, sample_weight=None, Y=None):
         """
         Return the mean accuracy on the given test data and labels.
 
@@ -157,28 +171,65 @@ class MyEnsembleVoteClassifier(EnsembleVoteClassifier):
         score : float
             Mean accuracy of ``self.predict(X)`` w.r.t. `y`.
         """
-        result = self._predict(X)
-        if hasattr(result, "numpy"):
-            result = result.numpy()
-        result = pd.DataFrame(result, columns=[c.name for c in self.clfs_])
+        if Y is not None:
+            return accuracy_score(y, Y, sample_weight=sample_weight)
+
+        return accuracy_score(y, self.predict(X), sample_weight=sample_weight)
+
+    def scores(
+        self, X, y, sample_weight=None, with_dataframe=False, with_Y=False
+    ) -> pd.Series | Tuple[pd.Series, pd.DataFrame]:
+        """
+        Return the mean accuracy on the given test data and labels.
+
+        In multi-label classification, this is the subset accuracy
+        which is a harsh metric since you require for each sample that
+        each label set be correctly predicted.
+
+        Parameters
+        ----------
+        X : array-like of shape (n_samples, n_features)
+            Test samples.
+
+        y : array-like of shape (n_samples,) or (n_samples, n_outputs)
+            True labels for `X`.
+
+        sample_weight : array-like of shape (n_samples,), default=None
+            Sample weights.
+
+        Returns
+        -------
+        score : float
+            Mean accuracy of ``self.predict(X)`` w.r.t. `y`.
+        """
+        log.info("Predicting result")
+        Y, result = self.predict(X, with_Y=True)
+        result_df = pd.DataFrame(result.cpu(), columns=[c.name for c in self.clfs_])
+        result_df.name = "predict"
 
         if self.labels:
-            result.replace(dict(enumerate(self.labels)), inplace=True)
+            result_df.replace(dict(enumerate(self.labels)), inplace=True)
 
-        result = result.apply(
+        result = result_df.apply(
             lambda p: accuracy_score(y, p, sample_weight=sample_weight),
             axis="rows",
             raw=True,
             result_type="reduce",
         )
-        result["ensemble"] = self.score(X, y)
+        result["ensemble"] = self.score(X, y, Y=Y)
         result.name = "accuracy"
 
+        if with_Y and with_dataframe:
+            return result, result_df, Y
+        elif with_Y:
+            return result, Y
+        elif with_dataframe:
+            return result, result_df
         return result
 
     def generate_model(self) -> Model:
         """Converts/creates our ensemble as a single Model."""
-        if self.voting == "soft":
+        if self.voting != "hard":
             raise NotImplementedError("Cannot generate a 'soft' voting model")
 
         name = self.clfs_[0].name.replace("_1", "_ensemble")
@@ -195,7 +246,7 @@ class MyEnsembleVoteClassifier(EnsembleVoteClassifier):
         return Model(inputs=model_input, outputs=outputs, name=name)
 
     def save_model(self, file_path: str) -> None:
-        """Save the model to Tensorflow SavedModel or a single HDF5 file."""
+        """Save the model to Keras SavedModel."""
         return self.generate_model().save(file_path)
 
     def fit(self, X, y, sample_weight=None):
@@ -221,7 +272,7 @@ class MyEnsembleVoteClassifier(EnsembleVoteClassifier):
         self : object
 
         """
-        if isinstance(y, np.ndarray) and len(y.shape) > 1 and y.shape[1] > 1:
+        if isinstance(y, KerasTensor) and len(y.shape) > 1 and y.shape[1] > 1:
             raise NotImplementedError(
                 "Multilabel and multi-output classification is not supported."
             )
@@ -253,8 +304,7 @@ class MyEnsembleVoteClassifier(EnsembleVoteClassifier):
             self.clfs_ = self.clfs
 
         if self.fit_base_estimators:
-            if self.verbose > 0:
-                print("Fitting %d classifiers..." % (len(self.clfs)))
+            log.debug("Fitting %d classifiers...", (len(self.clfs)))
 
             for clf in self.clfs_:
                 if self.verbose > 0:
@@ -316,9 +366,7 @@ class MyEnsembleVoteClassifier(EnsembleVoteClassifier):
 
         return results
 
-    def find_weights(self, X, y, method="nelder-mead") -> Any:
-        X_train, X_val, y_train, y_val = train_test_split(X, y, test_size=0.25)
-
+    def find_weights(self, X_train, X_val, y_train, y_val, method="nelder-mead") -> Any:
         def function_to_minimize(weights):
             newclf = MyEnsembleVoteClassifier(
                 voting=self.voting,
@@ -344,12 +392,13 @@ class MyEnsembleVoteClassifier(EnsembleVoteClassifier):
 
         results = minimize(
             function_to_minimize,
-            self.weights,
-            # bounds=[(0, 5)] * len(self.clfs_),
+            self.weights.cpu(),
+            bounds=[(0, 1)] * len(self.clfs_),
             method=method,
+            constraints=({"type": "eq", "fun": lambda w: ops.sum(w) - 1}),
         )
 
-        self.weights = results["x"]
+        self.weights = results.x / sum(results.x)
 
         return results
 
@@ -364,7 +413,7 @@ class HardBinaryVote(Layer):
         dtype: str | None = None,
         dynamic: bool = False,
         vote_weights: Iterable[int] | Iterable[float] | None = None,
-        **kwargs
+        **kwargs,
     ):
         """
         Initialize the voting layer.
@@ -398,9 +447,9 @@ class HardBinaryVote(Layer):
         super().__init__(trainable, name, dtype, dynamic, **kwargs)
         self.vote_weights = None
         if vote_weights is not None:
-            self.vote_weights = tf.convert_to_tensor(vote_weights, name="votes")
+            self.vote_weights = ops.convert_to_tensor(vote_weights, name="votes")
 
-    def call(self, inputs: Any) -> tf.Tensor | Iterable[tf.Tensor]:
+    def call(self, inputs: Any) -> KerasTensor | Iterable[KerasTensor]:
         """
         Hard Binary Voting logic.
 
@@ -434,11 +483,11 @@ class HardBinaryVote(Layer):
         Returns:
             A tensor or list/tuple of tensors.
         """
-        inputs = K.transpose(inputs)
+        inputs = ops.transpose(inputs)
 
-        return K.tf.map_fn(
-            lambda z: K.cast(
-                K.argmax(K.tf.math.bincount(z, weights=self.vote_weights)), "int32"
+        return ops.vectorized_map(
+            lambda z: ops.cast(
+                ops.argmax(ops.bincount(z, weights=self.vote_weights)), "int32"
             ),  # noqa: E501
             inputs,
         )
@@ -447,7 +496,7 @@ class HardBinaryVote(Layer):
 class HardClassVote(HardBinaryVote):
     """Hard Classifer Voting Layer."""
 
-    def call(self, inputs: Any) -> tf.Tensor | Iterable[tf.Tensor]:
+    def call(self, inputs: Any) -> KerasTensor | Iterable[KerasTensor]:
         """
         Hard Classification Voting logic.
 
@@ -481,18 +530,19 @@ class HardClassVote(HardBinaryVote):
         Returns:
             A tensor or list/tuple of tensors.
         """
-        inputs = K.transpose(K.cast(K.argmax(inputs), "int32"))
+        inputs = ops.transpose(ops.cast(ops.argmax(inputs), "int32"))
 
-        return K.tf.map_fn(
-            lambda z: K.cast(
-                K.argmax(K.tf.math.bincount(z, weights=self.vote_weights)), "int32"
+        return ops.vectorized_map(
+            lambda z: ops.cast(
+                ops.argmax(ops.bincount(z, weights=self.vote_weights)), "int32"
             ),  # noqa: E501
             inputs,
         )
 
 
-@tf.__internal__.dispatch.add_dispatch_support
-def hard_activation(z: Any, threshold: float = 0.5) -> tf.Tensor:
+# TODO: Find a keras means for dispatch support
+# @tf.__internal__.dispatch.add_dispatch_support
+def hard_activation(z: Any, threshold: float = 0.5) -> KerasTensor:
     """
     Hard activation function based on a threshold.
 
@@ -511,7 +561,7 @@ def hard_activation(z: Any, threshold: float = 0.5) -> tf.Tensor:
     Returns:
         A Tensor where all values either 0 or 1 based on the threshold
     """
-    return K.cast(K.greater_equal(z, threshold), tf.dtypes.int32)
+    return ops.cast(ops.greater_equal(z, threshold), "int32")
 
 
 get_custom_objects().update(

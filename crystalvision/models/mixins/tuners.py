@@ -1,7 +1,9 @@
 from functools import cached_property
 import os
 import gc
+import math
 import shutil
+import logging
 
 import pandas as pd
 
@@ -10,6 +12,9 @@ from keras_tuner.src.engine.objective import MultiObjective
 from keras_tuner.tuners import BayesianOptimization, Hyperband, RandomSearch
 
 from crystalvision.models import MODEL_DIR
+
+
+log = logging.getLogger("tuners")
 
 
 class MyRandomSearch(RandomSearch):
@@ -82,6 +87,22 @@ class RandomSearchTunerMixin(TunerMixin):
 class MyHyperband(Hyperband):
     """Variation of HyperBand algorithm."""
 
+    # def _build_hypermodel(self, hp):
+    #     import sys
+    #     model = super()._build_hypermodel(hp)
+    #     log.debug(hp.values)
+    #     if "tuner/trial_id" in hp.values:
+    #         trial_id = hp.values["tuner/trial_id"]
+    #         # Load best checkpoint from this trial.
+    #         if backend.config.multi_backend():
+    #             model.build_from_config(
+    #                 load_json(self._get_build_config_fname(trial_id))
+    #             )
+    #         log.info(self._get_checkpoint_fname(trial_id))
+    #         sys.exit(1)
+    #         model.load_weights(self._get_checkpoint_fname(trial_id))
+    #     return model
+
     def run_trial(self, trial, *args, **kwargs):
         result = super().run_trial(trial, *args, **kwargs)
 
@@ -143,6 +164,11 @@ class HyperbandTunerMixin(TunerMixin):
     @cached_property
     def tuner(self) -> RandomSearch:
         """Hyperband search tuner."""
+        log.info(
+            "hyperband_iterations: %s",
+            self.MAX_TRIALS * (math.log(self.MAX_TRIALS, self.FACTOR) ** 2),
+        )
+
         return MyHyperband(
             self,
             objective=self.objective,
@@ -196,8 +222,8 @@ class MyBayesianOptimization(BayesianOptimization):
             try:
                 models.append(self.load_model(trial))
             except Exception as err:
-                print(err)
-                print(trial)
+                log.exception(err)
+                log.error(trial)
                 raise err
             finally:
                 backend.clear_session()

@@ -9,14 +9,16 @@ Todo:
 import os
 import argparse
 from pathlib import Path
+import logging
+from pprint import pformat
 
 import yaml
 import pandas as pd
 from keras.models import load_model
 
-SRC_DIR = Path(os.path.dirname(__file__), "..")
-MODEL_DIR = Path(SRC_DIR, "..", "data", "model")
-TEST_IMG_DIR = Path(MODEL_DIR, "..", "test")
+SRC_DIR = Path(os.path.dirname(__file__), "..").resolve()
+MODEL_DIR = Path(SRC_DIR, "..", "data", "model").resolve()
+TEST_IMG_DIR = Path(MODEL_DIR, "..", "test").resolve()
 
 try:
     from .mixins.compiles import BinaryMixin
@@ -26,6 +28,9 @@ except ImportError:
     from crystalvision.models.mixins.compiles import BinaryMixin
     from crystalvision.models.base import CardModel
     from crystalvision.data.dataset import imagine_database, make_database
+
+
+log = logging.getLogger("crystalvision")
 
 
 def tune_model(
@@ -70,6 +75,13 @@ def tune_model(
     if not args.tune.exists():
         raise FileNotFoundError(str(args.tune.resolve()))
 
+    logging.basicConfig(
+        level=logging.DEBUG if args.verbose else logging.INFO,
+        format="[%(asctime)s] %(levelname)s [%(name)s] %(message)s",  # .%(funcName)s:%(lineno)d
+        datefmt="%d/%b/%Y %H:%M:%S",
+        encoding="utf-8",
+    )
+
     with args.tune.open("r") as fp:
         tune_data = yaml.safe_load(fp)
         if "image_shape" in tune_data:
@@ -79,7 +91,8 @@ def tune_model(
                 img_shape["width"],
                 img_shape["dimesion"],
             )
-    print(tune_data)
+
+    log.debug("Tune data:\r%s", pformat(tune_data))
 
     df = imagine_database(
         image=tune_data.get("image_type", "thumbs"), clear_extras=True
@@ -96,7 +109,7 @@ def tune_model(
 
     null_vdf = vdf[vdf["name_en"].isna()]
     if not null_vdf.empty:
-        print(null_vdf)
+        log.warning(null_vdf)
         raise ValueError("There are null values in test dataset")
 
     m = model(df, vdf, **tune_data)
@@ -106,15 +119,18 @@ def tune_model(
         m.save_multilabels()
 
     if args.verbose:
-        print(vdf)
+        log.debug("vdf:\n%s", vdf)
         if isinstance(m, BinaryMixin):
-            print(
+            log.debug(
+                "vdf stratified code:\n%s",
                 vdf.query("@m.feature_key == True")
                 .groupby(m.stratify_cols)
-                .count()["code"]
+                .count()["code"],
             )
         else:
-            print(vdf.groupby(m.stratify_cols).count()["code"])
+            log.debug(
+                "vdf stratifed code:\n%s", vdf.groupby(m.stratify_cols).count()["code"]
+            )
 
     m.tune_and_save(
         num_models=args.num, random_state=args.random_state, save_models=save_models

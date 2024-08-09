@@ -10,10 +10,10 @@ Todo:
     * N/A
 
 """
-import os
 import json
 import array
 import pickle
+import logging
 from pathlib import Path
 from typing import Tuple, List, Any, Set
 from functools import partial, cached_property
@@ -72,9 +72,17 @@ if backend.backend() == "tensorflow":
 
     ResourceExhaustedError = tf.errors.ResourceExhaustedError
 else:
+    from torch.onnx import export as export_onnx
+    from torch import randn
+    import onnx
+    from onnxsim import simplify
+
     # TODO: Find the real equivalents
     ResourceExhaustedError = ResourceWarning
     InvalidArgumentError = ArithmeticError
+
+
+log = logging.getLogger("models")
 
 
 class MyEncoder(json.JSONEncoder):
@@ -342,19 +350,43 @@ class CardModel(HyperModel):
         )
 
         for idx, (bm, bt) in enumerate(zip(best_models, best_trials)):
-            print(bm.name, f"trial_{bt.trial_id}", bt.score)
-            print(bm.summary())
+            log.info("%s\ttrial_%s\t%s", bm.name, bt.trial_id, bt.score)
+            log.info(bm.summary())
+            onnx_model_fp = (MODEL_DIR / f"{self.name}_{idx + 1}.onnx").resolve()
+            keras_model_fp = (MODEL_DIR / f"{self.name}_{idx + 1}.keras").resolve()
+            log.info("saving %s", onnx_model_fp)
+            bm.save(keras_model_fp)
             if backend.backend() == "tensorflow":
                 bm.output_names = None
                 spec = (
                     tf.TensorSpec((None, *self.IMAGE_SHAPE), tf.float32, name="input"),
                 )
-                onnx_model, _ = tf2onnx.convert.from_keras(bm, spec)
-                onnx.save(
-                    onnx_model, os.path.join(MODEL_DIR, f"{self.name}_{idx + 1}.onnx")
-                )
+                onnx_model, check = tf2onnx.convert.from_keras(bm, spec)
             else:
-                bm.save(os.path.join(MODEL_DIR, f"{self.name}_{idx + 1}.keras"))
+                dynamic_axes = {
+                    "inputs": {0: "batch_size"},
+                    "output": {0: "batch_size"},
+                }
+                example_input = randn(bm.input_shape)
+                export_onnx(
+                    bm,
+                    example_input,
+                    onnx_model_fp,
+                    dynamic_axes=dynamic_axes,
+                    input_names=["inputs"],
+                    output_names=["output"],
+                )
+                log.info("Exported PyTorch %s", bm)
+                # onnx_model = jit.trace(bm, example_input)
+                onnx_model = onnx.load(onnx_model_fp)
+                onnx_model, check = simplify(onnx_model)
+
+            if not check:
+                log.warning("Could not simply %s", bm)
+            else:
+                log.info("%s was simplified", bm)
+
+            onnx.save(onnx_model, onnx_model_fp)
 
     def fit(
         self,

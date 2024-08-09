@@ -389,7 +389,6 @@ class CustomDataset(IterableDataset):
         worker_info = torch.utils.data.get_worker_info()
         for idx in range(worker_info.id, len(self), worker_info.num_workers):
             yield self.preprocess_image(self.paths[idx]), self.labels[idx]
-        # print(worker_info, cache)
 
     def batch(self, batch_size: int):
         return DataLoader(

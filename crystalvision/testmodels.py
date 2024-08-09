@@ -15,44 +15,37 @@ Todo:
 
 """
 import json
-import os
-from glob import iglob
+import logging
 from typing import Tuple
 
+import swifter
 import numpy as np
 import pandas as pd
-import tensorflow as tf
 from keras.models import load_model
 from PIL import Image
 from skimage.io import imread
+from skimage.transform import resize as imresize
 from sklearn.metrics import accuracy_score
+from sklearn.model_selection import train_test_split
 from scipy.optimize import minimize
 from scipy.optimize._minimize import MINIMIZE_METHODS
 
 from crystalvision.data.base import DATA_DIR
-from crystalvision.data.dataset import make_database
+from crystalvision.data.dataset import make_database, paths_and_labels_to_dataset
 from crystalvision.models.base import MODEL_DIR
-from crystalvision.models.ensemble import hard_activation, MyEnsembleVoteClassifier
+from crystalvision.models.ext.ensemble import hard_activation, MyEnsembleVoteClassifier
 
 
-CATEGORIES: Tuple[str] = (
-    "name_en",
-    "element",
-    "type_en",
-    "cost",
-    "power",
-    "ex_burst",
-    "multicard",
-    "limit_break",
-    "mono",
-)
-IMAGE_DF: pd.DataFrame = pd.read_json(
-    os.path.join(os.path.dirname(__file__), "testmodels.json")
-)
-# print(IMAGE_DF)
+swifter.set_defaults(force_parallel=True)
+
+log = logging.getLogger()
+
+IMAGE_DF: pd.DataFrame = pd.read_json(DATA_DIR / "testmodels.json")
 
 
-def load_image(url: str, img_fname: str = "") -> np.ndarray:
+def load_image(
+    url: str, img_fname: str = "", resize: Tuple[int, int] | None = None
+) -> np.ndarray:
     """
     Load image (and cache it).
 
@@ -68,24 +61,34 @@ def load_image(url: str, img_fname: str = "") -> np.ndarray:
         img_fname = url.split("/")[-1]
         img_fname = img_fname.split("%2F")[-1]
 
-    dst = os.path.join(DATA_DIR, "test")
-    if not os.path.exists(dst):
-        os.makedirs(dst)
+    dst = DATA_DIR / "test" / img_fname
+    log.debug("Loading %s", dst)
+    dst.parent.mkdir(parents=True, exist_ok=True)
 
-    dst = os.path.join(dst, img_fname)
-    if os.path.exists(dst):
-        data = imread(dst)[:, :, :3]
+    if dst.exists():
+        data = imread(dst)
+        if resize:
+            data = imresize(data, resize, anti_aliasing=True, preserve_range=True)
+        data = data[:, :, :3]
         return data * (1.0 / 255)
 
     if url.startswith("blob:"):
         url = url[5:]
     data = imread(url)
+    log.info("Downloading %s", url)
     if img_fname.endswith(".jpg"):
         Image.fromarray(data).convert("RGB").save(dst)
     else:
         Image.fromarray(data).save(dst)
 
+    if resize:
+        data = imresize(data, resize, anti_aliasing=True, preserve_range=True)
+
     return data[:, :, :3] * (1.0 / 255)
+
+
+def apply_load_image(row: pd.Series) -> np.ndarray:
+    return load_image(row["uri"], f"{row.name}.jpg", resize=(250, 179))
 
 
 def find_threshold(X, y_true, labels, method="nelder-mead"):
@@ -124,7 +127,7 @@ def find_threshold(X, y_true, labels, method="nelder-mead"):
     return best_threshold
 
 
-def test_models() -> pd.DataFrame:
+def test_models(margs) -> pd.DataFrame:
     """
     Run all models and apply values in the dataframe.
 
@@ -132,6 +135,7 @@ def test_models() -> pd.DataFrame:
         ImageData dataframe with yhat(s)
     """
     df: pd.DataFrame = IMAGE_DF.copy().set_index("code")
+    missing_cards = set(df.index.unique())
     cols = [
         "name_en",
         "element",
@@ -144,108 +148,200 @@ def test_models() -> pd.DataFrame:
     ]
     mdf: pd.DataFrame = make_database().set_index("code")[cols]
     df = df.merge(mdf, on="code", how="left", sort=False)
-    # df['ex_burst'] = df['ex_burst'].astype('uint8')
-    # df['multicard'] = df['multicard'].astype('uint8')
-    # df["mono"] = df["element"].apply(lambda i: len(i) == 1 if i else True).astype(bool)
+    missing_cards = missing_cards - set(df.index.unique())
+    if missing_cards:
+        log.warning("missing cards:\n%s", missing_cards)
 
     df["uid"] = range(df.shape[0])
-    df["images"] = df.apply(
-        lambda x: tf.image.resize(load_image(x["uri"], f"{x['uid']}.jpg"), (250, 179)),
-        axis=1,
-    )
-
+    df["path"] = df["uid"].apply(lambda x: str(DATA_DIR / "test" / f"{x}.jpg"))
+    df.set_index("uid", inplace=True)
     df.query("full_art != 1 and focal == 1", inplace=True)
-    IMAGES = np.array(df.pop("images").tolist())
 
-    df.drop(["uid", "uri"], axis=1, inplace=True)
-    print(df)
-
-    if not os.path.exists(MODEL_DIR):
+    if not MODEL_DIR.exists():
         raise FileNotFoundError(f"Cannot find '{MODEL_DIR}', skipping")
 
-    for category in CATEGORIES:
-        label_fname = os.path.join(MODEL_DIR, f"{category}.json")
-        if not os.path.exists(label_fname):
-            print(f"Cannot find {label_fname}, skipping...")
+    for category in margs.models:
+        label_fname = (MODEL_DIR / f"{category}.json").resolve()
+        if not label_fname.exists():
+            log.warning("Cannot find %s, skipping...", label_fname)
             continue
 
         with open(label_fname) as fp:
             labels = json.load(fp)
 
-        models = [
-            load_model(mpath)
-            for mpath in iglob(str(MODEL_DIR) + os.sep + f"{category}_*.h5")
-            if "_model" not in mpath
-        ]
-        # ensemble_path = os.path.join(MODEL_DIR, f"{category}_ensemble.h5")
-        if len(models) > 1:
-            # if os.path.exists(ensemble_path):
-            #   model = tf.keras.models.load_model(ensemble_path)
-            #   x = model(IMAGES, training=False)
-            #   if category != "Ex_Burst":
-            #       x = [labels[y] for y in x]
-            # else:
-            if category in ("ex_burst", "multicard", "mono"):
-                voting = MyEnsembleVoteClassifier(
-                    models,
-                    labels=labels,
-                    activation=hard_activation,
-                    activation_kwargs={"threshold": 0.0},
-                )
-                x = voting.predict(IMAGES, "uint8")
-                print(voting.find_activation(IMAGES, df[category]))
-            else:
-                voting = MyEnsembleVoteClassifier(models, labels=labels)
-                x = voting.predict(IMAGES)
-            # print(voting._predict(IMAGES))
-            # print(df[category])
-            # labels = df[category].apply(lambda x: labels[x])
-            # print(voting._predict(IMAGES))
-            # print(voting.find_weights(IMAGES, df[category]))
-            scores = voting.scores(IMAGES, df[category])
-            print(scores)
-            # voting.save_model(ensemble_path)
-            x = x.to_numpy()
-        else:
-            # print(models[0].summary())
-            # print(models[0](IMAGES, training=False))
-            x = models[0].predict(IMAGES)
-            # print(x)
-            df[f"{category}_yhat"] = x
-            sample_size = min(df[category].value_counts())
-            data = df[[category, f"{category}_yhat"]].groupby(category)
-            print(data.min(), data.max())
-            data = data.sample(sample_size)
-            print(data)
-            threshold = find_threshold(data[f"{category}_yhat"], data[category], labels)
-            print(threshold)
-            # x = [labels[np.argmax(y)] for y in x]
-            x = [labels[y[0]] for y in hard_activation(x, threshold=threshold)]
+        ensemble_fp = MODEL_DIR / f"{category}_ensemble.keras"
+        if not ensemble_fp.exists():
+            log.warning("Creating ensemble: %s", ensemble_fp)
 
-        df[f"{category}_yhat"] = x
-        # if len(labels) <= 2: df[f"{category}_yhat"] = df[f"{category}_yhat"].astype('UInt8')
+            models = [
+                load_model(mpath) for mpath in MODEL_DIR.glob(f"{category}_*.keras")
+            ]
+            assert len(models) > 1, f"Not enough models found ({category})"
+
+            voting = MyEnsembleVoteClassifier(
+                models,
+                labels=labels,
+                voting=margs.voting,
+                activation=hard_activation if margs.hard_activation else None,
+                activation_kwargs={"threshold": 0.0} if margs.hard_activation else None,
+            )
+
+            df[category] = pd.Categorical(df[category], categories=labels)
+
+            ds = paths_and_labels_to_dataset(
+                image_paths=df["path"].tolist(),
+                image_size=(250, 179),
+                num_channels=3,
+                labels=df[category],
+                label_mode="categorical",  # pylint: disable=E1101
+                num_classes=len(labels),
+                data_format="channels_last",
+            )
+
+            # dtype = ""
+            # if category in ("ex_burst", "multicard", "limit_break", "mono"):
+            #     dtype = "uint8"
+
+            # x = voting.predict(ds, dtype=dtype)
+            # print(voting.find_activation(IMAGES, df[category]))
+            pre_score, models_predict, y_hat = voting.scores(
+                ds.batch(256), ds.labels, with_dataframe=True, with_Y=True
+            )
+            log.info("Prediction Scores:\n%s", pre_score)
+            log.info("Prediction DF:\n%s", models_predict)
+
+            df[f"{category}_yhat"] = pd.Categorical(y_hat, categories=labels)
+            mismatches = ~(df[category] == df[f"{category}_yhat"])
+            mismatches = df[mismatches]
+            print(mismatches)
+
+            disagreements = ~models_predict.apply(
+                lambda row: row.nunique() == 1, axis=1
+            )
+            disagreements = models_predict[disagreements]
+            log.info("Disagreements DF:\n%s", disagreements)
+
+            if not disagreements.empty:
+                dis_df = df.iloc[disagreements.index]
+                log.info("Disagreements:\n%s", dis_df)
+
+                X_train, X_test, y_train, y_test = train_test_split(
+                    dis_df["path"],
+                    dis_df[category],
+                    test_size=0.25,
+                    # stratify=dis_df[["element", "type_en"]],
+                    random_state=23,
+                )
+                print(y_train)
+
+                X_train = paths_and_labels_to_dataset(
+                    image_paths=X_train.tolist(),
+                    image_size=(250, 179),
+                    num_channels=3,
+                    labels=y_train,
+                    label_mode="categorical",  # pylint: disable=E1101
+                    num_classes=len(labels),
+                    data_format="channels_last",
+                )
+
+                X_test = paths_and_labels_to_dataset(
+                    image_paths=X_test.tolist(),
+                    image_size=(250, 179),
+                    num_channels=3,
+                    labels=y_test,
+                    label_mode="categorical",  # pylint: disable=E1101
+                    num_classes=len(labels),
+                    data_format="channels_last",
+                )
+
+                dis_ds = paths_and_labels_to_dataset(
+                    image_paths=dis_df["path"].tolist(),
+                    image_size=(250, 179),
+                    num_channels=3,
+                    labels=dis_df[category],
+                    label_mode="categorical",  # pylint: disable=E1101
+                    num_classes=len(labels),
+                    data_format="channels_last",
+                )
+
+                pre_score = voting.scores(dis_ds.batch(256), dis_ds.labels)
+                pre_weights = voting.weights.cpu()
+                print(
+                    voting.find_weights(
+                        X_train.batch(256), X_test.batch(256), y_train, y_test
+                    )
+                )
+                scores = voting.scores(dis_ds.batch(256), dis_ds.labels)
+                print(pre_score)
+                print(pre_weights)
+                print(scores)
+                print(voting.weights)
+
+            voting.save_model(ensemble_fp)
+
+        # ensemble_model = load_model(ensemble_fp)
+        # # print(models[0].summary())
+        # # print(models[0](IMAGES, training=False))
+        # x = ensemble_model.predict(IMAGES)
+        # # print(x)
+        # df[f"{category}_yhat"] = x
+        # sample_size = min(df[category].value_counts())
+        # data = df[[category, f"{category}_yhat"]].groupby(category)
+        # print(data.min(), data.max())
+        # data = data.sample(sample_size)
+        # print(data)
+        # threshold = find_threshold(data[f"{category}_yhat"], data[category], labels)
+        # print(threshold)
+        # # x = [labels[np.argmax(y)] for y in x]
+        # x = [labels[y[0]] for y in hard_activation(x, threshold=threshold)]
+
+        # df[f"{category}_yhat"] = x
+        # # if len(labels) <= 2: df[f"{category}_yhat"] = df[f"{category}_yhat"].astype('UInt8')
 
     return df
 
 
-def main() -> None:
+def main(margs) -> None:
     """Test the various models."""
-    df = test_models().reset_index()
+    log.info("woo")
+    df = test_models(margs).reset_index()
 
-    for category in CATEGORIES:
+    for category in margs.models:
         key = f"{category}_yhat"
         if key not in df:
             continue
         comp = df[category] == df[key]
         comp = comp.value_counts(normalize=True)
-        # print(comp)
 
         print(f"{category} accuracy: {comp.get(True, 0.0) * 100}%")
-        # print(xf)
 
     df.sort_index(axis=1, inplace=True)
     print(df)
 
 
 if __name__ == "__main__":
-    main()
+    import argparse
+
+    parser = argparse.ArgumentParser(description="Model tuning command-line tool")
+    parser.add_argument(
+        "--models", "-m", type=str, nargs="+", default=["type_en"], help="The models"
+    )
+    parser.add_argument("--voting", type=str, default="hard", help="The voting type")
+    parser.add_argument(
+        "--hard-activation", action="store_true", help="Use hard_activation"
+    )
+    parser.add_argument(
+        "--verbose", "-v", action="store_true", help="Enable verbose mode"
+    )
+
+    args = parser.parse_args()
+    print(args)
+
+    logging.basicConfig(
+        level=logging.DEBUG if args.verbose else logging.INFO,
+        format="[%(asctime)s] %(levelname)s [%(funcName)s] %(message)s",
+        datefmt="%d/%b/%Y %H:%M:%S",
+        encoding="utf-8",
+    )
+
+    main(args)

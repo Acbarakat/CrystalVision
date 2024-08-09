@@ -23,6 +23,7 @@ aiofiles = ">=23.2.1"
 dogpile-cache = ">=1.3.1"
 opencv-contrib-python-headless = ">=4.9.0.80"
 gradio = "^4.39.0"
+swifter = {extras = ["groupby"], version = "^1.4.0"}
 
 [tool.poetry.group.torch.dependencies]
 nvidia-cublas-cu12 = {version=">=12.1.3.1", source="nvidia"}

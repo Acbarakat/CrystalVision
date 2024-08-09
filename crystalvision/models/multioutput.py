@@ -21,7 +21,8 @@ except ImportError:
 class MultiLabel(HyperbandTunerMixin, MultiLabelCardModel):
     """Multilabel for all of a Card's labels."""
 
-    MAX_TRIALS: int = 100
+    MAX_TRIALS: int = 50
+    FACTOR = 15
     DEFAULT_EPOCHS: int = 50
 
     def __init__(self, df: DataFrame, vdf: DataFrame, **kwargs) -> None:
@@ -30,7 +31,15 @@ class MultiLabel(HyperbandTunerMixin, MultiLabelCardModel):
             df,
             vdf,
             ["type_en", "cost", "element_v2", "power", "icons"],
-            ["type_en", "cost", "element", "power", "ex_burst", "multicard"],
+            [
+                "type_en",
+                "cost",
+                "element",
+                "power",
+                "ex_burst",
+                "multicard",
+                "limit_break",
+            ],
             **kwargs
         )
 

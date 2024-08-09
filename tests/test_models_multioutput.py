@@ -1,3 +1,4 @@
+import os
 import json
 import pickle
 from pathlib import Path
@@ -6,6 +7,11 @@ import numpy as np
 import pandas as pd
 import pytest
 import cv2
+
+try:
+    import tensorflow  # noqa: F401
+except ModuleNotFoundError:
+    os.environ["KERAS_BACKEND"] = "torch"
 
 
 pd.set_option("display.max_columns", None)
@@ -84,11 +90,11 @@ def mlb():
 @pytest.mark.parametrize(
     "key, start, end",
     [
-        ("type_en", 0, 4),
-        ("cost", 4, 15),
-        ("power", 23, 34),
-        ("icons", 34, 37),
-        ("element_v2", 15, 23),
+        ("type_en", 0, 5),
+        ("cost", 5, 17),
+        ("power", 26, 38),
+        ("icons", 38, 42),
+        ("element_v2", 17, 26),
     ],
 )
 @pytest.mark.parametrize(

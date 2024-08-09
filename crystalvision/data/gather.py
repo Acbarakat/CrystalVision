@@ -17,6 +17,7 @@ import asyncio
 import json
 import os
 import typing
+import logging
 from io import BytesIO
 
 from tqdm.asyncio import tqdm
@@ -35,6 +36,8 @@ except ImportError:
         CARD_API_FILEPATH,
         DATA_DIR,
     )
+
+log = logging.getLogger("gather")
 
 
 def download_and_save() -> dict:
@@ -88,7 +91,7 @@ def download_and_save() -> dict:
 
     if duplicates:
         for d, code in duplicates[::-1]:
-            print(f"Found duplicate: {code}")
+            log.warning("Found duplicate: %s", code)
             del data["cards"][d]
 
     if not os.path.exists(DATA_DIR):
@@ -136,7 +139,7 @@ async def download_image(
             content = await resp.read()
 
             if resp.status == 404:
-                print(f"Failed to download {img_url}")
+                log.error("Failed to download %s", img_url)
                 return
 
     p = ImageFile.Parser()
@@ -251,7 +254,7 @@ async def main(pargs) -> None:
             )
 
     # Remainder of Cards
-    print(df)
+    log.info("df:\n%s", df)
 
     with open(CARD_API_FILEPATH, "w+") as fp:
         json.dump(data, fp, indent=4)

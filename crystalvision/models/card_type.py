@@ -57,7 +57,7 @@ class CardTyping(CategoricalMixin, BayesianOptimizationTunerMixin, CardModel):
         Returns:
             A model instance.
         """
-        batch_size = hp.Choice("batch_size", values=[16, 32, 64, 128, 256, 512])  # noqa
+        batch_size = hp.Choice("batch_size", values=[32, 64, 128])  # noqa
 
         pl1 = self._pooling2d_choice("pooling1", hp)[1]
         pl2 = self._pooling2d_choice("pooling2", hp)[1]
@@ -78,7 +78,7 @@ class CardTyping(CategoricalMixin, BayesianOptimizationTunerMixin, CardModel):
                 layers.Dropout(0.2, seed=seed),
                 # layers.Dense(hp.Int('dense_units', min_value=128, max_value=512, step=128), activation='relu'),
                 layers.Dense(128, activation="relu"),
-                layers.Dense(len(self.labels), activation="softmax"),
+                layers.Dense(len(self.labels), activation="softmax", name="result"),
             ],
             name=self.name,
         )
