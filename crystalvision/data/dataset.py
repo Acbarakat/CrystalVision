@@ -407,7 +407,8 @@ def paths_and_labels_to_dataset_torch(
     interpolation="bilinear",
     **kwargs,
 ):
-    interpolation = InterpolationMode[interpolation.upper()]
+    if isinstance(interpolation, str):
+        interpolation = InterpolationMode[interpolation.upper()]
 
     return CustomDataset(image_paths, image_size, labels, interpolation=interpolation)
 

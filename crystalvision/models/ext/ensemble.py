@@ -4,10 +4,10 @@ from typing import Any, Callable, List, Iterable, Tuple
 
 import pandas as pd
 from scipy.optimize import minimize
-from keras import ops, KerasTensor, activations
-from keras.layers import Activation, Flatten, Input, Layer
-from keras.models import Model
-from keras.saving import get_custom_objects
+from keras import ops, KerasTensor, activations, initializers
+from keras.src.layers import Activation, Flatten, Input, Layer
+from keras.src.models import Model
+from keras.src.saving import get_custom_objects
 from mlxtend.classifier import EnsembleVoteClassifier
 from mlxtend.externals.name_estimators import _name_estimators
 from sklearn.metrics import accuracy_score
@@ -232,11 +232,13 @@ class MyEnsembleVoteClassifier(EnsembleVoteClassifier):
         if self.voting != "hard":
             raise NotImplementedError("Cannot generate a 'soft' voting model")
 
-        name = self.clfs_[0].name.replace("_1", "_ensemble")
+        name = self.clfs_[0].name
+        name = name.replace(name.split("_")[-1], "ensemble")
         model_input = Input(shape=self.clfs_[0].input_shape[1:])
         y_models = [model(model_input, training=False) for model in self.clfs_]
 
         active = self.activation(y_models, **self.activation_kwargs)
+
         if self.clfs_[0].output_shape[1] == 1:
             flatten = Flatten()(active)
             outputs = HardBinaryVote(vote_weights=self.weights)(flatten)
@@ -408,46 +410,73 @@ class HardBinaryVote(Layer):
 
     def __init__(
         self,
-        trainable: bool = False,
-        name: str = "hard_vote",
+        *,
+        activity_regularizer=None,
+        trainable=True,
         dtype: str | None = None,
-        dynamic: bool = False,
+        autocast=True,
+        name: str = "hard_vote",
         vote_weights: Iterable[int] | Iterable[float] | None = None,
+        labelcount: int | None = 0,
         **kwargs,
     ):
-        """
-        Initialize the voting layer.
+        super().__init__(
+            activity_regularizer=activity_regularizer,
+            trainable=trainable,
+            dtype=dtype,
+            autocast=autocast,
+            name=name,
+        )
 
-        Args:
-            trainable (bool, optional): Whether the layer should be trained,
-                i.e. whether its potentially-trainable weights should be
-                returned as part of`layer.trainable_weights`.
-                (default is False)
-            name (str | None, optional): The name of the layer.
-                (defaults is "hard_vote")
-            dtype (_type_, optional): The dtype of the layer's computations
-                and weights. Can also be a `tf.keras.mixed_precision.Policy`,
-                which allows the computation and weight dtype to differ.
-                Default of `None` means to use
-                `tf.keras.mixed_precision.global_policy()`, which is a float32
-                policy unless set to different value.
-                (defaults is None)
-            dynamic (bool, optional): Set this to `True` if your layer should
-                only be run eagerly, and should not be used to generate a
-                static computation graph. This would be the case for a Tree-RNN
-                or a recursive network, for example, or generally for any layer
-                that manipulates tensors using Python control flow. If `False`,
-                we assume that the layer can safely be used to generate a
-                static computation graph.
-                (defaults is False)
-            vote_weights (Any | None, optional): The inital voting weights.
-                If `None`, the default tensor will be filled with 1s.
-                (defaults is None)
-        """
-        super().__init__(trainable, name, dtype, dynamic, **kwargs)
         self.vote_weights = None
         if vote_weights is not None:
-            self.vote_weights = ops.convert_to_tensor(vote_weights, name="votes")
+            self.vote_weights = ops.convert_to_numpy(vote_weights)
+        self.labelcount = labelcount
+
+    def build(self, input_shape):
+        super().build(input_shape)
+
+        if isinstance(input_shape, list):
+            if isinstance(input_shape[1], tuple):
+                input_shape = (len(input_shape), *input_shape[1])
+            else:
+                input_shape = (len(input_shape), *input_shape)
+
+        vote_weights_init = self.vote_weights
+        if vote_weights_init is None:
+            vote_weights_init = ops.divide(ops.ones(input_shape[0]), input_shape[0])
+
+        self.vote_weights = self.add_weight(
+            shape=(input_shape[0],),
+            initializer=initializers.Zeros,
+            trainable=self.trainable,
+            name="vote_weights",
+        )
+        self.vote_weights.assign_add(vote_weights_init)
+
+        labelcount_init = self.labelcount
+        self.labelcount = self.add_variable(
+            shape=(1,),
+            initializer=initializers.Zeros,
+            dtype="int64",
+            trainable=False,
+            name="labelcount",
+        )
+        if labelcount_init:
+            self.labelcount.assign_add(labelcount_init)
+        else:
+            self.labelcount.assign_add(input_shape[2])
+
+    def get_config(self):
+        config = super().get_config()
+        config.update(
+            {
+                "vote_weights": ops.convert_to_numpy(self.vote_weights.value).tolist(),
+                "labelcount": int(self.labelcount.value[0]),
+            }
+        )
+
+        return config
 
     def call(self, inputs: Any) -> KerasTensor | Iterable[KerasTensor]:
         """
@@ -483,14 +512,17 @@ class HardBinaryVote(Layer):
         Returns:
             A tensor or list/tuple of tensors.
         """
-        inputs = ops.transpose(inputs)
+        if isinstance(inputs, list):
+            inputs = ops.stack(inputs)
 
-        return ops.vectorized_map(
+        inputs = ops.vectorized_map(
             lambda z: ops.cast(
-                ops.argmax(ops.bincount(z, weights=self.vote_weights)), "int32"
+                ops.bincount(z, minlength=2, weights=self.vote_weights), "uint8"
             ),  # noqa: E501
-            inputs,
+            ops.transpose(inputs),
         )
+
+        return ops.argmax(inputs, axis=1)
 
 
 class HardClassVote(HardBinaryVote):
@@ -530,14 +562,18 @@ class HardClassVote(HardBinaryVote):
         Returns:
             A tensor or list/tuple of tensors.
         """
-        inputs = ops.transpose(ops.cast(ops.argmax(inputs), "int32"))
+        if isinstance(inputs, list):
+            inputs = ops.stack(inputs)
 
-        return ops.vectorized_map(
-            lambda z: ops.cast(
-                ops.argmax(ops.bincount(z, weights=self.vote_weights)), "int32"
-            ),  # noqa: E501
-            inputs,
+        inputs = ops.vectorized_map(lambda z: ops.argmax(z, axis=1), inputs)
+
+        inputs = ops.vectorized_map(
+            lambda z: ops.bincount(
+                z, minlength=int(self.labelcount.value), weights=self.vote_weights
+            ),
+            ops.transpose(inputs),
         )
+        return ops.argmax(inputs, axis=1)
 
 
 # TODO: Find a keras means for dispatch support

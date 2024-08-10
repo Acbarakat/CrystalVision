@@ -18,7 +18,6 @@ import json
 import logging
 from typing import Tuple
 
-import swifter
 import numpy as np
 import pandas as pd
 from keras.models import load_model
@@ -35,8 +34,6 @@ from crystalvision.data.dataset import make_database, paths_and_labels_to_datase
 from crystalvision.models.base import MODEL_DIR
 from crystalvision.models.ext.ensemble import hard_activation, MyEnsembleVoteClassifier
 
-
-swifter.set_defaults(force_parallel=True)
 
 log = logging.getLogger()
 
@@ -156,6 +153,7 @@ def test_models(margs) -> pd.DataFrame:
     df["path"] = df["uid"].apply(lambda x: str(DATA_DIR / "test" / f"{x}.jpg"))
     df.set_index("uid", inplace=True)
     df.query("full_art != 1 and focal == 1", inplace=True)
+    df = df.head(50)
 
     if not MODEL_DIR.exists():
         raise FileNotFoundError(f"Cannot find '{MODEL_DIR}', skipping")
@@ -169,8 +167,21 @@ def test_models(margs) -> pd.DataFrame:
         with open(label_fname) as fp:
             labels = json.load(fp)
 
+        df[category] = pd.Categorical(df[category], categories=labels)
+
+        ds = paths_and_labels_to_dataset(
+            image_paths=df["path"].tolist(),
+            image_size=(250, 179),
+            num_channels=3,
+            labels=df[category],
+            label_mode="categorical",  # pylint: disable=E1101
+            num_classes=len(labels),
+            data_format="channels_last",
+            interpolation=margs.interpolation,
+        )
+
         ensemble_fp = MODEL_DIR / f"{category}_ensemble.keras"
-        if not ensemble_fp.exists():
+        if not ensemble_fp.exists() or ensemble_fp.stat().st_size == 0:
             log.warning("Creating ensemble: %s", ensemble_fp)
 
             models = [
@@ -186,18 +197,6 @@ def test_models(margs) -> pd.DataFrame:
                 activation_kwargs={"threshold": 0.0} if margs.hard_activation else None,
             )
 
-            df[category] = pd.Categorical(df[category], categories=labels)
-
-            ds = paths_and_labels_to_dataset(
-                image_paths=df["path"].tolist(),
-                image_size=(250, 179),
-                num_channels=3,
-                labels=df[category],
-                label_mode="categorical",  # pylint: disable=E1101
-                num_classes=len(labels),
-                data_format="channels_last",
-            )
-
             # dtype = ""
             # if category in ("ex_burst", "multicard", "limit_break", "mono"):
             #     dtype = "uint8"
@@ -211,9 +210,10 @@ def test_models(margs) -> pd.DataFrame:
             log.info("Prediction DF:\n%s", models_predict)
 
             df[f"{category}_yhat"] = pd.Categorical(y_hat, categories=labels)
+
             mismatches = ~(df[category] == df[f"{category}_yhat"])
             mismatches = df[mismatches]
-            print(mismatches)
+            log.info("Mismatches DF:\n%s", mismatches[[category, f"{category}_yhat"]])
 
             disagreements = ~models_predict.apply(
                 lambda row: row.nunique() == 1, axis=1
@@ -221,18 +221,17 @@ def test_models(margs) -> pd.DataFrame:
             disagreements = models_predict[disagreements]
             log.info("Disagreements DF:\n%s", disagreements)
 
-            if not disagreements.empty:
+            if not disagreements.empty and margs.vote_minimize:
                 dis_df = df.iloc[disagreements.index]
-                log.info("Disagreements:\n%s", dis_df)
+                log.info("Disagreements:\n%s", dis_df[[category, f"{category}_yhat"]])
 
                 X_train, X_test, y_train, y_test = train_test_split(
                     dis_df["path"],
                     dis_df[category],
-                    test_size=0.25,
+                    test_size=0.1,
                     # stratify=dis_df[["element", "type_en"]],
                     random_state=23,
                 )
-                print(y_train)
 
                 X_train = paths_and_labels_to_dataset(
                     image_paths=X_train.tolist(),
@@ -242,6 +241,7 @@ def test_models(margs) -> pd.DataFrame:
                     label_mode="categorical",  # pylint: disable=E1101
                     num_classes=len(labels),
                     data_format="channels_last",
+                    interpolation=margs.interpolation,
                 )
 
                 X_test = paths_and_labels_to_dataset(
@@ -252,6 +252,7 @@ def test_models(margs) -> pd.DataFrame:
                     label_mode="categorical",  # pylint: disable=E1101
                     num_classes=len(labels),
                     data_format="channels_last",
+                    interpolation=margs.interpolation,
                 )
 
                 dis_ds = paths_and_labels_to_dataset(
@@ -262,6 +263,7 @@ def test_models(margs) -> pd.DataFrame:
                     label_mode="categorical",  # pylint: disable=E1101
                     num_classes=len(labels),
                     data_format="channels_last",
+                    interpolation=margs.interpolation,
                 )
 
                 pre_score = voting.scores(dis_ds.batch(256), dis_ds.labels)
@@ -277,15 +279,18 @@ def test_models(margs) -> pd.DataFrame:
                 print(scores)
                 print(voting.weights)
 
+            log.warning("Saving Model: %s", ensemble_fp)
             voting.save_model(ensemble_fp)
 
-        # ensemble_model = load_model(ensemble_fp)
-        # # print(models[0].summary())
-        # # print(models[0](IMAGES, training=False))
-        # x = ensemble_model.predict(IMAGES)
-        # # print(x)
-        # df[f"{category}_yhat"] = x
-        # sample_size = min(df[category].value_counts())
+        ensemble_model = load_model(ensemble_fp)
+        log.debug(ensemble_model.summary())
+
+        yhat = ensemble_model.predict(ds.batch(256))
+        log.debug("y_hat: %s", yhat)
+
+        df[f"{category}_yhat"] = pd.Categorical.from_codes(yhat, categories=labels)
+        log.debug("Y vs. y_hat:\n%s", df[[category, f"{category}_yhat"]])
+
         # data = df[[category, f"{category}_yhat"]].groupby(category)
         # print(data.min(), data.max())
         # data = data.sample(sample_size)
@@ -303,7 +308,6 @@ def test_models(margs) -> pd.DataFrame:
 
 def main(margs) -> None:
     """Test the various models."""
-    log.info("woo")
     df = test_models(margs).reset_index()
 
     for category in margs.models:
@@ -313,19 +317,32 @@ def main(margs) -> None:
         comp = df[category] == df[key]
         comp = comp.value_counts(normalize=True)
 
-        print(f"{category} accuracy: {comp.get(True, 0.0) * 100}%")
+        log.info("%s accuracy: %.2f%%", category, comp.get(True, 0.0) * 100)
 
-    df.sort_index(axis=1, inplace=True)
-    print(df)
+    # df.sort_index(axis=1, inplace=True)
+    # print(df)
 
 
 if __name__ == "__main__":
     import argparse
+    from keras import backend
+
+    if backend.backend() == "torch":
+        from torchvision.transforms.functional import InterpolationMode
 
     parser = argparse.ArgumentParser(description="Model tuning command-line tool")
     parser.add_argument(
         "--models", "-m", type=str, nargs="+", default=["type_en"], help="The models"
     )
+    parser.add_argument(
+        "--interpolation",
+        "-i",
+        type=InterpolationMode,
+        default=InterpolationMode.NEAREST_EXACT,
+        choices=list(InterpolationMode),
+        help="An up/downsampling method.",
+    )
+    parser.add_argument("--vote-minimize", action="store_true")
     parser.add_argument("--voting", type=str, default="hard", help="The voting type")
     parser.add_argument(
         "--hard-activation", action="store_true", help="Use hard_activation"
