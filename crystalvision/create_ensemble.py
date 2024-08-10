@@ -124,7 +124,7 @@ def find_threshold(X, y_true, labels, method="nelder-mead"):
     return best_threshold
 
 
-def test_models(margs) -> pd.DataFrame:
+def create_models(margs) -> pd.DataFrame:
     """
     Run all models and apply values in the dataframe.
 
@@ -152,8 +152,8 @@ def test_models(margs) -> pd.DataFrame:
     df["uid"] = range(df.shape[0])
     df["path"] = df["uid"].apply(lambda x: str(DATA_DIR / "test" / f"{x}.jpg"))
     df.set_index("uid", inplace=True)
-    df.query("full_art != 1 and focal == 1", inplace=True)
-    df = df.head(50)
+    if margs.data_filter:
+        df.query(margs.data_filter, inplace=True)
 
     if not MODEL_DIR.exists():
         raise FileNotFoundError(f"Cannot find '{MODEL_DIR}', skipping")
@@ -308,7 +308,7 @@ def test_models(margs) -> pd.DataFrame:
 
 def main(margs) -> None:
     """Test the various models."""
-    df = test_models(margs).reset_index()
+    df = create_models(margs).reset_index()
 
     for category in margs.models:
         key = f"{category}_yhat"
@@ -324,15 +324,25 @@ def main(margs) -> None:
 
 
 if __name__ == "__main__":
+    import yaml
     import argparse
+    from pathlib import Path
     from keras import backend
+    from crystalvision.models import SRC_DIR
 
     if backend.backend() == "torch":
         from torchvision.transforms.functional import InterpolationMode
 
     parser = argparse.ArgumentParser(description="Model tuning command-line tool")
     parser.add_argument(
-        "--models", "-m", type=str, nargs="+", default=["type_en"], help="The models"
+        "--config",
+        "-c",
+        type=Path,
+        help="The ensemble YAML file",
+        default=SRC_DIR / "models" / "ensemble.yml",
+    )
+    parser.add_argument(
+        "--models", "-m", type=str, nargs="+", default=[], help="The models"
     )
     parser.add_argument(
         "--interpolation",
@@ -348,11 +358,18 @@ if __name__ == "__main__":
         "--hard-activation", action="store_true", help="Use hard_activation"
     )
     parser.add_argument(
+        "--data-filter",
+        default="full_art != 1 and focal == 1",
+    )
+    parser.add_argument(
         "--verbose", "-v", action="store_true", help="Enable verbose mode"
     )
 
     args = parser.parse_args()
-    print(args)
+    args.config = args.config.resolve()
+
+    if not args.config.exists():
+        raise FileNotFoundError(str(args.config.resolve()))
 
     logging.basicConfig(
         level=logging.DEBUG if args.verbose else logging.INFO,
@@ -360,5 +377,12 @@ if __name__ == "__main__":
         datefmt="%d/%b/%Y %H:%M:%S",
         encoding="utf-8",
     )
+
+    with args.config.open("r") as fp:
+        for key, value in yaml.safe_load(fp).items():
+            if getattr(args, key) in (None, parser.get_default(key)):
+                setattr(args, key, value)
+
+    log.info(args)
 
     main(args)

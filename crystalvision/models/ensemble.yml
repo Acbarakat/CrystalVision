@@ -1,0 +1,4 @@
+models:
+  - multilabel
+vote_minimize: true
+verbose: true
