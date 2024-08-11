@@ -549,6 +549,7 @@ class MultiLabelCardModel(  # pylint: disable=W0223
         test_size: float = 0.2,
         one_hot_threshold: float = 0.95,
         image_shape: Tuple[int, int, int] | None = None,
+        reuse_labels: bool = True,
         **kwargs,
     ) -> None:
         self.name: str = name
@@ -563,12 +564,18 @@ class MultiLabelCardModel(  # pylint: disable=W0223
         self.feature_key: List[str] = feature_key
         self.stratify_cols: List[str] = stratify_cols
 
+        self.reuse_labels: bool = reuse_labels
+
         if labels:
             self.labels = labels
         else:
             self.labels: List[str] = []
             for fkey in self.feature_key:
-                labels = self.df[fkey].explode().unique()
+                col = self.df[fkey]
+                if pd.api.types.is_categorical_dtype(col):
+                    labels = col.cat.categories
+                else:
+                    labels = self.df[fkey].explode().unique()
                 labels = np.insert(labels, 0, f"null_{fkey}")
                 assert False not in [
                     isinstance(sub_label, str) for sub_label in labels
@@ -580,7 +587,11 @@ class MultiLabelCardModel(  # pylint: disable=W0223
         if generate_metrics:
             idx: int = 0
             for fkey in self.feature_key:
-                labels = self.df[fkey].explode().unique()
+                col = self.df[fkey]
+                if pd.api.types.is_categorical_dtype(col):
+                    labels = col.cat.categories
+                else:
+                    labels = self.df[fkey].explode().unique()
                 labels = np.insert(labels, 0, f"null_{fkey}")
                 self._metrics.append(
                     MyBinaryAccuracy(
@@ -609,7 +620,7 @@ class MultiLabelCardModel(  # pylint: disable=W0223
 
     def save_multilabels(self) -> None:
         mlb_file = Path(MODEL_DIR / self.name / f"{self.name}_mlb.pkl").resolve()
-        if not mlb_file.exists():
+        if not mlb_file.exists() or not self.reuse_labels:
             mlb = MyMultiLabelBinarizer(classes=self.labels)
 
             self.df_codes = mlb.fit_transform(
@@ -622,8 +633,9 @@ class MultiLabelCardModel(  # pylint: disable=W0223
             if not mlb_file.parent.exists():
                 mlb_file.parent.mkdir(parents=True)
 
-            with mlb_file.open("wb+") as f:
-                pickle.dump((mlb, self.df_codes, self.vdf_codes), f)
+            if self.reuse_labels:
+                with mlb_file.open("wb+") as f:
+                    pickle.dump((mlb, self.df_codes, self.vdf_codes), f)
         else:
             with mlb_file.open("rb") as f:
                 _, self.df_codes, self.vdf_codes = pickle.load(f)

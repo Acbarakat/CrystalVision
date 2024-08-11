@@ -85,10 +85,16 @@ def make_database(clear_extras: bool = False) -> pd.DataFrame:
         df["multicard"].apply(lambda i: i == "\u25cb" or i == "1").astype(bool)
     )
     df["limit_break"] = df["text_en"].str.contains("Limit Break --")
-    df["icons"] = df[["ex_burst", "multicard", "limit_break"]].apply(
+
+    icon_labels = ["multicard", "ex_burst", "limit_break"]
+    df["icons"] = df[icon_labels].apply(
         lambda row: tuple(row[row].index) if not row[row].index.empty else ("no_icon",),
         axis=1,
     )
+    df["icons"].astype(
+        pd.CategoricalDtype(categories=["no_icon"] + icon_labels, ordered=True)
+    )
+
     df["mono"] = df["element"].apply(lambda i: len(i) == 1 if i else True).astype(bool)
     df["element_v2"] = df["element"].apply(
         lambda x: tuple(x) if x is not None else tuple()

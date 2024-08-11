@@ -11,7 +11,6 @@ from keras.src.saving import get_custom_objects
 from mlxtend.classifier import EnsembleVoteClassifier
 from mlxtend.externals.name_estimators import _name_estimators
 from sklearn.metrics import accuracy_score
-from sklearn.preprocessing import normalize
 from sklearn.base import clone
 from sklearn.preprocessing import LabelEncoder
 from sklearn.model_selection import train_test_split
@@ -79,8 +78,8 @@ class MyEnsembleVoteClassifier(EnsembleVoteClassifier):
     def _predict(self, X: KerasTensor) -> KerasTensor:
         """Collect results from clf.predict calls."""
         if not self.fit_base_estimators:
-            log.info("Collection predictions from %s", self.clfs_)
-            predictions = ops.stack(clf.predict(X) for clf in self.clfs_)
+            log.debug("Collection predictions from %s", self.clfs_)
+            predictions = self._predict_probas(X)
 
             if predictions.shape[2] == 1:
                 raise NotImplementedError(predictions, predictions.shape)
@@ -92,15 +91,16 @@ class MyEnsembleVoteClassifier(EnsembleVoteClassifier):
 
             return self.activation(predictions, **self.activation_kwargs)
 
-        log.info("Collection predictions from %s w/ fit_base_estimators", self.clfs_)
-        return ops.transpose([self.le_.transform(clf.predict(X)) for clf in self.clfs_])
+        log.debug("Collection predictions from %s w/ fit_base_estimators", self.clfs_)
+        return ops.transpose([self.le_.transform(self._predict_probas(X))])
 
     def _predict_probas(self, X) -> KerasTensor:
         """Collect results from clf.predict_proba calls."""
-        probas = [clf(X, training=False) for clf in self.clfs_]
-        probas = [ops.dot(c, w) for c, w in zip(probas, self.weights)]
-        probas = ops.divide(ops.sum(probas, axis=0), len(self.clfs_))
-        return normalize(probas, axis=1, norm="l1")
+        result = ops.stack(clf.predict(X) for clf in self.clfs_)
+        if self.voting == "soft":
+            result *= ops.reshape(self.weights, (-1, 1, 1))
+
+        return result
 
     def predict(
         self, X: KerasTensor, dtype: str = "", with_Y=False
@@ -124,16 +124,20 @@ class MyEnsembleVoteClassifier(EnsembleVoteClassifier):
         if dtype:
             predictions = ops.cast(predictions, dtype=dtype)
 
-        if self.voting == "soft":
-            raise NotImplementedError("soft")
-            print(predictions)
-            print(ops.dot(predictions, self.weights))
-            maj = ops.argmax(predictions, axis=1)
-        elif self.voting == "hard":
+        if self.voting == "hard":
             maj = ops.vectorized_map(
-                lambda x: ops.argmax(ops.bincount(x, minlength=predictions.shape[1])),
+                lambda x: ops.argmax(
+                    ops.bincount(
+                        x, minlength=predictions.shape[1], weights=self.weights
+                    )
+                ),
                 predictions,
             )
+        elif self.voting == "soft":
+            maj = ops.argmax(ops.sum(predictions, axis=0), axis=1)
+            predictions = ops.argmax(ops.transpose(predictions), axis=0)
+        else:
+            raise NotImplementedError(self.voting)
 
         if self.fit_base_estimators:
             maj = self.le_.inverse_transform(maj)

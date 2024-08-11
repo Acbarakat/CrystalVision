@@ -30,7 +30,7 @@ from scipy.optimize import minimize
 from scipy.optimize._minimize import MINIMIZE_METHODS
 
 from crystalvision.data.base import DATA_DIR
-from crystalvision.data.dataset import make_database, paths_and_labels_to_dataset
+from crystalvision.data.dataset import imagine_database, paths_and_labels_to_dataset
 from crystalvision.models.base import MODEL_DIR
 from crystalvision.models.ext.ensemble import hard_activation, MyEnsembleVoteClassifier
 
@@ -133,18 +133,25 @@ def create_models(margs) -> pd.DataFrame:
     """
     df: pd.DataFrame = IMAGE_DF.copy().set_index("code")
     missing_cards = set(df.index.unique())
+
     cols = [
         "name_en",
         "element",
+        "element_v2",
         "type_en",
         "cost",
         "power",
         "ex_burst",
         "multicard",
         "limit_break",
+        "icons",
+        "filename",
     ]
-    mdf: pd.DataFrame = make_database().set_index("code")[cols]
+    mdf: pd.DataFrame = imagine_database(clear_extras=True).set_index("code")[cols]
+    mdf = mdf[~mdf.index.duplicated(keep="first")]
+
     df = df.merge(mdf, on="code", how="left", sort=False)
+
     missing_cards = missing_cards - set(df.index.unique())
     if missing_cards:
         log.warning("missing cards:\n%s", missing_cards)
@@ -167,7 +174,21 @@ def create_models(margs) -> pd.DataFrame:
         with open(label_fname) as fp:
             labels = json.load(fp)
 
-        df[category] = pd.Categorical(df[category], categories=labels)
+        if margs.label_mode == "category":
+            if not pd.api.types.is_categorical_dtype(df[category]):
+                df[category] = pd.Categorical(df[category], categories=labels)
+        elif margs.label_mode == "multilabel":
+            from crystalvision.models.multioutput import MultiLabel
+
+            mdf = MultiLabel(mdf, df, reuse_labels=False)
+            assert np.equal(
+                labels, mdf.labels
+            ).all(), "Save labels and current labels dont match"
+            df[category] = [tuple(row) for row in mdf.vdf_codes]
+        else:
+            raise RuntimeError(f"Unknown label_mode: {margs.label_mode}")
+
+        del mdf
 
         ds = paths_and_labels_to_dataset(
             image_paths=df["path"].tolist(),
@@ -192,6 +213,7 @@ def create_models(margs) -> pd.DataFrame:
             voting = MyEnsembleVoteClassifier(
                 models,
                 labels=labels,
+                weights=margs.init_weights,
                 voting=margs.voting,
                 activation=hard_activation if margs.hard_activation else None,
                 activation_kwargs={"threshold": 0.0} if margs.hard_activation else None,
@@ -226,10 +248,10 @@ def create_models(margs) -> pd.DataFrame:
                 log.info("Disagreements:\n%s", dis_df[[category, f"{category}_yhat"]])
 
                 X_train, X_test, y_train, y_test = train_test_split(
-                    dis_df["path"],
-                    dis_df[category],
-                    test_size=0.1,
-                    # stratify=dis_df[["element", "type_en"]],
+                    df["path"],  # dis_df["path"],
+                    df[category],  # dis_df[category],
+                    test_size=margs.test_size,
+                    stratify=df[margs.stratify] if margs.stratify is not None else None,
                     random_state=23,
                 )
 
@@ -266,14 +288,19 @@ def create_models(margs) -> pd.DataFrame:
                     interpolation=margs.interpolation,
                 )
 
-                pre_score = voting.scores(dis_ds.batch(256), dis_ds.labels)
-                pre_weights = voting.weights.cpu()
-                print(
+                if margs.use_disagreement:
+                    pre_score = voting.scores(dis_ds.batch(256), dis_ds.labels)
+                pre_weights = voting.weights.cpu().numpy()
+                log.debug(
                     voting.find_weights(
                         X_train.batch(256), X_test.batch(256), y_train, y_test
                     )
                 )
-                scores = voting.scores(dis_ds.batch(256), dis_ds.labels)
+
+                if margs.use_disagreement:
+                    scores = voting.scores(dis_ds.batch(256), dis_ds.labels)
+                else:
+                    scores = voting.scores(ds.batch(256), ds.labels)
                 print(pre_score)
                 print(pre_weights)
                 print(scores)
@@ -364,6 +391,14 @@ if __name__ == "__main__":
     parser.add_argument(
         "--verbose", "-v", action="store_true", help="Enable verbose mode"
     )
+    parser.add_argument("--label-mode", default="category")
+    parser.add_argument(
+        "--stratify",
+        nargs="+",
+    )
+    parser.add_argument("--test-size", default=0.25, type=float)
+    parser.add_argument("--init-weights", type=float, nargs="+")
+    parser.add_argument("--use-disagreement", action="store_true")
 
     args = parser.parse_args()
     args.config = args.config.resolve()

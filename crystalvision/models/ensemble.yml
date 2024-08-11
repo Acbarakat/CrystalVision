@@ -1,4 +1,11 @@
 models:
-  - multilabel
+  # - multilabel
+  - type_en
+# label_mode: multilabel
+label_mode: category
+voting: soft
+stratify:
+  - type_en
+  - element
 vote_minimize: true
 verbose: true
