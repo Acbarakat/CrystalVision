@@ -141,6 +141,7 @@ def create_models(margs) -> pd.DataFrame:
         "type_en",
         "cost",
         "power",
+        "power_v2",
         "ex_burst",
         "multicard",
         "limit_break",
@@ -216,37 +217,48 @@ def create_models(margs) -> pd.DataFrame:
                 weights=margs.init_weights,
                 voting=margs.voting,
                 activation=hard_activation if margs.hard_activation else None,
-                activation_kwargs={"threshold": 0.0} if margs.hard_activation else None,
+                activation_kwargs={"threshold": margs.threshold} if margs.hard_activation else None,
             )
 
-            # dtype = ""
-            # if category in ("ex_burst", "multicard", "limit_break", "mono"):
-            #     dtype = "uint8"
-
-            # x = voting.predict(ds, dtype=dtype)
-            # print(voting.find_activation(IMAGES, df[category]))
             pre_score, models_predict, y_hat = voting.scores(
                 ds.batch(256), ds.labels, with_dataframe=True, with_Y=True
             )
             log.info("Prediction Scores:\n%s", pre_score)
             log.info("Prediction DF:\n%s", models_predict)
 
-            df[f"{category}_yhat"] = pd.Categorical(y_hat, categories=labels)
+            if margs.voting in ("multisoft",):
+                df[f"{category}_yhat"] = list(y_hat.itertuples(index=False, name=None))
+            else:
+                df[f"{category}_yhat"] = pd.Categorical(y_hat, categories=labels)
 
             mismatches = ~(df[category] == df[f"{category}_yhat"])
             mismatches = df[mismatches]
             log.info("Mismatches DF:\n%s", mismatches[[category, f"{category}_yhat"]])
 
-            disagreements = ~models_predict.apply(
-                lambda row: row.nunique() == 1, axis=1
-            )
-            disagreements = models_predict[disagreements]
-            log.info("Disagreements DF:\n%s", disagreements)
+            if margs.use_disagreement:
+                if margs.voting in ("multisoft",):
+                    raise NotImplementedError
+                else:
+                    disagreements = ~models_predict.apply(
+                        lambda row: row.nunique() == 1, axis=1
+                    )
+                    disagreements = models_predict[disagreements]
+                    log.info("Disagreements DF:\n%s", disagreements)
+                    dis_df = df.iloc[disagreements.index]
+                    log.info("Disagreements:\n%s", dis_df[[category, f"{category}_yhat"]])
 
-            if not disagreements.empty and margs.vote_minimize:
-                dis_df = df.iloc[disagreements.index]
-                log.info("Disagreements:\n%s", dis_df[[category, f"{category}_yhat"]])
+                dis_ds = paths_and_labels_to_dataset(
+                    image_paths=dis_df["path"].tolist(),
+                    image_size=(250, 179),
+                    num_channels=3,
+                    labels=dis_df[category],
+                    label_mode="categorical",  # pylint: disable=E1101
+                    num_classes=len(labels),
+                    data_format="channels_last",
+                    interpolation=margs.interpolation,
+                )
 
+            if margs.vote_minimize:
                 X_train, X_test, y_train, y_test = train_test_split(
                     df["path"],  # dis_df["path"],
                     df[category],  # dis_df[category],
@@ -271,17 +283,6 @@ def create_models(margs) -> pd.DataFrame:
                     image_size=(250, 179),
                     num_channels=3,
                     labels=y_test,
-                    label_mode="categorical",  # pylint: disable=E1101
-                    num_classes=len(labels),
-                    data_format="channels_last",
-                    interpolation=margs.interpolation,
-                )
-
-                dis_ds = paths_and_labels_to_dataset(
-                    image_paths=dis_df["path"].tolist(),
-                    image_size=(250, 179),
-                    num_channels=3,
-                    labels=dis_df[category],
                     label_mode="categorical",  # pylint: disable=E1101
                     num_classes=len(labels),
                     data_format="channels_last",
@@ -399,6 +400,7 @@ if __name__ == "__main__":
     parser.add_argument("--test-size", default=0.25, type=float)
     parser.add_argument("--init-weights", type=float, nargs="+")
     parser.add_argument("--use-disagreement", action="store_true")
+    parser.add_argument("--threshold", type=float, default=0.95)
 
     args = parser.parse_args()
     args.config = args.config.resolve()

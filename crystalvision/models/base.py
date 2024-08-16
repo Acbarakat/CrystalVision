@@ -519,7 +519,7 @@ class MyMultiLabelBinarizer(MultiLabelBinarizer):
                 if isinstance(label, (set, tuple, list)):
                     for sub_label in label:
                         index.add(class_mapping[sub_label])
-                else:
+                elif not pd.isna(label):
                     index.add(class_mapping[label])
 
             indices.extend(index)

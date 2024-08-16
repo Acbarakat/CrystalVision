@@ -87,12 +87,13 @@ def make_database(clear_extras: bool = False) -> pd.DataFrame:
     df["limit_break"] = df["text_en"].str.contains("Limit Break --")
 
     icon_labels = ["multicard", "ex_burst", "limit_break"]
-    df["icons"] = df[icon_labels].apply(
-        lambda row: tuple(row[row].index) if not row[row].index.empty else ("no_icon",),
-        axis=1,
-    )
-    df["icons"].astype(
-        pd.CategoricalDtype(categories=["no_icon"] + icon_labels, ordered=True)
+
+    def get_true_column(row):
+        true_cols = row[row].index
+        return true_cols[0] if len(true_cols) > 0 else pd.NA
+
+    df["icons"] = df[icon_labels].apply(get_true_column, axis=1).astype(
+       pd.CategoricalDtype(categories=icon_labels, ordered=True)
     )
 
     df["mono"] = df["element"].apply(lambda i: len(i) == 1 if i else True).astype(bool)
@@ -100,8 +101,17 @@ def make_database(clear_extras: bool = False) -> pd.DataFrame:
         lambda x: tuple(x) if x is not None else tuple()
     )
     df["element"] = df["element"].str.join("_")
+
     df["power"] = (
         df["power"].str.replace(" ", "").replace("\u2015", "").replace("\uff0d", "")
+    )
+    
+    df["power_v2"] = df["power"].astype(
+        pd.CategoricalDtype(categories=(str(i * 1000) for i in range (1, 11)), ordered=True)
+    )
+    
+    df["cost"] = df["cost"].astype(
+        pd.CategoricalDtype(categories=(str(i) for i in range (1, 12)), ordered=True)
     )
 
     return df

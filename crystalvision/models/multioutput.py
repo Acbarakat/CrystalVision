@@ -30,7 +30,7 @@ class MultiLabel(HyperbandTunerMixin, MultiLabelCardModel):
             "multilabel",
             df,
             vdf,
-            ["type_en", "cost", "element_v2", "power", "icons"],
+            ["type_en", "cost", "element_v2", "power_v2", "icons"],
             [
                 "type_en",
                 "cost",

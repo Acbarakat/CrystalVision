@@ -1,9 +1,11 @@
 import warnings
 import logging
+from functools import cache
 from typing import Any, Callable, List, Iterable, Tuple
 
 import pandas as pd
-from scipy.optimize import minimize
+import numpy as np
+from scipy.optimize import minimize, Bounds
 from keras import ops, KerasTensor, activations, initializers
 from keras.src.layers import Activation, Flatten, Input, Layer
 from keras.src.models import Model
@@ -33,6 +35,7 @@ class MyEnsembleVoteClassifier(EnsembleVoteClassifier):
         activation: Callable | None = None,
         activation_kwargs: dict | None = None,
         labels: List[str] | None = None,
+        threshold: float = 0.95,
     ):
         """
         _summary_
@@ -59,21 +62,44 @@ class MyEnsembleVoteClassifier(EnsembleVoteClassifier):
         super().__init__(
             clfs, voting, weights, verbose, use_clones, fit_base_estimators
         )
-        assert self.voting in ("soft", "hard"), f"Unknown voting: {self.voting}"
+        assert self.voting in ("soft", "multisoft", "hard", "multihard"), f"Unknown voting: {self.voting}"
+        assert labels is not None, "A list of labels is required"
         self.clfs_ = clfs
-        self.activation = activations.linear
-        if activation is not None:
-            self.activation = activation
-        self.activation_kwargs = {}
-        if activation_kwargs is not None:
-            self.activation_kwargs = activation_kwargs
-        self.weights = (
-            ops.ones(len(clfs))
-            if self.weights is None
-            else ops.convert_to_tensor(self.weights)
-        )
-        self.weights /= ops.sum(self.weights)
+        self.activation = activations.linear if activation is None else activation
+        self.activation_kwargs = {} if activation_kwargs is None else activation_kwargs
         self.labels = labels
+        self.threshold = threshold
+        self.set_weights(weights)
+
+    def set_weights(self, weights):
+        self.weights = (
+            ops.ones(len(self.clfs_) if self.voting in ("hard", "soft") else (len(self.clfs_), len(self.labels)))
+            if weights is None
+            else ops.convert_to_tensor(weights)
+        )
+        self.weights /= ops.sum(self.weights, axis=None if len(self.weights.shape) == 1 else 0)
+
+    def transform(self, X):
+        """Return class labels or probabilities for X for each estimator.
+
+        Parameters
+        ----------
+        X : {array-like, sparse matrix}, shape = [n_samples, n_features]
+            Training vectors, where n_samples is the number of samples and
+            n_features is the number of features.
+
+        Returns
+        -------
+        If `voting='soft'` : array-like = [n_classifiers, n_samples, n_classes]
+            Class probabilties calculated by each classifier.
+        If `voting='hard'` : array-like = [n_classifiers, n_samples]
+            Class labels predicted by each classifier.
+
+        """
+        if self.voting in ("soft", "multisoft"):
+            return self._predict_probas(X)
+
+        return self._predict(X)
 
     def _predict(self, X: KerasTensor) -> KerasTensor:
         """Collect results from clf.predict calls."""
@@ -85,20 +111,24 @@ class MyEnsembleVoteClassifier(EnsembleVoteClassifier):
                 raise NotImplementedError(predictions, predictions.shape)
                 return self.activation(predictions[0], **self.activation_kwargs)
 
-            predictions = ops.transpose(
-                ops.vectorized_map(lambda x: ops.argmax(x, axis=1), predictions),
-            )
+            if self.voting in ("soft", "hard"):
+                predictions = ops.transpose(
+                    ops.vectorized_map(lambda x: ops.argmax(x, axis=1), predictions),
+                )
+            else:
+                raise NotImplementedError(predictions, self.voting)
 
             return self.activation(predictions, **self.activation_kwargs)
 
         log.debug("Collection predictions from %s w/ fit_base_estimators", self.clfs_)
         return ops.transpose([self.le_.transform(self._predict_probas(X))])
 
-    def _predict_probas(self, X) -> KerasTensor:
+    @cache
+    def _predict_probas(self, X, apply_weights: bool = False) -> KerasTensor:
         """Collect results from clf.predict_proba calls."""
         result = ops.stack(clf.predict(X) for clf in self.clfs_)
-        if self.voting == "soft":
-            result *= ops.reshape(self.weights, (-1, 1, 1))
+        if apply_weights:
+            result *= ops.reshape(self.weights, (-1, 1, 1)) if len(self.weights.shape) else self.weights
 
         return result
 
@@ -134,17 +164,28 @@ class MyEnsembleVoteClassifier(EnsembleVoteClassifier):
                 predictions,
             )
         elif self.voting == "soft":
-            maj = ops.argmax(ops.sum(predictions, axis=0), axis=1)
+            maj = ops.reshape(self.weights, (-1, 1, 1)) if len(self.weights.shape) == 1 else self.weights
+            maj = ops.argmax(ops.sum(ops.multiply(predictions, maj), axis=0), axis=1)
             predictions = ops.argmax(ops.transpose(predictions), axis=0)
+        elif self.voting == "multisoft":
+            maj = ops.reshape(self.weights, (-1, 1, 1)) if len(self.weights.shape) == 1 else ops.reshape(self.weights, (-1, 1, len(self.labels)))
+            maj = ops.sum(ops.multiply(predictions, maj), axis=0)
+
+            maj = self.activation(maj, **self.activation_kwargs)
+            predictions = self.activation(predictions, **self.activation_kwargs)
         else:
             raise NotImplementedError(self.voting)
 
         if self.fit_base_estimators:
             maj = self.le_.inverse_transform(maj)
 
-        maj = pd.Series(maj.cpu())
-        if self.labels:
+        if self.voting in ("soft", "hard"):
+            maj = pd.Series(maj.cpu())
             maj.replace(dict(enumerate(self.labels)), inplace=True)
+        elif self.voting in ("multisoft",):
+            maj = pd.DataFrame(maj.cpu(), columns=self.labels)
+        else:
+            raise NotImplementedError(self.voting)
 
         if with_Y:
             return maj, predictions
@@ -175,8 +216,50 @@ class MyEnsembleVoteClassifier(EnsembleVoteClassifier):
         score : float
             Mean accuracy of ``self.predict(X)`` w.r.t. `y`.
         """
+        if self.voting in ("soft", "hard"):
+            return self._single_score(X, y, sample_weight=sample_weight, Y=Y)
+        elif self.voting in ("multisoft", "multihard"):
+            return self._multi_score(X, y, sample_weight=sample_weight, Y=Y)
+        
+        raise NotImplementedError(self.voting)
+    
+    def _multi_score(self, X, y, sample_weight=None, Y=None):
+        if Y is None:
+            Y = self.predict(X)
+
+        y = ops.convert_to_numpy(y.tolist())
+        if y.shape < Y.shape:
+            columns_to_keep = Y.columns[Y.shape[1] - y.shape[1]:]
+            Y = Y[columns_to_keep]
+        
+        assert y.shape == Y.shape, f"{y.shape} does not match {Y.shape}"
+
+        result = {
+            "all": ops.divide(
+                ops.sum(ops.logical_and(ops.ravel(y), ops.ravel(Y.to_numpy()))),
+                ops.sum(ops.ravel(y))
+            ).cpu().numpy()
+        }
+
+        y = ops.transpose(y)
+        for i, label in enumerate(self.labels):
+            result[label] = pd.NA
+            if (score_denom := ops.sum(y[i])) > 0:
+                result[label] = ops.sum(ops.logical_and(y[i], Y[label].to_numpy()))
+                result[label] = ops.divide(
+                    result[label],
+                    score_denom
+                ).cpu().numpy()
+
+        return pd.Series(result)
+        
+    def _single_score(self, X, y, sample_weight=None, Y=None):
         if Y is not None:
-            return accuracy_score(y, Y, sample_weight=sample_weight)
+            try:
+                return accuracy_score(y, Y, sample_weight=sample_weight)
+            except ValueError:
+                y = ops.convert_to_numpy(y.tolist())
+                return accuracy_score(y, Y, sample_weight=sample_weight)
 
         return accuracy_score(y, self.predict(X), sample_weight=sample_weight)
 
@@ -208,19 +291,40 @@ class MyEnsembleVoteClassifier(EnsembleVoteClassifier):
         """
         log.info("Predicting result")
         Y, result = self.predict(X, with_Y=True)
-        result_df = pd.DataFrame(result.cpu(), columns=[c.name for c in self.clfs_])
-        result_df.name = "predict"
-
-        if self.labels:
+        
+        if self.voting in ("hard", "soft"):
+            result_df = pd.DataFrame(result.cpu(), columns=[c.name for c in self.clfs_])
             result_df.replace(dict(enumerate(self.labels)), inplace=True)
 
-        result = result_df.apply(
-            lambda p: accuracy_score(y, p, sample_weight=sample_weight),
-            axis="rows",
-            raw=True,
-            result_type="reduce",
-        )
-        result["ensemble"] = self.score(X, y, Y=Y)
+            result = result_df.apply(
+                lambda p: accuracy_score(y, p, sample_weight=sample_weight),
+                axis="rows",
+                raw=True,
+                result_type="reduce",
+            )
+            result["ensemble"] = self.score(X, y, Y=Y)
+        elif self.voting in ("multisoft",):
+            indexes = pd.MultiIndex.from_product([
+                [c.name + f"_{i}" for i, c in enumerate(self.clfs_)],
+                range(result.shape[1]),
+            ], names=['model', 'uuid'])
+            flattened_result = result.cpu().numpy().reshape(-1, result.shape[2])
+            result_df = pd.DataFrame(
+                flattened_result,
+                index=indexes,
+                columns=self.labels,
+            )
+
+            result = result_df.groupby("model").apply(
+                lambda p: self._multi_score(X, y, sample_weight=sample_weight, Y=p), #, threshold=threshold[p.name]),
+            )
+            ensemble = self._multi_score(X, y, sample_weight=sample_weight, Y=Y)
+            ensemble.name = "ensemble"
+            result = result._append(ensemble)
+        else:
+            raise NotImplementedError(self.voting)
+
+        result_df.name = "predict"
         result.name = "accuracy"
 
         if with_Y and with_dataframe:
@@ -234,7 +338,7 @@ class MyEnsembleVoteClassifier(EnsembleVoteClassifier):
     def generate_model(self) -> Model:
         """Converts/creates our ensemble as a single Model."""
         if self.voting != "hard":
-            raise NotImplementedError("Cannot generate a 'soft' voting model")
+            raise NotImplementedError(f"Cannot generate a '{self.voting}' voting model")
 
         name = self.clfs_[0].name
         name = name.replace(name.split("_")[-1], "ensemble")
@@ -243,11 +347,14 @@ class MyEnsembleVoteClassifier(EnsembleVoteClassifier):
 
         active = self.activation(y_models, **self.activation_kwargs)
 
-        if self.clfs_[0].output_shape[1] == 1:
-            flatten = Flatten()(active)
-            outputs = HardBinaryVote(vote_weights=self.weights)(flatten)
+        if self.voting in ("hard", "soft"):
+            if self.clfs_[0].output_shape[1] == 1:
+                flatten = Flatten()(active)
+                outputs = HardBinaryVote(vote_weights=self.weights)(flatten)
+            else:
+                outputs = HardClassVote(vote_weights=self.weights)(active)
         else:
-            outputs = HardClassVote(vote_weights=self.weights)(active)
+            raise NotImplementedError(self.voting)
 
         return Model(inputs=model_input, outputs=outputs, name=name)
 
@@ -283,11 +390,6 @@ class MyEnsembleVoteClassifier(EnsembleVoteClassifier):
                 "Multilabel and multi-output classification is not supported."
             )
 
-        if self.voting not in ("soft", "hard"):
-            raise ValueError(
-                "Voting must be 'soft' or 'hard'; got (voting=%r)" % self.voting
-            )
-
         if len(self.weights) != len(self.clfs):
             raise ValueError(
                 "Number of classifiers and weights must be equal"
@@ -315,9 +417,9 @@ class MyEnsembleVoteClassifier(EnsembleVoteClassifier):
             for clf in self.clfs_:
                 if self.verbose > 0:
                     i = self.clfs_.index(clf) + 1
-                    print(
-                        "Fitting clf%d: %s (%d/%d)"
-                        % (i, _name_estimators((clf,))[0][0], i, len(self.clfs_))
+                    log.debug(
+                        "Fitting clf%d: %s (%d/%d)",
+                        i, _name_estimators((clf,))[0][0], i, len(self.clfs_)
                     )
 
                 if self.verbose > 2:
@@ -347,7 +449,6 @@ class MyEnsembleVoteClassifier(EnsembleVoteClassifier):
                 activation=self.activation,
                 activation_kwargs={"threshold": threshold},
             )
-            # print(newclf.weights)
 
             newclf.fit(X_train, y_train)
 
@@ -372,40 +473,129 @@ class MyEnsembleVoteClassifier(EnsembleVoteClassifier):
 
         return results
 
-    def find_weights(self, X_train, X_val, y_train, y_val, method="nelder-mead") -> Any:
-        def function_to_minimize(weights):
-            newclf = MyEnsembleVoteClassifier(
-                voting=self.voting,
-                use_clones=False,
-                fit_base_estimators=False,
-                clfs=self.clfs_,
-                weights=weights,  # use the new weights
-                labels=self.labels,
-                activation=self.activation,
-                activation_kwargs=self.activation_kwargs,
-            )
-            # print(newclf.weights)
+    @classmethod
+    def create_initial_simplex_from_guess(cls, initial_guess, max_val=0.5):
+        """
+        Create an initial simplex for optimization based on the given initial guess.
 
+        Args:
+            initial_guess (array-like): The starting point for the simplex.
+            epsilon (float): The perturbation amount used to create the simplex.
+
+        Returns:
+            np.ndarray: A simplex where each vertex is perturbed from the initial guess.
+        """
+        #n = len(initial_guess)  # Number of dimensions
+        #simplex = [initial_guess] #, np.diag(np.ones(n)), np.full((n, n), 1 / (n-1))]
+        #np.fill_diagonal(simplex[2], 0)
+        d = len(initial_guess)  # Number of dimensions
+        
+        # Initialize simplex vertices
+        simplex = np.zeros((d + 1, d))
+        
+        # First vertex is the initial guess
+        simplex[0] = initial_guess
+        
+        # Create the other d vertices by perturbing each component
+        for i in range(d):
+            vertex = np.copy(initial_guess)
+            perturbation = 1 / (d - 1)
+            
+            # Clamp the perturbation to max_val and adjust the remaining elements
+            if perturbation > max_val:
+                perturbation = max_val
+            
+            vertex[i] += perturbation
+            remaining_value = 1 - vertex[i]
+            remaining_indices = [j for j in range(d) if j != i]
+            
+            for j in remaining_indices:
+                vertex[j] = min(remaining_value / len(remaining_indices), max_val)
+                remaining_value -= vertex[j]
+            
+            # Ensure the sum of the row is exactly 1
+            simplex[i + 1] = vertex / vertex.sum()
+
+        return simplex
+
+    def find_weights(self, X_train, X_val, y_train, y_val, method="nelder-mead") -> Any:
+        newclf = MyEnsembleVoteClassifier(
+            voting=self.voting,
+            use_clones=False,
+            fit_base_estimators=False,
+            clfs=self.clfs_,
+            weights=None,  # use the new weights
+            labels=self.labels,
+            activation=self.activation,
+            activation_kwargs=self.activation_kwargs,
+        )
+
+        def function_to_minimize(weights, prime_label="all"):
+            newclf.set_weights(weights)
             newclf.fit(X_train, y_train)
 
             # this is the mean accuracy
             score = newclf.score(X_val, y_val)
+            if self.voting in ("multisoft", "multihard"):
+                score = score[prime_label]
 
             # change accuracy to error so that smaller is better
             score_to_minimize = 1.0 - score
 
             return score_to_minimize
 
-        results = minimize(
-            function_to_minimize,
-            self.weights.cpu(),
-            bounds=[(0, 1)] * len(self.clfs_),
-            method=method,
-            constraints=({"type": "eq", "fun": lambda w: ops.sum(w) - 1}),
-        )
+        contraints = None
+        if method not in ("nelder-mead"):
+            contraints = ({"type": "eq", "fun": lambda w: ops.sum(w) - 1})
+        options = {
+            'xatol': 1e-6,
+            'fatol': 1e-6,
+        }
 
-        self.weights = results.x / sum(results.x)
+        if len(self.weights.shape) == 1:
+            weights = self.weights.cpu().numpy()
+            options["initial_simplex"] = self.create_initial_simplex_from_guess(weights)
+            
+            results = minimize(
+                function_to_minimize,
+                weights,
+                bounds=Bounds(0.0, 1.0),
+                method=method,
+                constraints=contraints,
+                options=options
+            )
 
+            self.weights = results.x / sum(results.x)
+
+            return results
+        
+        results = []
+        new_weights = []
+        weights = ops.transpose(self.weights).cpu()
+        for i, prime_label in enumerate(self.labels):
+            new_weight = weights[i].numpy()
+            options["initial_simplex"] = self.create_initial_simplex_from_guess(new_weight)
+            try:
+                result = minimize(
+                    function_to_minimize,
+                    new_weight,
+                    prime_label,
+                    bounds=Bounds(0.0, 1.0),
+                    method=method,
+                    constraints=contraints,
+                    options=options
+                )
+                new_weight = result.x / sum(result.x)
+            except TypeError as err:
+                log.warning("%s is NA (%s)", prime_label, err)
+                result = None
+
+            log.info("%s new weight is %s", prime_label, new_weight)
+            results.append(result)
+            new_weights.append(new_weight)
+
+        self.weights = ops.transpose(ops.convert_to_tensor(new_weights))
+        
         return results
 
 
