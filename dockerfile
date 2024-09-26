@@ -1,4 +1,4 @@
-FROM nvcr.io/nvidia/cuda:12.5.1-cudnn-devel-ubuntu22.04
+FROM nvcr.io/nvidia/cuda:12.6.1-cudnn-devel-ubuntu22.04
 
 
 # # TensorRT
