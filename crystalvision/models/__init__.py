@@ -14,7 +14,8 @@ from pprint import pformat
 
 import yaml
 import pandas as pd
-from keras.models import load_model
+
+# from keras.models import load_model
 
 SRC_DIR = Path(os.path.dirname(__file__), "..").resolve()
 MODEL_DIR = Path(SRC_DIR, "..", "data", "model").resolve()
@@ -135,8 +136,3 @@ def tune_model(
     m.tune_and_save(
         num_models=args.num, random_state=args.random_state, save_models=save_models
     )
-
-    if args.verbose:
-        for i in range(1, args.num + 1):
-            best_model = load_model(os.path.join(MODEL_DIR, f"{m.name}_{i}.h5"))
-            print(best_model.summary())

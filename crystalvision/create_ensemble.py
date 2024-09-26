@@ -16,14 +16,12 @@ Todo:
 """
 import json
 import logging
-from typing import Tuple
 
 import numpy as np
 import pandas as pd
 from keras.models import load_model
 from PIL import Image
 from skimage.io import imread
-from skimage.transform import resize as imresize
 from sklearn.metrics import accuracy_score
 from sklearn.model_selection import train_test_split
 from scipy.optimize import minimize
@@ -40,9 +38,7 @@ log = logging.getLogger()
 IMAGE_DF: pd.DataFrame = pd.read_json(DATA_DIR / "testmodels.json")
 
 
-def load_image(
-    url: str, img_fname: str = "", resize: Tuple[int, int] | None = None
-) -> np.ndarray:
+def check_image(url: str, img_fname: str = "") -> bool:
     """
     Load image (and cache it).
 
@@ -59,15 +55,11 @@ def load_image(
         img_fname = img_fname.split("%2F")[-1]
 
     dst = DATA_DIR / "test" / img_fname
-    log.debug("Loading %s", dst)
+    log.debug("Checking %s", dst)
     dst.parent.mkdir(parents=True, exist_ok=True)
 
     if dst.exists():
-        data = imread(dst)
-        if resize:
-            data = imresize(data, resize, anti_aliasing=True, preserve_range=True)
-        data = data[:, :, :3]
-        return data * (1.0 / 255)
+        return True
 
     if url.startswith("blob:"):
         url = url[5:]
@@ -78,14 +70,7 @@ def load_image(
     else:
         Image.fromarray(data).save(dst)
 
-    if resize:
-        data = imresize(data, resize, anti_aliasing=True, preserve_range=True)
-
-    return data[:, :, :3] * (1.0 / 255)
-
-
-def apply_load_image(row: pd.Series) -> np.ndarray:
-    return load_image(row["uri"], f"{row.name}.jpg", resize=(250, 179))
+    return False
 
 
 def find_threshold(X, y_true, labels, method="nelder-mead"):
@@ -131,6 +116,7 @@ def create_models(margs) -> pd.DataFrame:
     Returns:
         ImageData dataframe with yhat(s)
     """
+    IMAGE_DF.apply(lambda row: check_image(row.uri, f"{row.name}.jpg"), axis=1)
     df: pd.DataFrame = IMAGE_DF.copy().set_index("code")
     missing_cards = set(df.index.unique())
 

@@ -351,7 +351,7 @@ class CardModel(HyperModel):
 
         for idx, (bm, bt) in enumerate(zip(best_models, best_trials)):
             log.info("%s\ttrial_%s\t%s", bm.name, bt.trial_id, bt.score)
-            log.info(bm.summary())
+            log.debug(bm.summary())
             onnx_model_fp = (MODEL_DIR / f"{self.name}_{idx + 1}.onnx").resolve()
             keras_model_fp = (MODEL_DIR / f"{self.name}_{idx + 1}.keras").resolve()
             log.info("saving %s", onnx_model_fp)

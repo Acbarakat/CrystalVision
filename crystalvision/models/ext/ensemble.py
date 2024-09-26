@@ -504,7 +504,7 @@ class MyEnsembleVoteClassifier(EnsembleVoteClassifier):
         return results
 
     @classmethod
-    def create_initial_simplex_from_guess(cls, initial_guess, max_val=0.5):
+    def create_initial_simplex_from_guess(cls, initial_guess, max_val=0.499):
         """
         Create an initial simplex for optimization based on the given initial guess.
 

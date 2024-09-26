@@ -21,7 +21,7 @@ except ImportError:
 class MultiLabel(HyperbandTunerMixin, MultiLabelCardModel):
     """Multilabel for all of a Card's labels."""
 
-    MAX_TRIALS: int = 50
+    MAX_TRIALS: int = 31
     FACTOR = 15
     DEFAULT_EPOCHS: int = 50
 
@@ -43,8 +43,8 @@ class MultiLabel(HyperbandTunerMixin, MultiLabelCardModel):
             **kwargs
         )
 
-        self.callbacks[0].min_delta = 5e-06
-        self.callbacks[0].patience = 10
+        self.callbacks[0].min_delta = 5e-04
+        self.callbacks[0].patience = 3
 
     def build(self, hp: HyperParameters, seed: int | None = None) -> models.Sequential:
         """
@@ -111,4 +111,4 @@ class MultiLabel(HyperbandTunerMixin, MultiLabelCardModel):
 if __name__ == "__main__":
     from crystalvision.models import tune_model
 
-    tune_model(MultiLabel, clear_cache=False)
+    tune_model(MultiLabel, clear_cache=True)
