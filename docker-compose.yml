@@ -1,0 +1,37 @@
+name: crystalvision
+
+services:
+  ollama:
+    image: ollama/ollama:latest
+    # build:
+      # dockerfile: docker/Dockerfile.ollama
+    ports:
+      - 11434:11434
+    volumes:
+      - ollama:/root/.ollama
+    restart: unless-stopped
+    deploy:
+      resources:
+        reservations:
+          devices:
+          - driver: nvidia
+            count: 1
+            capabilities: [gpu]
+  discord-bot:
+    build:
+      dockerfile: docker/Dockerfile.discordbot
+    environment:
+      PYTHONUNBUFFERED: 1
+      DISCORD_TOKEN: ${DISCORD_TOKEN}
+      OLLAMA_EMBED_MODEL: ${OLLAMA_EMBED_MODEL}
+      OLLAMA_CHAT_MODEL: ${OLLAMA_CHAT_MODEL}
+    volumes:
+      - ffdata:/data/
+    depends_on:
+      - ollama
+
+volumes:
+  ollama:
+    external: true
+  ffdata:
+    external: true
