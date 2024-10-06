@@ -12,6 +12,7 @@ log.setLevel(logging.INFO)
 SRC_DIR = Path(os.path.dirname(__file__), "..").resolve()
 CORPUS_DIR = Path(SRC_DIR, "..", "data", "corpus").resolve()
 CORPUS_JSON = (CORPUS_DIR / ".." / "corpus_uris.json").resolve()
+PROMPTS_JSON = (CORPUS_DIR / ".." / "prompts.json").resolve()
 CORPUS_URIS = {}
 
 if CORPUS_JSON.exists():

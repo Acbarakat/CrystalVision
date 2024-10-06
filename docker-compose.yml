@@ -3,8 +3,6 @@ name: crystalvision
 services:
   ollama:
     image: ollama/ollama:latest
-    # build:
-      # dockerfile: docker/Dockerfile.ollama
     ports:
       - 11434:11434
     volumes:
@@ -27,6 +25,12 @@ services:
       OLLAMA_CHAT_MODEL: ${OLLAMA_CHAT_MODEL}
     volumes:
       - ffdata:/app/data/
+      - type: bind
+        source: ./data/prompts.json
+        target: /app/data/prompts.json
+      - type: bind
+        source: ./data/corpus_uris.json
+        target: /app/data/corpus_uris.json
     depends_on:
       - ollama
 

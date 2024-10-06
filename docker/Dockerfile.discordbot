@@ -16,10 +16,6 @@ RUN --mount=type=cache,target=/poetry-cache poetry install --compile --only lang
 WORKDIR /app/crystalvision
 COPY crystalvision/ .
 
-WORKDIR /tmp/corpus
-COPY data/corpus_uris.json .
-RUN mv /tmp/corpus/ /app/data/
-
 WORKDIR /app
 ENV DISCORD_TOKEN=${DISCORD_TOKEN}
 ENV OLLAMA_EMBED_MODEL=${OLLAMA_EMBED_MODEL}
