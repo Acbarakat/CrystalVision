@@ -26,7 +26,7 @@ services:
       OLLAMA_EMBED_MODEL: ${OLLAMA_EMBED_MODEL}
       OLLAMA_CHAT_MODEL: ${OLLAMA_CHAT_MODEL}
     volumes:
-      - ffdata:/data/
+      - ffdata:/app/data/
     depends_on:
       - ollama
 

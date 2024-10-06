@@ -15,12 +15,18 @@ from typing import Optional
 
 import discord
 from discord import Intents, ChannelType, channel
-import discord.message
 from ollama import Client, AsyncClient
+
+try:
+    import lang
+except (ModuleNotFoundError, ImportError):
+    from crystalvision import lang
 
 
 log = logging.getLogger("discord.crystalvision")
 log.setLevel(logging.DEBUG)
+
+log.debug(lang.CORPUS_URIS)
 
 intents = Intents.default()
 intents.members = True

@@ -8,17 +8,22 @@ RUN apt install libffi-dev libnacl-dev python3-dev -yqq
 RUN pip install poetry==1.8.3
 RUN poetry config virtualenvs.create false && poetry config cache-dir /poetry-cache
 
-WORKDIR /crystalvision
+WORKDIR /app
 
-COPY pyproject.toml poetry.lock poetry.toml ./
-# RUN --mount=type=cache,target=/poetry-cache poetry install --compile
+COPY ./_torch/pyproject.toml ./_torch/poetry.lock poetry.toml ./
+RUN --mount=type=cache,target=/poetry-cache poetry install --compile --only lang,discord --no-root
 
-RUN pip install discord.py ollama
+WORKDIR /app/crystalvision
+COPY crystalvision/ .
 
-COPY crystalvision ./
+WORKDIR /tmp/corpus
+COPY data/corpus_uris.json .
+RUN mv /tmp/corpus/ /app/data/
 
+WORKDIR /app
 ENV DISCORD_TOKEN=${DISCORD_TOKEN}
 ENV OLLAMA_EMBED_MODEL=${OLLAMA_EMBED_MODEL}
 ENV OLLAMA_CHAT_MODEL=${OLLAMA_CHAT_MODEL}
+ENV PYTHONPATH=/app
 
-ENTRYPOINT [ "python", "discordbot.py" ]
+ENTRYPOINT [ "python", "-m", "crystalvision.discordbot" ]
