@@ -1,0 +1,27 @@
+# FROM nvcr.io/nvidia/cuda:12.6.1-cudnn-devel-ubuntu22.04
+FROM python:3.11
+
+RUN apt-get update && apt-get upgrade -yqq
+
+RUN apt install libffi-dev libnacl-dev python3-dev -yqq
+
+RUN pip install poetry==1.8.3 playwright
+RUN poetry config virtualenvs.create false && poetry config cache-dir /poetry-cache
+RUN playwright install --with-deps chromium
+
+WORKDIR /app
+
+COPY ./_torch/pyproject.toml ./_torch/poetry.lock poetry.toml ./
+RUN --mount=type=cache,target=/poetry-cache poetry install --compile --only lang,discord --no-root
+
+WORKDIR /app/crystalvision
+COPY crystalvision/ .
+
+WORKDIR /app
+ENV DISCORD_TOKEN=${DISCORD_TOKEN}
+ENV OLLAMA_EMBED_MODEL=${OLLAMA_EMBED_MODEL}
+ENV OLLAMA_CHAT_MODEL=${OLLAMA_CHAT_MODEL}
+ENV USER_AGENT=CrystalVision
+ENV PYTHONPATH=/app
+
+ENTRYPOINT [ "python", "-m", "crystalvision.discordbot" ]
