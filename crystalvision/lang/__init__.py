@@ -9,6 +9,7 @@ import asyncio
 log = logging.getLogger("crystalvision.lang")
 log.setLevel(logging.INFO)
 
+
 SRC_DIR = Path(os.path.dirname(__file__), "..").resolve()
 CORPUS_DIR = Path(SRC_DIR, "..", "data", "corpus").resolve()
 CORPUS_JSON = (CORPUS_DIR / ".." / "corpus_uris.json").resolve()
@@ -22,11 +23,11 @@ else:
     log.error("Could not find %s", CORPUS_JSON)
 
 
-async def download_pdf(session, uri, dst):
+async def download_file(session, uri, dst):
     if dst.exists():
-        log.info("Found PDF: %s", dst.name)
+        log.info("Found file: %s", dst.name)
     else:
-        log.info("Downloading PDF: %s", dst.name)
+        log.info("Downloading file: %s", dst.name)
         async with session.get(uri) as response:
             if response.status == 200:
                 # Open a file in binary write mode
@@ -43,12 +44,13 @@ async def download_pdf(session, uri, dst):
 async def gather_corpus():
     async with aiohttp.ClientSession() as session:
         tasks = []
-        for uri in CORPUS_URIS.get("pdf", []):
-            if uri.startswith("http"):
+        for corpus in CORPUS_URIS:
+            uri = corpus.get("uri")
+            if uri.startswith("http") and uri.endswith("pdf"):
                 fname = uri.split("/")[-1]
                 dst = (CORPUS_DIR / fname).resolve()
                 dst.parent.mkdir(parents=True, exist_ok=True)
-                tasks.append(download_pdf(session, uri, dst))
+                tasks.append(download_file(session, uri, dst))
         await asyncio.gather(*tasks)
 
 

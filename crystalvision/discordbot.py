@@ -2,9 +2,10 @@
 Serve a FFTCG discord bot.
 
 TODO:
-- Use RAG Model and context from message
+- Specialize the rules comp intos its own thing
 - Use message history as context, with a max limit deque,
 only pulling from the last checkpoint, maybe on disk db? or in mem only
+- Decode content <@###> into user names
 
 """
 
@@ -12,21 +13,30 @@ import os
 import json
 import logging
 import asyncio
+import hashlib
 from typing import Optional
-from functools import wraps
+from functools import cached_property, wraps
 
 import discord
 from discord import Intents, ChannelType, channel
 from ollama import Client, AsyncClient
+from langchain_core.language_models import BaseLLM
+from langchain_chroma import Chroma
+from langchain_core.vectorstores import VectorStore, VectorStoreRetriever
+from langchain.chains import create_retrieval_chain
+from langchain.chains.combine_documents import create_stuff_documents_chain
+from langchain_core.prompts import ChatPromptTemplate
 
 try:
-    from lang import PROMPTS_JSON
+    from .lang import PROMPTS_JSON, CORPUS_DIR
+    from .lang.docs import DOCS
 except (ModuleNotFoundError, ImportError):
-    from crystalvision.lang import PROMPTS_JSON
+    from crystalvision.lang import PROMPTS_JSON, CORPUS_DIR
+    from crystalvision.lang.docs import DOCS
 
 
 log = logging.getLogger("discord.crystalvision")
-log.setLevel(logging.DEBUG)
+log.setLevel(logging.INFO)
 
 intents = Intents.default()
 intents.members = True
@@ -71,14 +81,32 @@ def thinking(timeout: int = 999):
 class CrystalClient(discord.Client):
     """A discord bot for FFTCG"""
 
-    def __init__(self, *args, ollama: Optional[AsyncClient] = None, **kwargs) -> None:
+    def __init__(
+        self,
+        *args,
+        ollama: Optional[AsyncClient] = None,
+        embeddings: Optional[BaseLLM] = None,
+        llm: Optional[BaseLLM] = None,
+        **kwargs,
+    ) -> None:
         super().__init__(*args, **kwargs)
 
         assert ollama, "No ollama AsyncClient provided"
+        assert embeddings, "No embeddings provided"
+        assert llm, "No llm provided"
 
         self.ollama: Optional[AsyncClient] = ollama
+        self.embeddings: Optional[BaseLLM] = embeddings
+        self.llm: Optional[BaseLLM] = llm
+        self.vector_store: VectorStore = Chroma(
+            collection_name="crystalvision-discordbot",
+            embedding_function=self.embeddings,
+            persist_directory=str(CORPUS_DIR / ".." / "chroma_langchain_db"),
+        )
         self.model: str = os.getenv("OLLAMA_CHAT_MODEL")
         self.prompts: dict = {}
+
+        self._ready: bool = False
 
     async def on_ready(self) -> None:
         """Trigger when bot is ready/online"""
@@ -88,6 +116,39 @@ class CrystalClient(discord.Client):
         else:
             log.error("Could not find prompts json (%s)", PROMPTS_JSON)
 
+        missing_docs = []
+        missing_uuids = []
+        for document in DOCS:
+            async for doc in document.alazy_load():
+                if (uuid := doc.metadata.get("id", None)) is None:
+                    uuid = hashlib.blake2b(
+                        doc.metadata["source"].encode(), digest_size=10
+                    ).hexdigest()
+                    if (page_num := doc.metadata.get("page", None)) is not None:
+                        uuid += f"-{page_num}"
+                    if (title := doc.metadata.get("title", None)) is not None:
+                        title = hashlib.blake2b(
+                            title.encode(), digest_size=6
+                        ).hexdigest()
+                        uuid += f"-{title}"
+
+                result = self.vector_store.get(ids=[uuid])
+                if uuid in result["ids"]:
+                    log.debug(
+                        "%s (%s) is already in the vectorstore", uuid, doc.metadata
+                    )
+                else:
+                    log.info("Adding %s (%s) to the vector store", uuid, doc.metadata)
+                    missing_docs.append(doc)
+                    missing_uuids.append(uuid)
+
+        if missing_docs:
+            await self.vector_store.aadd_documents(
+                documents=missing_docs, ids=missing_uuids
+            )
+        del missing_docs
+        del missing_uuids
+
         activity = discord.Activity(
             name="CrystalVision", state="Ask me", type=discord.ActivityType.custom
         )
@@ -95,15 +156,50 @@ class CrystalClient(discord.Client):
 
         log.info("Logged in as '%s' (ID: %s)", self.user, self.user.id)
 
+        self._ready = True
+
+    @cached_property
+    def retriever(self) -> VectorStoreRetriever:
+        return self.vector_store.as_retriever()
+
+    def decode_message(self, message: discord.Message) -> str:
+        return message.content
+
     async def generate(self, content, context) -> str:
         kwargs = self.prompts.get("general", {})
+        print(content)
 
-        result = await self.ollama.generate(
-            model=self.model, prompt=content, system=kwargs.get("system"), keep_alive=-1
+        system_prompt = (
+            "Use the following pieces of retrieved context to inform your response."
+            "\n\n"
+            "{context}"
         )
-        log.debug(result)
 
-        return result["response"]
+        prompt = ChatPromptTemplate.from_messages(
+            [
+                ("system", system_prompt),
+                ("system", kwargs.get("system", "You are a chatbot.")),
+                ("human", "{input}"),
+            ]
+        )
+
+        qa_chain = create_stuff_documents_chain(self.llm, prompt)
+        rag_chain = create_retrieval_chain(self.vector_store.as_retriever(), qa_chain)
+
+        result = await rag_chain.ainvoke({"input": content})
+        print(result)
+        answer = result["answer"]
+
+        if len(answer) > 2000:
+            log.warning("The initial response is too long: \n%s", answer)
+            sub_result = await self.ollama.generate(
+                model=self.model,
+                prompt=answer,
+                system="Make this response more concise but still formatted for discord. It must be less than 2000 characters long.",
+            )
+            answer = sub_result["response"]
+
+        return answer
 
     async def generate_thread_title(self, initial_message, response) -> str:
         kwargs = self.prompts.get("title_thread", {})
@@ -142,7 +238,7 @@ class CrystalClient(discord.Client):
         resp_channel = message.channel
 
         response = await self.generate(
-            message.content,
+            self.decode_message(message),
             None,
         )
 
@@ -157,6 +253,10 @@ class CrystalClient(discord.Client):
         await resp_channel.send(response, mention_author=mention_author)
 
     async def on_message(self, message: discord.Message) -> None:
+        if not self._ready:
+            log.warning("%s is not ready", self.user)
+            return
+
         if self.user == message.author:
             # don't respond to ourselves
             return
@@ -171,7 +271,9 @@ class CrystalClient(discord.Client):
 
 
 if __name__ == "__main__":
-    client = Client(host="http://ollama:11434")
+    from langchain_ollama import OllamaEmbeddings, OllamaLLM
+
+    client = Client()
 
     assert (embed_model := os.getenv("OLLAMA_EMBED_MODEL")), "No embed model provided"
     assert (chat_model := os.getenv("OLLAMA_CHAT_MODEL")), "No chat model provided"
@@ -182,5 +284,10 @@ if __name__ == "__main__":
             client.pull(model)
         log.info("Found model: %s", model)
 
-    bot = CrystalClient(ollama=AsyncClient(host="http://ollama:11434"), intents=intents)
+    bot = CrystalClient(
+        ollama=AsyncClient(),
+        intents=intents,
+        embeddings=OllamaEmbeddings(model=embed_model),
+        llm=OllamaLLM(model=chat_model, temperature=0.0),
+    )
     bot.run(os.getenv("DISCORD_TOKEN"))

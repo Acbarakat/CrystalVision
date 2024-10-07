@@ -23,6 +23,8 @@ services:
       DISCORD_TOKEN: ${DISCORD_TOKEN}
       OLLAMA_EMBED_MODEL: ${OLLAMA_EMBED_MODEL}
       OLLAMA_CHAT_MODEL: ${OLLAMA_CHAT_MODEL}
+      PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION: python
+      OLLAMA_HOST: http://ollama:11434
     volumes:
       - ffdata:/app/data/
       - type: bind
