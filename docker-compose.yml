@@ -27,6 +27,7 @@ services:
       OLLAMA_HOST: http://ollama:11434
     volumes:
       - ffdata:/app/data/
+      - ./data/jtemplate/:/app/data/jtemplate/
       - type: bind
         source: ./data/prompts.json
         target: /app/data/prompts.json

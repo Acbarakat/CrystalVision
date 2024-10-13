@@ -36,7 +36,7 @@ except (ModuleNotFoundError, ImportError):
 
 
 log = logging.getLogger("discord.crystalvision")
-log.setLevel(logging.INFO)
+log.setLevel(logging.DEBUG)
 
 intents = Intents.default()
 intents.members = True
@@ -261,13 +261,13 @@ class CrystalClient(discord.Client):
             # don't respond to ourselves
             return
 
-        if self.user.mentioned_in(message) or isinstance(
-            message.channel, channel.DMChannel
+        log.debug(message)
+        if (
+            self.user.mentioned_in(message)
+            or f"<@!{self.user.id}>" in message.content
+            or isinstance(message.channel, channel.DMChannel)
         ):
             await self.reply_to_message(message)
-
-        else:
-            log.debug(message)
 
 
 if __name__ == "__main__":

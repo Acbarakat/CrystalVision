@@ -1,11 +1,13 @@
 import logging
 import json
 import asyncio
+import re
 from typing import List, Iterator, AsyncIterator
 
 import jq
 from langchain_core.documents import Document
 from langchain_community.document_loaders import PyPDFLoader, AsyncChromiumLoader
+from jinja2 import Environment, FileSystemLoader, select_autoescape, Template
 
 try:
     from . import CORPUS_URIS, CORPUS_DIR
@@ -17,6 +19,10 @@ log = logging.getLogger("lang.loaders")
 log.setLevel(logging.INFO)
 
 DOCS = []
+JENV = Environment(
+    loader=FileSystemLoader(CORPUS_DIR / ".." / "jtemplate"),
+    autoescape=select_autoescape(),
+)
 
 
 class ChromiumJsonLoader(AsyncChromiumLoader):
@@ -28,7 +34,8 @@ class ChromiumJsonLoader(AsyncChromiumLoader):
         user_agent: str | None = None,
         extra_http_headers: dict | None = None,
         cache_name: str | None = None,
-        page_content_string: str = "{body}",
+        page_content_string: str = "",
+        page_content_template: str = "",
         jq_query: str = ".",
     ):
         super().__init__(urls, headless=headless, user_agent=user_agent)
@@ -42,7 +49,12 @@ class ChromiumJsonLoader(AsyncChromiumLoader):
         self.cache_name: str | None = cache_name
         self.handle_script: str = "body => body.querySelector('pre').innerHTML"
         self.page_content_string: str = page_content_string
+        self.page_content_template: Template | None = page_content_template
+        if page_content_template:
+            self.page_content_template = JENV.get_template(page_content_template)
         self.jq_query: jq._Program = jq.compile(jq_query)
+
+    CARD_CODE = re.compile(r"\d{2}-\d{3}[CRHL]")
 
     async def ascrape_playwright(self, url: str) -> str:
         """
@@ -107,8 +119,21 @@ class ChromiumJsonLoader(AsyncChromiumLoader):
                     "source": content["source"],
                     "id": content["id"],
                 }
+                code = self.CARD_CODE.search(content["title"])
+                if code:
+                    code = code.group(0)
+                    metadata["code"] = code
+
+                page_content = content
+                if self.page_content_string:
+                    page_content = self.page_content_string.format(code=code, **content)
+                elif self.page_content_template:
+                    page_content = self.page_content_template.render(
+                        code=code, **content
+                    )
+
                 yield Document(
-                    page_content=self.page_content_string.format(**content),
+                    page_content=page_content,
                     metadata=metadata,
                 )
 
@@ -136,8 +161,21 @@ class ChromiumJsonLoader(AsyncChromiumLoader):
                     "source": content["source"],
                     "id": content["id"],
                 }
+                code = self.CARD_CODE.search(content["title"])
+                if code:
+                    code = code.group(0)
+                    metadata["code"] = code
+
+                page_content = content
+                if self.page_content_string:
+                    page_content = self.page_content_string.format(code=code, **content)
+                elif self.page_content_template:
+                    page_content = self.page_content_template.render(
+                        code=code, **content
+                    )
+
                 yield Document(
-                    page_content=self.page_content_string.format(**content),
+                    page_content=page_content,
                     metadata=metadata,
                 )
 
