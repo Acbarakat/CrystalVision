@@ -24,11 +24,13 @@ TEST_IMG_DIR = Path(MODEL_DIR, "..", "test").resolve()
 try:
     from .mixins.compiles import BinaryMixin
     from .base import CardModel
-    from ..data.dataset import imagine_database, make_database
+    from ..data.dataset import imagine_database
+    from ..data.card_database import make_database
 except ImportError:
     from crystalvision.models.mixins.compiles import BinaryMixin
     from crystalvision.models.base import CardModel
-    from crystalvision.data.dataset import imagine_database, make_database
+    from crystalvision.data.dataset import imagine_database
+    from crystalvision.data.card_database import make_database
 
 
 log = logging.getLogger("crystalvision")

@@ -46,7 +46,7 @@ async def gather_corpus():
         tasks = []
         for corpus in CORPUS_URIS:
             uri = corpus.get("uri")
-            if uri.startswith("http") and uri.endswith("pdf"):
+            if isinstance(uri, str) and uri.startswith("http") and uri.endswith("pdf"):
                 fname = uri.split("/")[-1]
                 dst = (CORPUS_DIR / fname).resolve()
                 dst.parent.mkdir(parents=True, exist_ok=True)

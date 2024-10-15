@@ -12,7 +12,7 @@ RUN playwright install --with-deps chromium
 WORKDIR /app
 
 COPY ./_torch/pyproject.toml ./_torch/poetry.lock poetry.toml ./
-RUN --mount=type=cache,target=/poetry-cache poetry install --compile --only lang,discord --no-root
+RUN --mount=type=cache,target=/poetry-cache poetry install --compile --only base,lang,discord --no-root
 
 WORKDIR /app/crystalvision
 COPY crystalvision/ .
