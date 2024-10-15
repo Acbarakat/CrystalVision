@@ -14,18 +14,22 @@ import json
 import logging
 import asyncio
 import hashlib
+import re
 from typing import Optional
 from functools import cached_property, wraps
 
 import discord
+import pandas as pd
 from discord import Intents, ChannelType, channel
 from ollama import Client, AsyncClient
+from langchain.agents.agent import AgentExecutor
 from langchain_core.language_models import BaseLLM
 from langchain_chroma import Chroma
 from langchain_core.vectorstores import VectorStore, VectorStoreRetriever
-from langchain.chains import create_retrieval_chain
-from langchain.chains.combine_documents import create_stuff_documents_chain
-from langchain_core.prompts import ChatPromptTemplate
+from langchain_experimental.agents.agent_toolkits import create_pandas_dataframe_agent
+from langchain.tools.retriever import create_retriever_tool
+
+from crystalvision.lang.loaders import explain_database
 
 try:
     from .lang import PROMPTS_JSON, CORPUS_DIR
@@ -36,13 +40,19 @@ except (ModuleNotFoundError, ImportError):
 
 
 log = logging.getLogger("discord.crystalvision")
-log.setLevel(logging.INFO)
+log.setLevel(logging.DEBUG)
 
 intents = Intents.default()
 intents.members = True
 intents.message_content = True
 intents.reactions = True
 intents.guilds = True
+
+pd.set_option("display.max_columns", None)
+pd.set_option("display.max_rows", None)
+pd.set_option("display.max_colwidth", None)
+
+EMOJI_JSON = (CORPUS_DIR / ".." / "emoji.json").resolve()
 
 
 def thinking(timeout: int = 999):
@@ -105,8 +115,41 @@ class CrystalClient(discord.Client):
         )
         self.model: str = os.getenv("OLLAMA_CHAT_MODEL")
         self.prompts: dict = {}
+        self.emoji_mapping: dict = {}
+        self.df: pd.DataFrame = explain_database()
 
         self._ready: bool = False
+
+    @cached_property
+    def agent(self) -> AgentExecutor:
+        kwargs = self.prompts.get("discord", {})
+
+        retriever_tool = create_retriever_tool(
+            self.retriever,
+            "rules_search",
+            kwargs.get("rules_search", "Search for information"),
+        )
+
+        prefix = kwargs.get("df_prefix1", "You are a pandas agent.")
+        for col in self.df.columns:
+            if col_desc := self.df[col].attrs.get("description", ""):
+                prefix += f"'{col}' refers to {col_desc}. "
+
+        prefix += kwargs.get("df_prefix2", "")
+
+        return create_pandas_dataframe_agent(
+            self.llm,
+            self.df,
+            verbose=True,
+            include_df_in_prompt=None,
+            allow_dangerous_code=True,
+            prefix=prefix,
+            extra_tools=[retriever_tool],
+        )
+
+    @cached_property
+    def retriever(self) -> VectorStoreRetriever:
+        return self.vector_store.as_retriever()
 
     async def on_ready(self) -> None:
         """Trigger when bot is ready/online"""
@@ -115,6 +158,12 @@ class CrystalClient(discord.Client):
                 self.prompts = json.load(fp)
         else:
             log.error("Could not find prompts json (%s)", PROMPTS_JSON)
+
+        if EMOJI_JSON.exists():
+            with open(EMOJI_JSON, "r") as fp:
+                self.emoji_mapping = json.load(fp)
+        else:
+            log.error("Could not find emoji json (%s)", EMOJI_JSON)
 
         missing_docs = []
         missing_uuids = []
@@ -158,46 +207,30 @@ class CrystalClient(discord.Client):
 
         self._ready = True
 
-    @cached_property
-    def retriever(self) -> VectorStoreRetriever:
-        return self.vector_store.as_retriever()
-
     def decode_message(self, message: discord.Message) -> str:
         return message.content
 
+    CARD_ITALICS = re.compile(r"\[\[i\]\](.*?)\[\[/\]\]")
+    EX_BURST = re.compile(r"\[\[ex\]\]EX BURS[T|T ]\[\[/\]\]")
+
+    def format_message(self, message: str) -> str:
+        answer = self.EX_BURST.sub("《EX》", message)
+        answer = re.sub(
+            "|".join(self.emoji_mapping.keys()),
+            lambda match: self.emoji_mapping[match.group(0)],
+            answer,
+        )
+        answer = re.sub(r"\u2029\s+|\u2029\s", "\n", answer)
+        answer = self.CARD_ITALICS.sub(r"*\1*", answer)
+        return answer
+
     async def generate(self, content, context) -> str:
-        kwargs = self.prompts.get("general", {})
-        print(content)
+        result = await self.agent.ainvoke(content)
+        answer = self.format_message(result["output"])
 
-        system_prompt = (
-            "Use the following pieces of retrieved context to inform your response."
-            "\n\n"
-            "{context}"
-        )
-
-        prompt = ChatPromptTemplate.from_messages(
-            [
-                ("system", system_prompt),
-                ("system", kwargs.get("system", "You are a chatbot.")),
-                ("human", "{input}"),
-            ]
-        )
-
-        qa_chain = create_stuff_documents_chain(self.llm, prompt)
-        rag_chain = create_retrieval_chain(self.vector_store.as_retriever(), qa_chain)
-
-        result = await rag_chain.ainvoke({"input": content})
-        print(result)
-        answer = result["answer"]
-
+        # TODO: Maybe send 2+ messages instead
         if len(answer) > 2000:
-            log.warning("The initial response is too long: \n%s", answer)
-            sub_result = await self.ollama.generate(
-                model=self.model,
-                prompt=answer,
-                system="Make this response more concise but still formatted for discord. It must be less than 2000 characters long.",
-            )
-            answer = sub_result["response"]
+            log.warning("The initial response is too long")
 
         return answer
 
@@ -261,13 +294,13 @@ class CrystalClient(discord.Client):
             # don't respond to ourselves
             return
 
-        if self.user.mentioned_in(message) or isinstance(
-            message.channel, channel.DMChannel
+        log.debug(message)
+        if (
+            self.user.mentioned_in(message)
+            or f"<@!{self.user.id}>" in message.content
+            or isinstance(message.channel, channel.DMChannel)
         ):
             await self.reply_to_message(message)
-
-        else:
-            log.debug(message)
 
 
 if __name__ == "__main__":

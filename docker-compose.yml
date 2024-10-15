@@ -27,12 +27,19 @@ services:
       OLLAMA_HOST: http://ollama:11434
     volumes:
       - ffdata:/app/data/
+      - ./data/jtemplate/:/app/data/jtemplate/
       - type: bind
         source: ./data/prompts.json
         target: /app/data/prompts.json
       - type: bind
+        source: ./data/emoji.json
+        target: /app/data/emoji.json
+      - type: bind
         source: ./data/corpus_uris.json
         target: /app/data/corpus_uris.json
+      - type: bind
+        source: ./data/cards.json
+        target: /app/data/cards.json
     depends_on:
       - ollama
 
