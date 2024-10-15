@@ -420,7 +420,7 @@ def extend_dataset_torch(
 
     if brightness is not None:
         augments.append(
-            (transforms.ColorJitter(brightness=brightness), "bright_{name}")
+            (transforms.ColorJitter(brightness=(1.0 + brightness, 1.0 + brightness)), "bright_{name}")
         )
 
     if contrast is not None:
