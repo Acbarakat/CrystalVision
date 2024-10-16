@@ -34,9 +34,11 @@ from crystalvision.lang.loaders import explain_database
 try:
     from .lang import PROMPTS_JSON, CORPUS_DIR
     from .lang.docs import DOCS
+    from .lang.tools import MultiImageEmbedTool
 except (ModuleNotFoundError, ImportError):
     from crystalvision.lang import PROMPTS_JSON, CORPUS_DIR
     from crystalvision.lang.docs import DOCS
+    from crystalvision.lang.tools import MultiImageEmbedTool
 
 
 log = logging.getLogger("discord.crystalvision")
@@ -144,7 +146,7 @@ class CrystalClient(discord.Client):
             include_df_in_prompt=None,
             allow_dangerous_code=True,
             prefix=prefix,
-            extra_tools=[retriever_tool],
+            extra_tools=[retriever_tool, MultiImageEmbedTool(self.df)],
         )
 
     @cached_property
@@ -211,6 +213,7 @@ class CrystalClient(discord.Client):
         return message.content
 
     CARD_ITALICS = re.compile(r"\[\[i\]\](.*?)\[\[/\]\]")
+    CARD_SPECIAL = re.compile(r"\[\[s\]\](.*?)\[\[/\]\]")
     EX_BURST = re.compile(r"\[\[ex\]\]EX BURS[T|T ]\[\[/\]\]")
 
     def format_message(self, message: str) -> str:
@@ -222,6 +225,7 @@ class CrystalClient(discord.Client):
         )
         answer = re.sub(r"\u2029\s+|\u2029\s", "\n", answer)
         answer = self.CARD_ITALICS.sub(r"*\1*", answer)
+        answer = self.CARD_SPECIAL.sub(r"***\1***", answer)
         return answer
 
     async def generate(self, content, context) -> str:

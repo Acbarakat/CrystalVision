@@ -41,7 +41,7 @@ kanji_to_english = {
 TEXTEN_REGEX = re.compile(
     "|".join(re.escape(kanji) for kanji in kanji_to_english.keys())
 )
-CARD_CODE = re.compile(r"\d{1,2}-\d{3}[CRHLS]")
+CARD_CODE = re.compile(r"(?:\d{1,2})-\d{3}[CRHLS]|PR-\d{3}")
 
 
 def explain_database():
@@ -49,8 +49,9 @@ def explain_database():
         description = json.loads(fp.read_bytes())
 
     df = make_database().drop(
-        ["id", "images", "thumbs", "element", "power", "multicard", "mono"], axis=1
+        ["id", "thumbs", "element", "power", "multicard", "mono"], axis=1
     )
+    df = df[~df["code"].str.contains("C-")]
     for lang in ("de", "fr", "es", "it", "ja"):
         df.drop(
             [f"name_{lang}", f"text_{lang}", f"job_{lang}", f"type_{lang}"],
@@ -66,6 +67,13 @@ def explain_database():
     df["text_en"] = (
         df["text_en"].str.replace(r"\[\[br\]\]", "\u2029", regex=True).str.strip()
     )
+    df["images"] = df["images"].apply(
+        lambda x: (
+            f"https://fftcg.cdn.sewest.net/images/cards/full/{x[0]}" if x else None
+        )
+    )
+    df["cost"] = df["cost"].astype(int)
+    df["power"] = df["power"].astype(float)
 
     for col in df.columns:
         if col_attrs := description.get(col):
