@@ -8,6 +8,9 @@
     "type_en": {
         "description": "the English type of the card"
     },
+    "power": {
+        "description": "the numerical value of power of the card"
+    },
     "isMultiElement": {
         "description": "if the card is multielement/multi-element/multi element but not which elements it is"
     },
@@ -22,5 +25,8 @@
     },
     "ex_burst": {
         "description": "if the card has an exburst/ex burst/ex-burst/ex/EX ability"
+    },
+    "images": {
+        "description": "the card image URL"
     }
 }
