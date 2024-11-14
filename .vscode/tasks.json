@@ -10,7 +10,8 @@
             "args": [
                 "run",
                 "python",
-                "./crystalvision/data/gather.py",
+                "-m",
+                "crystalvision.gather_assets",
                 "-f=./data/testmodels.json"
             ],
             "problemMatcher": []

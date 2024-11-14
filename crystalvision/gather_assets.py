@@ -29,7 +29,7 @@ import pandas as pd
 from PIL import ImageFile, Image
 
 try:
-    from .base import MISSING_CARDS_FILEPATH, CARD_API_FILEPATH, DATA_DIR
+    from .data.base import MISSING_CARDS_FILEPATH, CARD_API_FILEPATH, DATA_DIR
 except ImportError:
     from crystalvision.data.base import (
         MISSING_CARDS_FILEPATH,
