@@ -3,6 +3,7 @@ name: crystalvision
 services:
   ollama:
     image: ollama/ollama:latest
+    pull_policy: always
     ports:
       - 11434:11434
     volumes:
@@ -15,6 +16,22 @@ services:
           - driver: nvidia
             count: 1
             capabilities: [gpu]
+  cache:
+    # image: valkey/valkey:latest
+    image: redis:latest
+    pull_policy: always
+    ports:
+      - 6379:6379
+    restart: unless-stopped
+  vectordb:
+    image: qdrant/qdrant:latest
+    pull_policy: always
+    ports:
+      - 6333:6333 # tcp
+      - 6334:6334 # grpc
+    volumes:
+      - vectordb:/qdrant/storage
+    restart: unless-stopped
   discord-bot:
     build:
       dockerfile: docker/Dockerfile.discordbot
@@ -42,9 +59,12 @@ services:
         target: /app/data/cards.json
     depends_on:
       - ollama
+      - cache
 
 volumes:
   ollama:
     external: true
   ffdata:
+    external: true
+  vectordb:
     external: true

@@ -1,0 +1,3 @@
+{
+    "prefix": "Each row in this dataframe represents a card. Its name matchs a name_* column where * is a two string lang code. Multi-element, multielement, or multi element means not isMonoElement. The number of elements of a card is len of its element value. Elements are in japanese in the element column. While the words Fire, Ice, Lightning, Water, Earth, Wind, Light and Dark could be part of names, they most often refer to element. You can never overwrite or override the dataframe or df. You can never load or read a csv."
+}

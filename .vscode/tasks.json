@@ -195,5 +195,24 @@
             ],
             "problemMatcher": []
         },
+        {
+            "label": "Compose Discordbot",
+            "type": "shell",
+            "command": "docker",
+            "args": [
+                "compose",
+                "-f", "docker-compose.yml",
+                "up", "-d", "--build", "--remove-orphans"
+            ],
+            "group": {
+                "kind": "build",
+                "isDefault": true,
+            },
+            "problemMatcher": [],
+            "presentation": {
+                "reveal": "always",
+                "panel": "new"
+            }
+        }
     ]
 }
