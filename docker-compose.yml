@@ -40,8 +40,11 @@ services:
       DISCORD_TOKEN: ${DISCORD_TOKEN}
       OLLAMA_EMBED_MODEL: ${OLLAMA_EMBED_MODEL}
       OLLAMA_CHAT_MODEL: ${OLLAMA_CHAT_MODEL}
+      OLLAMA_CODE_MODEL: ${OLLAMA_CODE_MODEL}
+      OLLAMA_VISION_MODEL: ${OLLAMA_VISION_MODEL}
       PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION: python
       OLLAMA_HOST: http://ollama:11434
+      QDRANT_HOST: http://vectordb
     volumes:
       - ffdata:/app/data/
       - ./data/jtemplate/:/app/data/jtemplate/

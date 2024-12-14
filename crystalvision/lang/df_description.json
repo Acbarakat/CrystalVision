@@ -28,5 +28,8 @@
     },
     "images": {
         "description": "the card image URL"
+    },
+    "text_en": {
+        "description": "the English text of the card; containing any possible activated abilities, auto-abilities, or triggered abilities."
     }
 }

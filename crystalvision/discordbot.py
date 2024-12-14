@@ -15,6 +15,7 @@ import logging
 import asyncio
 import hashlib
 import re
+import uuid
 from typing import Optional
 from functools import cached_property, wraps
 
@@ -24,10 +25,11 @@ from discord import Intents, ChannelType, channel
 from ollama import Client, AsyncClient
 from langchain.agents.agent import AgentExecutor
 from langchain_core.language_models import BaseLLM
-from langchain_chroma import Chroma
-from langchain_core.vectorstores import VectorStore, VectorStoreRetriever
+from langchain_core.vectorstores import VectorStoreRetriever
 from langchain_experimental.agents.agent_toolkits import create_pandas_dataframe_agent
 from langchain.tools.retriever import create_retriever_tool
+from langchain_qdrant import QdrantVectorStore
+from qdrant_client import QdrantClient, models as qmodels
 
 from crystalvision.lang.loaders import explain_database
 
@@ -93,27 +95,45 @@ def thinking(timeout: int = 999):
 class CrystalClient(discord.Client):
     """A discord bot for FFTCG"""
 
+    COLLECTION_NAME = "crystalvision-discordbot"
+
     def __init__(
         self,
         *args,
         ollama: Optional[AsyncClient] = None,
         embeddings: Optional[BaseLLM] = None,
-        llm: Optional[BaseLLM] = None,
+        code_llm: Optional[BaseLLM] = None,
+        chat_llm: Optional[BaseLLM] = None,
         **kwargs,
     ) -> None:
         super().__init__(*args, **kwargs)
 
         assert ollama, "No ollama AsyncClient provided"
         assert embeddings, "No embeddings provided"
-        assert llm, "No llm provided"
+        assert code_llm, "No code llm provided"
+        assert chat_llm, "No chat llm provided"
 
         self.ollama: Optional[AsyncClient] = ollama
-        self.embeddings: Optional[BaseLLM] = embeddings
-        self.llm: Optional[BaseLLM] = llm
-        self.vector_store: VectorStore = Chroma(
-            collection_name="crystalvision-discordbot",
-            embedding_function=self.embeddings,
-            persist_directory=str(CORPUS_DIR / ".." / "chroma_langchain_db"),
+        self.embeddings: Optional[OllamaEmbeddings] = embeddings
+        self.code_llm: Optional[BaseLLM] = code_llm
+        self.chat_llm: Optional[BaseLLM] = chat_llm
+        self._vector_store_client: QdrantClient = QdrantClient(
+            url=os.getenv("QDRANT_HOST"), prefer_grpc=True
+        )
+        distance = qmodels.Distance.COSINE
+        if not self._vector_store_client.collection_exists(self.COLLECTION_NAME):
+            embedding_vector = self.embeddings.embed_query("Getting the dimesionality!")
+            self._vector_store_client.create_collection(
+                collection_name=self.COLLECTION_NAME,
+                vectors_config=qmodels.VectorParams(
+                    size=len(embedding_vector), distance=distance
+                ),
+            )
+        self.vector_store: QdrantVectorStore = QdrantVectorStore(
+            self._vector_store_client,
+            collection_name=self.COLLECTION_NAME,
+            embedding=self.embeddings,
+            distance=distance,
         )
         self.model: str = os.getenv("OLLAMA_CHAT_MODEL")
         self.prompts: dict = {}
@@ -139,8 +159,8 @@ class CrystalClient(discord.Client):
 
         prefix += kwargs.get("df_prefix2", "")
 
-        return create_pandas_dataframe_agent(
-            self.llm,
+        agent = create_pandas_dataframe_agent(
+            self.code_llm,
             self.df,
             verbose=True,
             include_df_in_prompt=None,
@@ -148,6 +168,13 @@ class CrystalClient(discord.Client):
             prefix=prefix,
             extra_tools=[retriever_tool, MultiImageEmbedTool(self.df)],
         )
+
+        agent.tools[0].description += self.prompts.get("pandas", {}).get(
+            "description", ""
+        )
+        print(agent.tools[0].description)
+
+        return agent
 
     @cached_property
     def retriever(self) -> VectorStoreRetriever:
@@ -171,27 +198,29 @@ class CrystalClient(discord.Client):
         missing_uuids = []
         for document in DOCS:
             async for doc in document.alazy_load():
-                if (uuid := doc.metadata.get("id", None)) is None:
-                    uuid = hashlib.blake2b(
+                if (q_uuid := doc.metadata.get("id", None)) is None:
+                    q_uuid = hashlib.blake2b(
                         doc.metadata["source"].encode(), digest_size=10
                     ).hexdigest()
                     if (page_num := doc.metadata.get("page", None)) is not None:
-                        uuid += f"-{page_num}"
+                        q_uuid += f"-{page_num}"
                     if (title := doc.metadata.get("title", None)) is not None:
                         title = hashlib.blake2b(
                             title.encode(), digest_size=6
                         ).hexdigest()
-                        uuid += f"-{title}"
+                        q_uuid += f"-{title}"
+                q_uuid = uuid.uuid5(uuid.NAMESPACE_URL, name=q_uuid)
+                q_uuid = str(q_uuid)
 
-                result = self.vector_store.get(ids=[uuid])
-                if uuid in result["ids"]:
+                result = self.vector_store.get_by_ids([q_uuid])
+                if result:
                     log.debug(
-                        "%s (%s) is already in the vectorstore", uuid, doc.metadata
+                        "%s (%s) is already in the vectorstore", q_uuid, doc.metadata
                     )
                 else:
-                    log.info("Adding %s (%s) to the vector store", uuid, doc.metadata)
+                    log.info("Adding %s (%s) to the vector store", q_uuid, doc.metadata)
                     missing_docs.append(doc)
-                    missing_uuids.append(uuid)
+                    missing_uuids.append(q_uuid)
 
         if missing_docs:
             await self.vector_store.aadd_documents(
@@ -314,8 +343,9 @@ if __name__ == "__main__":
 
     assert (embed_model := os.getenv("OLLAMA_EMBED_MODEL")), "No embed model provided"
     assert (chat_model := os.getenv("OLLAMA_CHAT_MODEL")), "No chat model provided"
+    assert (code_model := os.getenv("OLLAMA_CODE_MODEL")), "No code model provided"
 
-    for model in (embed_model, chat_model):
+    for model in (embed_model, chat_model, code_model):
         if model not in client.list():
             log.warning("Downloading model: %s", model)
             client.pull(model)
@@ -325,6 +355,7 @@ if __name__ == "__main__":
         ollama=AsyncClient(),
         intents=intents,
         embeddings=OllamaEmbeddings(model=embed_model),
-        llm=OllamaLLM(model=chat_model, temperature=0.0),
+        code_llm=OllamaLLM(model=code_model, temperature=0.0),
+        chat_llm=OllamaLLM(model=chat_model, temperature=0.0),
     )
     bot.run(os.getenv("DISCORD_TOKEN"))
