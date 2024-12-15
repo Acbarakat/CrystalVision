@@ -10,6 +10,7 @@ packages = [{include = "crystalvision", from="."}]
 [tool.poetry.dependencies]
 python = "3.11.*,<3.12"
 
+
 [tool.poetry.group.base.dependencies]
 pandas = ">=2.1.2"
 tqdm = ">=4.66.1"
@@ -41,10 +42,10 @@ nvidia-nvjitlink-cu12 = {version=">=12.3.101", source="nvidia"}
 torch = {version=">=2.5.1+cu124", source="pytorch"}
 torchvision = {version=">=0.20.1+cu124", source="pytorch"}
 accimage = [
-    {path = "./data/accimage-0.2.0-cp310-cp310-win_amd64.whl", platform="win32", python = "3.10.*"},
-    {path = "./data/accimage-0.2.0-cp310-cp310-linux_x86_64.whl", platform="linux", python = "3.10.*,<3.11"},
+    # {path = "./data/accimage-0.2.0-cp310-cp310-win_amd64.whl", platform="win32", python = "3.10.*"},
+    # {path = "./data/accimage-0.2.0-cp310-cp310-linux_x86_64.whl", platform="linux", python = "3.10.*,<3.11"},
     {path = "./data/accimage-0.2.0-cp311-cp311-linux_x86_64.whl", platform="linux", python = "3.11.*,<3.12"},
-    {path = "./data/accimage-0.2.0-cp312-cp312-linux_x86_64.whl", platform="linux", python = "3.12.*"}
+    # {path = "./data/accimage-0.2.0-cp312-cp312-linux_x86_64.whl", platform="linux", python = "3.12.*"}
 ]
 
 [tool.poetry.group.dev.dependencies]
@@ -66,19 +67,19 @@ paretoset = ">=1.2.3"
 [tool.poetry.group.labeling.dependencies]
 pyqt5-qt5 = "<5.15.11"
 pyqt5 = "^5.15.10"
-labelme = ">=5.4.1"
+# labelme = ">=5.4.1"  # causes issues with onnxruntime-gpu if installed after
 labelme2yolo = ">=0.1.4"
 
 [tool.poetry.group.detection.dependencies]
 ultralytics = ">=8.1.11"
-onnx = ">=1.12.0"
-onnxsim = ">=0.4.33"
-onnxslim = ">=0.1.31"
-onnxruntime-gpu = {version=">=1.18.1", source="onnx-gpu"}
-onnx-graphsurgeon = {version=">=0.5.2", source="nvidia"}
 lapx = ">=0.5.2"
 # ray = {extras = ["tune"], version = ">=2.9.2"}
 
+[tool.poetry.group.onnx.dependencies]
+onnxsim = ">=0.4.33"
+onnxslim = ">=0.1.31"
+onnxruntime-gpu = ">=1.19.0"
+onnx-graphsurgeon = {version=">=0.5.2", source="nvidia"}
 
 [tool.poetry.group.lang.dependencies]
 langchain = ">=0.3.1"
@@ -91,6 +92,8 @@ playwright = ">=1.47.0"
 jq = ">=1.8.0"
 Jinja2 = ">=3.1.4"
 langchain-experimental = ">=0.3.2"
+fastembed-gpu = ">=0.4.2"
+
 
 [tool.poetry.group.discord.dependencies]
 discord-py = ">=2.4.0"
@@ -101,25 +104,25 @@ name = "pytorch"
 url = "https://download.pytorch.org/whl/cu124"
 priority = "supplemental"
 
-[[tool.poetry.source]]
-name = "pytorch-nightly"
-url = "https://download.pytorch.org/whl/nightly/cu124"
-priority = "supplemental"
+# [[tool.poetry.source]]
+# name = "pytorch-nightly"
+# url = "https://download.pytorch.org/whl/nightly/cu124"
+# priority = "supplemental"
 
-[[tool.poetry.source]]
-name = "pytorch-base"
-url = "https://download.pytorch.org/whl"
-priority = "supplemental"
+# [[tool.poetry.source]]
+# name = "pytorch-base"
+# url = "https://download.pytorch.org/whl"
+# priority = "supplemental"
 
 [[tool.poetry.source]]
 name = "nvidia"
 url = "https://pypi.nvidia.com/"
 priority = "supplemental"
 
-[[tool.poetry.source]]
-name = "onnx-gpu"
-url = "https://aiinfra.pkgs.visualstudio.com/PublicPackages/_packaging/onnxruntime-cuda-12/pypi/simple/"
-priority = "supplemental"
+# [[tool.poetry.source]]
+# name = "onnx-gpu"
+# url = "https://aiinfra.pkgs.visualstudio.com/PublicPackages/_packaging/onnxruntime-cuda-12/pypi/simple/"
+# priority = "supplemental"
 
 
 [build-system]

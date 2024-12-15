@@ -13,13 +13,13 @@ import os
 import json
 import logging
 import asyncio
-import hashlib
 import re
 import uuid
 from typing import Optional
 from functools import cached_property, wraps
 
 import discord
+import ollama
 import pandas as pd
 from discord import Intents, ChannelType, channel
 from ollama import Client, AsyncClient
@@ -32,6 +32,7 @@ from langchain_qdrant import QdrantVectorStore
 from qdrant_client import QdrantClient, models as qmodels
 
 from crystalvision.lang.loaders import explain_database
+from crystalvision.lang.embeddings import FastEmbedEmbeddingsGPU
 
 try:
     from .lang import PROMPTS_JSON, CORPUS_DIR
@@ -101,7 +102,7 @@ class CrystalClient(discord.Client):
         self,
         *args,
         ollama: Optional[AsyncClient] = None,
-        embeddings: Optional[BaseLLM] = None,
+        embeddings: Optional[FastEmbedEmbeddingsGPU] = None,
         code_llm: Optional[BaseLLM] = None,
         chat_llm: Optional[BaseLLM] = None,
         **kwargs,
@@ -114,7 +115,7 @@ class CrystalClient(discord.Client):
         assert chat_llm, "No chat llm provided"
 
         self.ollama: Optional[AsyncClient] = ollama
-        self.embeddings: Optional[OllamaEmbeddings] = embeddings
+        self.embeddings: Optional[FastEmbedEmbeddingsGPU] = embeddings
         self.code_llm: Optional[BaseLLM] = code_llm
         self.chat_llm: Optional[BaseLLM] = chat_llm
         self._vector_store_client: QdrantClient = QdrantClient(
@@ -172,7 +173,6 @@ class CrystalClient(discord.Client):
         agent.tools[0].description += self.prompts.get("pandas", {}).get(
             "description", ""
         )
-        print(agent.tools[0].description)
 
         return agent
 
@@ -199,16 +199,11 @@ class CrystalClient(discord.Client):
         for document in DOCS:
             async for doc in document.alazy_load():
                 if (q_uuid := doc.metadata.get("id", None)) is None:
-                    q_uuid = hashlib.blake2b(
-                        doc.metadata["source"].encode(), digest_size=10
-                    ).hexdigest()
+                    q_uuid = doc.metadata["source"]
                     if (page_num := doc.metadata.get("page", None)) is not None:
-                        q_uuid += f"-{page_num}"
+                        q_uuid += f"/{page_num}"
                     if (title := doc.metadata.get("title", None)) is not None:
-                        title = hashlib.blake2b(
-                            title.encode(), digest_size=6
-                        ).hexdigest()
-                        q_uuid += f"-{title}"
+                        q_uuid += f"/{title}"
                 q_uuid = uuid.uuid5(uuid.NAMESPACE_URL, name=q_uuid)
                 q_uuid = str(q_uuid)
 
@@ -302,13 +297,22 @@ class CrystalClient(discord.Client):
     @thinking()
     async def reply_to_message(self, message: discord.Message) -> None:
         resp_channel = message.channel
-
-        response = await self.generate(
-            self.decode_message(message),
-            None,
-        )
-
         mention_author = True
+
+        try:
+            response = await self.generate(
+                self.decode_message(message),
+                None,
+            )
+        except ollama._types.ResponseError as err:
+            if "out of memory" in str(err):
+                await resp_channel.send(
+                    "I'm very tired and my memory is running low. Can you try asking again later?",
+                    mention_author=mention_author,
+                )
+                return
+            raise err
+
         if resp_channel.type == ChannelType.text:
             thread_name = await self.generate_thread_title(message.content, response)
             resp_channel = await resp_channel.create_thread(

@@ -32,6 +32,13 @@ services:
     volumes:
       - vectordb:/qdrant/storage
     restart: unless-stopped
+    deploy:
+      resources:
+        reservations:
+          devices:
+          - driver: nvidia
+            count: 1
+            capabilities: [gpu]
   discord-bot:
     build:
       dockerfile: docker/Dockerfile.discordbot
@@ -42,6 +49,7 @@ services:
       OLLAMA_CHAT_MODEL: ${OLLAMA_CHAT_MODEL}
       OLLAMA_CODE_MODEL: ${OLLAMA_CODE_MODEL}
       OLLAMA_VISION_MODEL: ${OLLAMA_VISION_MODEL}
+      FASTEMBED_TEXT_MODEL: ${FASTEMBED_TEXT_MODEL}
       PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION: python
       OLLAMA_HOST: http://ollama:11434
       QDRANT_HOST: http://vectordb
@@ -60,8 +68,16 @@ services:
       - type: bind
         source: ./data/cards.json
         target: /app/data/cards.json
+    deploy:
+      resources:
+        reservations:
+          devices:
+          - driver: nvidia
+            count: 1
+            capabilities: [gpu]
     depends_on:
       - ollama
+      - vectordb
       - cache
 
 volumes:

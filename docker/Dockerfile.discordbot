@@ -1,4 +1,4 @@
-# FROM nvcr.io/nvidia/cuda:12.6.1-cudnn-devel-ubuntu22.04
+# FROM nvcr.io/nvidia/cuda:12.6.3-cudnn-devel-ubuntu22.04
 FROM python:3.11
 
 RUN apt-get update && apt-get upgrade -yqq
@@ -9,10 +9,14 @@ RUN pip install poetry==1.8.5 playwright==1.49.1
 RUN poetry config virtualenvs.create false && poetry config cache-dir /poetry-cache
 RUN playwright install --with-deps chromium
 
+WORKDIR /app/data
+
+COPY ./data/accimage-0.2.0-cp311-cp311-linux_x86_64.whl ./
+
 WORKDIR /app
 
 COPY ./_torch/pyproject.toml ./_torch/poetry.lock poetry.toml ./
-RUN --mount=type=cache,target=/poetry-cache poetry install --compile --only base,lang,discord --no-root
+RUN --mount=type=cache,target=/poetry-cache poetry install --compile --only base,torch,onnx,lang,discord --no-root
 
 WORKDIR /app/crystalvision
 COPY crystalvision/ .
@@ -23,6 +27,7 @@ ENV OLLAMA_EMBED_MODEL=${OLLAMA_EMBED_MODEL}
 ENV OLLAMA_CHAT_MODEL=${OLLAMA_CHAT_MODEL}
 ENV OLLAMA_CODE_MODEL=${OLLAMA_CODE_MODEL}
 ENV OLLAMA_VISION_MODEL=${OLLAMA_VISION_MODEL}
+ENV FASTEMBED_TEXT_MODEL=${FASTEMBED_TEXT_MODEL}
 ENV USER_AGENT=CrystalVision
 ENV PYTHONPATH=/app
 
