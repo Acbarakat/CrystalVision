@@ -1,4 +1,4 @@
-from typing import Dict
+from typing import Dict, Optional
 import importlib
 
 import torch
@@ -14,6 +14,8 @@ assert (
 
 
 class FastEmbedEmbeddingsGPU(FastEmbedEmbeddings):
+    mtype: Optional[str] = "text"
+
     @pre_init
     def validate_environment(cls, values: Dict) -> Dict:
         """Validate that FastEmbed has been installed."""
@@ -21,6 +23,7 @@ class FastEmbedEmbeddingsGPU(FastEmbedEmbeddings):
         max_length = values.get("max_length")
         cache_dir = values.get("cache_dir")
         threads = values.get("threads")
+        mtype = values.get("mtype", "text")
 
         try:
             fastembed = importlib.import_module("fastembed")
@@ -36,11 +39,19 @@ class FastEmbedEmbeddingsGPU(FastEmbedEmbeddings):
                 'FastEmbedEmbeddings requires `pip install -U "fastembed>=0.2.0"`.'
             )
 
-        values["model"] = fastembed.TextEmbedding(
-            model_name=model_name,
-            max_length=max_length,
-            cache_dir=cache_dir,
-            threads=threads,
-            cuda=True,
-        )
+        if mtype == "image":
+            values["model"] = fastembed.ImageEmbedding(
+                model_name=model_name,
+                cache_dir=cache_dir,
+                threads=threads,
+                cuda=True,
+            )
+        else:
+            values["model"] = fastembed.TextEmbedding(
+                model_name=model_name,
+                max_length=max_length,
+                cache_dir=cache_dir,
+                threads=threads,
+                cuda=True,
+            )
         return values

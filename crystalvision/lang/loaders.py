@@ -44,7 +44,7 @@ TEXTEN_REGEX = re.compile(
 CARD_CODE = re.compile(r"(?:\d{1,2})-\d{3}[CRHLS]|PR-\d{3}")
 
 
-def explain_database():
+def explain_database(one_image: bool = True):
     with Path(__file__).parent / "df_description.json" as fp:
         description = json.loads(fp.read_bytes())
 
@@ -67,11 +67,12 @@ def explain_database():
     df["text_en"] = (
         df["text_en"].str.replace(r"\[\[br\]\]", "\u2029", regex=True).str.strip()
     )
-    df["images"] = df["images"].apply(
-        lambda x: (
-            f"https://fftcg.cdn.sewest.net/images/cards/full/{x[0]}" if x else None
+    if one_image:
+        df["images"] = df["images"].apply(
+            lambda x: (
+                f"https://fftcg.cdn.sewest.net/images/cards/full/{x[0]}" if x else None
+            )
         )
-    )
     df["cost"] = df["cost"].astype(int)
     df["power"] = df["power"].astype(float)
 
