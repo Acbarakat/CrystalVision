@@ -93,11 +93,13 @@ jq = ">=1.8.0"
 Jinja2 = ">=3.1.4"
 langchain-experimental = ">=0.3.2"
 fastembed-gpu = ">=0.4.2"
-
+xattr = ">=1.1.0"
 
 [tool.poetry.group.discord.dependencies]
 discord-py = ">=2.4.0"
 
+[tool.poetry.group.watchdog.dependencies]
+watchdog = ">=6.0.0"
 
 [[tool.poetry.source]]
 name = "pytorch"

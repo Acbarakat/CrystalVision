@@ -41,5 +41,6 @@ class FastEmbedEmbeddingsGPU(FastEmbedEmbeddings):
             max_length=max_length,
             cache_dir=cache_dir,
             threads=threads,
+            cuda=True,
         )
         return values

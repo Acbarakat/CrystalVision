@@ -39,6 +39,31 @@ services:
           - driver: nvidia
             count: 1
             capabilities: [gpu]
+  watchdog:
+    build:
+      dockerfile: docker/Dockerfile.watchdog
+    environment:
+      PYTHONUNBUFFERED: 1
+      FASTEMBED_TEXT_MODEL: ${FASTEMBED_TEXT_MODEL}
+      PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION: python
+      QDRANT_HOST: http://vectordb
+    volumes:
+      - ffdata:/app/data/
+      - vectordb:/tmp/fastembed_cache/
+      - ./data/jtemplate/:/app/data/jtemplate/
+      - type: bind
+        source: ./data/corpus_uris.json
+        target: /app/data/corpus_uris.json
+      - type: bind
+        source: ./data/cards.json
+        target: /app/data/cards.json
+    deploy:
+      resources:
+        reservations:
+          devices:
+          - driver: nvidia
+            count: 1
+            capabilities: [gpu]
   discord-bot:
     build:
       dockerfile: docker/Dockerfile.discordbot
@@ -55,6 +80,7 @@ services:
       QDRANT_HOST: http://vectordb
     volumes:
       - ffdata:/app/data/
+      - vectordb:/tmp/fastembed_cache/
       - ./data/jtemplate/:/app/data/jtemplate/
       - type: bind
         source: ./data/prompts.json
@@ -62,9 +88,6 @@ services:
       - type: bind
         source: ./data/emoji.json
         target: /app/data/emoji.json
-      - type: bind
-        source: ./data/corpus_uris.json
-        target: /app/data/corpus_uris.json
       - type: bind
         source: ./data/cards.json
         target: /app/data/cards.json
@@ -79,6 +102,7 @@ services:
       - ollama
       - vectordb
       - cache
+      - watchdog
 
 volumes:
   ollama:

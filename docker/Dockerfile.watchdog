@@ -17,7 +17,7 @@ WORKDIR /app
 
 COPY ./_torch/pyproject.toml ./_torch/poetry.lock poetry.toml ./
 RUN --mount=type=cache,target=/poetry-cache poetry install --compile --only base,torch,onnx,lang --no-root
-RUN --mount=type=cache,target=/poetry-cache poetry install --compile --only discord --no-root
+RUN --mount=type=cache,target=/poetry-cache poetry install --compile --only watchdog --no-root
 
 WORKDIR /app/crystalvision
 COPY crystalvision/ .
@@ -32,4 +32,4 @@ ENV FASTEMBED_TEXT_MODEL=${FASTEMBED_TEXT_MODEL}
 ENV USER_AGENT=CrystalVision
 ENV PYTHONPATH=/app
 
-ENTRYPOINT [ "python", "-m", "crystalvision.discordbot" ]
+ENTRYPOINT [ "python", "-m", "crystalvision.corpus_watchdog" ]

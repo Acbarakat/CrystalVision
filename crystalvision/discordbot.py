@@ -14,7 +14,6 @@ import json
 import logging
 import asyncio
 import re
-import uuid
 from typing import Optional
 from functools import cached_property, wraps
 
@@ -29,19 +28,18 @@ from langchain_core.vectorstores import VectorStoreRetriever
 from langchain_experimental.agents.agent_toolkits import create_pandas_dataframe_agent
 from langchain.tools.retriever import create_retriever_tool
 from langchain_qdrant import QdrantVectorStore
-from qdrant_client import QdrantClient, models as qmodels
-
-from crystalvision.lang.loaders import explain_database
-from crystalvision.lang.embeddings import FastEmbedEmbeddingsGPU
+from qdrant_client import QdrantClient
 
 try:
-    from .lang import PROMPTS_JSON, CORPUS_DIR
-    from .lang.docs import DOCS
+    from .lang import PROMPTS_JSON, EMOJI_JSON
     from .lang.tools import MultiImageEmbedTool
+    from .lang.loaders import explain_database
+    from .lang.embeddings import FastEmbedEmbeddingsGPU
 except (ModuleNotFoundError, ImportError):
-    from crystalvision.lang import PROMPTS_JSON, CORPUS_DIR
-    from crystalvision.lang.docs import DOCS
+    from crystalvision.lang import PROMPTS_JSON, EMOJI_JSON
     from crystalvision.lang.tools import MultiImageEmbedTool
+    from crystalvision.lang.loaders import explain_database
+    from crystalvision.lang.embeddings import FastEmbedEmbeddingsGPU
 
 
 log = logging.getLogger("discord.crystalvision")
@@ -56,8 +54,6 @@ intents.guilds = True
 pd.set_option("display.max_columns", None)
 pd.set_option("display.max_rows", None)
 pd.set_option("display.max_colwidth", None)
-
-EMOJI_JSON = (CORPUS_DIR / ".." / "emoji.json").resolve()
 
 
 def thinking(timeout: int = 999):
@@ -96,7 +92,7 @@ def thinking(timeout: int = 999):
 class CrystalClient(discord.Client):
     """A discord bot for FFTCG"""
 
-    COLLECTION_NAME = "crystalvision-discordbot"
+    COLLECTION_NAME = os.getenv("COLLECTION_NAME", "crystalvision-discordbot")
 
     def __init__(
         self,
@@ -121,20 +117,10 @@ class CrystalClient(discord.Client):
         self._vector_store_client: QdrantClient = QdrantClient(
             url=os.getenv("QDRANT_HOST"), prefer_grpc=True
         )
-        distance = qmodels.Distance.COSINE
-        if not self._vector_store_client.collection_exists(self.COLLECTION_NAME):
-            embedding_vector = self.embeddings.embed_query("Getting the dimesionality!")
-            self._vector_store_client.create_collection(
-                collection_name=self.COLLECTION_NAME,
-                vectors_config=qmodels.VectorParams(
-                    size=len(embedding_vector), distance=distance
-                ),
-            )
         self.vector_store: QdrantVectorStore = QdrantVectorStore(
             self._vector_store_client,
             collection_name=self.COLLECTION_NAME,
             embedding=self.embeddings,
-            distance=distance,
         )
         self.model: str = os.getenv("OLLAMA_CHAT_MODEL")
         self.prompts: dict = {}
@@ -193,36 +179,6 @@ class CrystalClient(discord.Client):
                 self.emoji_mapping = json.load(fp)
         else:
             log.error("Could not find emoji json (%s)", EMOJI_JSON)
-
-        missing_docs = []
-        missing_uuids = []
-        for document in DOCS:
-            async for doc in document.alazy_load():
-                if (q_uuid := doc.metadata.get("id", None)) is None:
-                    q_uuid = doc.metadata["source"]
-                    if (page_num := doc.metadata.get("page", None)) is not None:
-                        q_uuid += f"/{page_num}"
-                    if (title := doc.metadata.get("title", None)) is not None:
-                        q_uuid += f"/{title}"
-                q_uuid = uuid.uuid5(uuid.NAMESPACE_URL, name=q_uuid)
-                q_uuid = str(q_uuid)
-
-                result = self.vector_store.get_by_ids([q_uuid])
-                if result:
-                    log.debug(
-                        "%s (%s) is already in the vectorstore", q_uuid, doc.metadata
-                    )
-                else:
-                    log.info("Adding %s (%s) to the vector store", q_uuid, doc.metadata)
-                    missing_docs.append(doc)
-                    missing_uuids.append(q_uuid)
-
-        if missing_docs:
-            await self.vector_store.aadd_documents(
-                documents=missing_docs, ids=missing_uuids
-            )
-        del missing_docs
-        del missing_uuids
 
         activity = discord.Activity(
             name="CrystalVision", state="Ask me", type=discord.ActivityType.custom
@@ -341,15 +297,15 @@ class CrystalClient(discord.Client):
 
 
 if __name__ == "__main__":
-    from langchain_ollama import OllamaEmbeddings, OllamaLLM
+    from langchain_ollama import OllamaLLM
 
     client = Client()
 
-    assert (embed_model := os.getenv("OLLAMA_EMBED_MODEL")), "No embed model provided"
+    assert (embed_model := os.getenv("FASTEMBED_TEXT_MODEL")), "No embed model provided"
     assert (chat_model := os.getenv("OLLAMA_CHAT_MODEL")), "No chat model provided"
     assert (code_model := os.getenv("OLLAMA_CODE_MODEL")), "No code model provided"
 
-    for model in (embed_model, chat_model, code_model):
+    for model in (chat_model, code_model):
         if model not in client.list():
             log.warning("Downloading model: %s", model)
             client.pull(model)
@@ -358,7 +314,7 @@ if __name__ == "__main__":
     bot = CrystalClient(
         ollama=AsyncClient(),
         intents=intents,
-        embeddings=OllamaEmbeddings(model=embed_model),
+        embeddings=FastEmbedEmbeddingsGPU(model_name=embed_model),
         code_llm=OllamaLLM(model=code_model, temperature=0.0),
         chat_llm=OllamaLLM(model=chat_model, temperature=0.0),
     )
