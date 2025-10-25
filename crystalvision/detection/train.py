@@ -1,6 +1,7 @@
 """
 Train the card object detection
 """
+
 from argparse import Namespace
 from typing import Dict, Any
 from multiprocessing import freeze_support

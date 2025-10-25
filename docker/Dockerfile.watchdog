@@ -1,12 +1,15 @@
-# FROM nvcr.io/nvidia/cuda:12.6.3-cudnn-devel-ubuntu22.04
-FROM python:3.11
+FROM nvcr.io/nvidia/cuda:12.8.0-cudnn-devel-ubuntu22.04
 
 RUN apt-get update && apt-get upgrade -yqq
 
-RUN apt install libffi-dev libnacl-dev python3-dev -yqq
+RUN apt install libffi-dev libnacl-dev python3.11-dev python3.11-distutils curl -yqq
 
-RUN pip install poetry==1.8.5 playwright==1.49.1
+RUN curl -sS https://bootstrap.pypa.io/get-pip.py | python3.11
+
+RUN pip install poetry==2.2.1
 RUN poetry config virtualenvs.create false && poetry config cache-dir /poetry-cache
+
+RUN pip install playwright==1.49.1
 RUN playwright install --with-deps chromium
 
 WORKDIR /app/data
@@ -15,7 +18,7 @@ COPY ./data/accimage-0.2.0-cp311-cp311-linux_x86_64.whl ./
 
 WORKDIR /app
 
-COPY ./_torch/pyproject.toml ./_torch/poetry.lock poetry.toml ./
+COPY pyproject.toml poetry.lock poetry.toml ./
 RUN --mount=type=cache,target=/poetry-cache poetry install --compile --only base,torch,onnx,lang --no-root
 RUN --mount=type=cache,target=/poetry-cache poetry install --compile --only watchdog --no-root
 
@@ -32,4 +35,4 @@ ENV FASTEMBED_TEXT_MODEL=${FASTEMBED_TEXT_MODEL}
 ENV USER_AGENT=CrystalVision
 ENV PYTHONPATH=/app
 
-ENTRYPOINT [ "python", "-m", "crystalvision.corpus_watchdog" ]
+ENTRYPOINT [ "python3.11", "-m", "crystalvision.corpus_watchdog" ]

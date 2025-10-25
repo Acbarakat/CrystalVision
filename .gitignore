@@ -137,6 +137,3 @@ runs/
 cards.json
 yolo*.pt
 cuda*.deb
-
-/poetry.lock
-/pyproject.toml

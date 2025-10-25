@@ -1,6 +1,7 @@
 """
 Detect FFTCG cards and show them via OpenCV.
 """
+
 import json
 import logging
 from pathlib import Path

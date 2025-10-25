@@ -25,9 +25,11 @@ class YOLOv8Seg:
         # Build Ort session
         self.session = ort.InferenceSession(
             onnx_model,
-            providers=["CUDAExecutionProvider", "CPUExecutionProvider"]
-            if ort.get_device() == "GPU"
-            else ["CPUExecutionProvider"],
+            providers=(
+                ["CUDAExecutionProvider", "CPUExecutionProvider"]
+                if ort.get_device() == "GPU"
+                else ["CPUExecutionProvider"]
+            ),
         )
 
         # Numpy dtype: support both FP32 and FP16 onnx model
@@ -106,9 +108,10 @@ class YOLOv8Seg:
         r = min(new_shape[0] / shape[0], new_shape[1] / shape[1])
         ratio = r, r
         new_unpad = int(round(shape[1] * r)), int(round(shape[0] * r))
-        pad_w, pad_h = (new_shape[1] - new_unpad[0]) / 2, (
-            new_shape[0] - new_unpad[1]
-        ) / 2  # wh padding
+        pad_w, pad_h = (
+            (new_shape[1] - new_unpad[0]) / 2,
+            (new_shape[0] - new_unpad[1]) / 2,
+        )  # wh padding
         if shape[::-1] != new_unpad:  # resize
             img = cv2.resize(img, new_unpad, interpolation=cv2.INTER_LINEAR)
         top, bottom = int(round(pad_h - 0.1)), int(round(pad_h + 0.1))
@@ -279,16 +282,18 @@ class YOLOv8Seg:
             gain = min(
                 im1_shape[0] / im0_shape[0], im1_shape[1] / im0_shape[1]
             )  # gain  = old / new
-            pad = (im1_shape[1] - im0_shape[1] * gain) / 2, (
-                im1_shape[0] - im0_shape[0] * gain
-            ) / 2  # wh padding
+            pad = (
+                (im1_shape[1] - im0_shape[1] * gain) / 2,
+                (im1_shape[0] - im0_shape[0] * gain) / 2,
+            )  # wh padding
         else:
             pad = ratio_pad[1]
 
         # Calculate tlbr of mask
         top, left = int(round(pad[1] - 0.1)), int(round(pad[0] - 0.1))  # y, x
-        bottom, right = int(round(im1_shape[0] - pad[1] + 0.1)), int(
-            round(im1_shape[1] - pad[0] + 0.1)
+        bottom, right = (
+            int(round(im1_shape[0] - pad[1] + 0.1)),
+            int(round(im1_shape[1] - pad[0] + 0.1)),
         )
         if len(masks.shape) < 2:
             raise ValueError(

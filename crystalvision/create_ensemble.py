@@ -14,6 +14,7 @@ Todo:
     * Explore minimize function further
 
 """
+
 import json
 import logging
 

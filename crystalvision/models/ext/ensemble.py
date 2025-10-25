@@ -428,9 +428,7 @@ class MyEnsembleVoteClassifier(EnsembleVoteClassifier):
         self.classes_ = self.le_.classes_
 
         if not self.fit_base_estimators and self.use_clones:
-            warnings.warn(
-                "fit_base_estimators=False " "enforces use_clones to be `False`"
-            )
+            warnings.warn("fit_base_estimators=False enforces use_clones to be `False`")
             self.use_clones = False
 
         if self.use_clones:

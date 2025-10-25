@@ -13,6 +13,7 @@ Todo:
     * Add Illustrator data (http://www.square-enix-shop.com/jp/ff-tcg/card/illust_index.html)
 
 """
+
 import asyncio
 import json
 import os
@@ -36,6 +37,7 @@ except ImportError:
         CARD_API_FILEPATH,
         DATA_DIR,
     )
+
 
 log = logging.getLogger("gather")
 
@@ -142,11 +144,19 @@ async def download_image(
                 log.error("Failed to download %s", img_url)
                 return
 
+    if len(content) < 1024:
+        log.warning("%s Failed! (Invalid data size of %s)", img_url, len(content))
+        return dst
+
     p = ImageFile.Parser()
     p.feed(content)
 
     # Convert to jpg
-    img = p.close().convert("RGB")
+    try:
+        img = p.close().convert("RGB")
+    except OSError as err:
+        log.warning("%s Failed! (%s)", img_url, err)
+        return dst
 
     if crop:
         img = img.crop(crop)
@@ -190,7 +200,15 @@ async def main(pargs) -> None:
     df = pd.read_table(
         "http://www.square-enix-shop.com/jp/ff-tcg/card/data/list_card.txt", header=None
     )
-    df.rename({0: "code", 1: "element", 2: "name_ja", 7: "image"}, axis=1, inplace=True)
+    df.rename(
+        {0: "code", 1: "element", 2: "name_ja", 7: "image", 11: "illustrator"},
+        axis=1,
+        inplace=True,
+    )
+    df["illustrator"] = df["illustrator"].str.extract(r"ILLUSTRATION:\s*([^\n]+)")
+    df["illustrator"] = df["illustrator"].str.replace(
+        ".*YOSHITAKA AMANO", "Yoshitaka Amano", regex=True
+    )
 
     # Special case flip
     df.replace({"code": "PR-051/11-083R"}, {"code": "11-083R/PR-051"}, inplace=True)
@@ -227,6 +245,9 @@ async def main(pargs) -> None:
 
             if "image" in d:
                 del d["image"]
+
+            if not pd.isna(row["illustrator"]):
+                d["illustrator"] = row["illustrator"]
 
             d["images"]["thumbs"].append(
                 f"http://www.square-enix-shop.com/jp/ff-tcg/card/cimg/thumb/{fname}"

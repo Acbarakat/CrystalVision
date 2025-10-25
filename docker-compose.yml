@@ -24,7 +24,7 @@ services:
       - 6379:6379
     restart: unless-stopped
   vectordb:
-    image: qdrant/qdrant:latest
+    image: qdrant/qdrant:gpu-nvidia-latest
     pull_policy: always
     ports:
       - 6333:6333 # tcp

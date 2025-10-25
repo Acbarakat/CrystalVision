@@ -10,6 +10,7 @@ Todo:
     * N/A
 
 """
+
 import json
 import array
 import pickle
@@ -533,7 +534,8 @@ class MyMultiLabelBinarizer(MultiLabelBinarizer):
 
 
 class MultiLabelCardModel(  # pylint: disable=W0223
-    OneHotMeanIoUMixin, CardModel  # pylint: disable=W231
+    OneHotMeanIoUMixin,
+    CardModel,  # pylint: disable=W231
 ):
     """Base multilabel hypermodel for Cards."""
 

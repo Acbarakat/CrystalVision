@@ -10,6 +10,7 @@ Todo:
     * N/A
 
 """
+
 import os
 from copy import deepcopy
 from typing import Tuple, List, Any
@@ -57,7 +58,8 @@ elif backend.backend() == "torch":
 
 # Define a cache region
 cache = make_region().configure(
-    "dogpile.cache.memory", expiration_time=3600  # Cache expiration time in seconds
+    "dogpile.cache.memory",
+    expiration_time=3600,  # Cache expiration time in seconds
 )
 
 
@@ -101,7 +103,7 @@ def imagine_database(image: str = "thumbs", clear_extras: bool = False) -> pd.Da
 
     # WA: Bad Download/Image from server
     df.query(
-        f"{image} not in ('8-080C_es.jpg', '11-138S_fr.jpg', '12-049H_fr_Premium.jpg', '13-106H_de.jpg')",
+        f"{image} not in ('8-080C_es.jpg', '11-138S_fr.jpg', '12-049H_fr_Premium.jpg', '13-106H_de.jpg', 'Re-001H_eg.jpg')",
         inplace=True,
     )
 

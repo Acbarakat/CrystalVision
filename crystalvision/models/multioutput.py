@@ -6,6 +6,7 @@ Todo:
     * N/A
 
 """
+
 from pandas import DataFrame
 from keras import layers, models, optimizers, metrics
 from keras_tuner import HyperParameters
@@ -40,7 +41,7 @@ class MultiLabel(HyperbandTunerMixin, MultiLabelCardModel):
                 "multicard",
                 "limit_break",
             ],
-            **kwargs
+            **kwargs,
         )
 
         self.callbacks[0].min_delta = 5e-04
