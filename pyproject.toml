@@ -1,15 +1,18 @@
-[tool.poetry]
+[project]
 name = "crystalvision"
-version = "0.3.2"
 description = "FFTCG Image Classification and Detection."
-authors = ["Allonte <angelosheltie@gmail.com>"]
-license = "MIT License"
+license = "MIT"
+dynamic = ["version"]
 readme = "README.md"
+authors = [{name = "Allonte", email = "angelosheltie@gmail.com"}]
+requires-python = '>=3.11,<3.12'
+dependencies = []
+
+[tool.poetry]
+version = "0.3.2"
 packages = [{include = "crystalvision", from="."}]
 package-mode = true
-
-[tool.poetry.dependencies]
-python = ">=3.11,<3.12"
+requires-poetry = '>=2.0.0'
 
 [tool.poetry.group.base.dependencies]
 pandas = ">=2.1.2"
