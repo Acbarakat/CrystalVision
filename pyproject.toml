@@ -153,6 +153,9 @@ addopts = [
 ]
 pythonpath = ["src"]
 
+[tool.ruff.format]
+line-ending = "lf"
+
 [tool.ruff.lint]
 select = ["E", "F"]
 ignore = ["E501"]
