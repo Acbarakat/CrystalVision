@@ -12,7 +12,9 @@
                 "python",
                 "-m",
                 "crystalvision.gather_assets",
-                "-f=./data/testmodels.json"
+                "-f",
+                "./data/testmodels.json",
+                "--debug"
             ],
             "problemMatcher": []
         },

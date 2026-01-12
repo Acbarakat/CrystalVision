@@ -137,3 +137,4 @@ runs/
 cards.json
 yolo*.pt
 cuda*.deb
+jp_cards.csv

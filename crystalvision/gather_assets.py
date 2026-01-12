@@ -14,12 +14,14 @@ Todo:
 
 """
 
+import re
 import asyncio
 import json
 import os
 import typing
 import logging
 from io import BytesIO
+import urllib
 
 from tqdm.asyncio import tqdm
 import aiohttp
@@ -197,22 +199,72 @@ async def main(pargs) -> None:
         unit="cards",
     )
 
+    with urllib.request.urlopen(
+        "http://www.square-enix-shop.com/jp/ff-tcg/card/data/list_card.txt"
+    ) as f:
+        df = f.read()
+
+    df = re.sub(
+        r'(?:\t"&copy;[^"]*"|\t&copy;[^\r\n]*)',
+        "\tplaceholder",
+        df.decode(),
+        flags=re.IGNORECASE | re.MULTILINE,
+    )
+    df = re.sub(
+        r"\tplaceholder\t+$", "\tplacholder", df, flags=re.IGNORECASE | re.MULTILINE
+    )
+    df = BytesIO(df.encode())
+
     df = pd.read_table(
-        "http://www.square-enix-shop.com/jp/ff-tcg/card/data/list_card.txt", header=None
+        df,
+        header=None,
+        true_values=["◯", "○"],
+        on_bad_lines="warn",
+        # on_bad_lines=lambda x: print(x)
     )
     df.rename(
-        {0: "code", 1: "element", 2: "name_ja", 7: "image", 11: "illustrator"},
+        {
+            0: "code",
+            1: "element",
+            2: "name_ja",
+            7: "image",
+            9: "is_promo",
+            11: "illustrator",
+        },
         axis=1,
         inplace=True,
     )
-    df["illustrator"] = df["illustrator"].str.extract(r"ILLUSTRATION:\s*([^\n]+)")
+    df["illustrator"] = df[4].str.extract(r"ILLUSTRATION:\s*([^\n]+)")
     df["illustrator"] = df["illustrator"].str.replace(
         ".*YOSHITAKA AMANO", "Yoshitaka Amano", regex=True
     )
+    df[6] = df[6].astype(str)
+
+    def find_illustrator(row: pd.Series) -> str | None:
+        if row[6].startswith("AkaneSaito|"):
+            return "Akane Saito"
+
+        if "|" in row[6]:
+            return re.sub(r"(?<=[a-z])(?=[A-Z])", " ", row[6].split("|")[1]).strip()
+
+        if "YuyaIshihata" == row[6]:
+            return "Yuya Ishihata"
+
+        if not isinstance(row["illustrator"], float) and (
+            stripped_text := row["illustrator"].strip()
+        ):
+            return stripped_text
+
+        return None
+
+    df["illustrator"] = df.apply(find_illustrator, axis=1)
 
     # Special case flip
     df.replace({"code": "PR-051/11-083R"}, {"code": "11-083R/PR-051"}, inplace=True)
     df.replace({"code": "PR-055/11-062R"}, {"code": "11-062R/PR-055"}, inplace=True)
+
+    if pargs.debug:
+        df.to_csv("jp_cards.csv")
 
     cleared_codes = []
     images = []
@@ -302,6 +354,9 @@ if __name__ == "__main__":
         type=Path,
         required=True,
         help="Path to the JSON validation assets file.",
+    )
+    parser.add_argument(
+        "--debug", action="store_true", help="Enable debug assets and logging"
     )
 
     args = parser.parse_args()
