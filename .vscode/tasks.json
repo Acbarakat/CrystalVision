@@ -16,6 +16,11 @@
                 "./data/testmodels.json",
                 "--debug"
             ],
+            "options": {
+                "env": {
+                    "KERAS_BACKEND": "torch",
+                }
+            },
             "problemMatcher": []
         },
         {

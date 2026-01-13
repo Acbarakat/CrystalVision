@@ -138,3 +138,10 @@ cards.json
 yolo*.pt
 cuda*.deb
 jp_cards.csv
+/crystalvision/unsloth_compiled_cache
+/fftcg.parquet
+/fftcg_data
+/crystalvision/.Trash-1001
+/crystalvision/outputs
+/crystalvision/lora_model
+/crystalvision/training_checkpoints

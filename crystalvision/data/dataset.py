@@ -17,6 +17,7 @@ from typing import Tuple, List, Any
 
 import pandas as pd
 import numpy as np
+import swifter  # noqa
 from dogpile.cache import make_region
 from keras import layers, backend
 
@@ -62,8 +63,30 @@ cache = make_region().configure(
     expiration_time=3600,  # Cache expiration time in seconds
 )
 
+BAD_THUMBS = (
+    "8-080C_es.jpg",
+    "11-138S_fr.jpg",
+    "12-049H_fr_Premium.jpg",
+    "13-106H_de.jpg",
+    "Re-133H_es.jpg",
+)
+THUMBS_DIR = os.path.abspath(os.path.join(DATA_DIR, "thumb"))
+BAD_IMAGES = (
+    "8-080C_es.jpg",
+    "11-138S_fr.jpg",
+    "12-049H_fr_Premium.jpg",
+    "13-106H_de.jpg",
+    "Re-133H_es.jpg",
+)
+IMAGES_DIR = os.path.abspath(os.path.join(DATA_DIR, "img"))
 
-def imagine_database(image: str = "thumbs", clear_extras: bool = False) -> pd.DataFrame:
+
+def imagine_database(
+    image: str = "thumbs",
+    clear_extras: bool = False,
+    ignore_fullart: bool = True,
+    simplify_lang: bool = False,
+) -> pd.DataFrame:
     """
     Explode the database based on `image` kwarg.
 
@@ -80,9 +103,17 @@ def imagine_database(image: str = "thumbs", clear_extras: bool = False) -> pd.Da
     Returns:
         Card API DataFrame
     """
-    assert image in ("thumbs", "images"), f"'{image}' is not valid"
-    df = make_database().explode(image)
-    # df["Class"] = df['thumbs'].apply(lambda x: 'Full Art' if '_fl' in x.lower() else '')
+    assert image in ("thumbs", "images", "both"), f"'{image}' is not valid"
+
+    df = make_database()
+
+    match image:
+        case "both":
+            df1 = df.explode("thumbs").assign(image_type="thumbs")
+            df2 = df.explode("images").assign(image_type="images")
+            df = pd.concat([df1, df2], copy=False)
+        case _:
+            df = df.explode(image)
 
     # Ignore Crystal Tokens
     df.query("type_en != 'Crystal'", inplace=True)
@@ -90,32 +121,85 @@ def imagine_database(image: str = "thumbs", clear_extras: bool = False) -> pd.Da
     # Ignore Boss Deck cards
     df.query("rarity != 'B'", inplace=True)
 
-    # Ignore Full Art Cards
-    df.query(
-        f"~{image}.str.contains('_FL') and ~{image}.str.contains('_2_')", inplace=True
-    )
-
-    # Ignore Promo Cards, they tend to be Full Art
-    df.query(f"~{image}.str.contains('_PR')", inplace=True)
-
-    # Ignore
-    df.query(f"~{image}.str.contains('_premium')", inplace=True)
+    if ignore_fullart:
+        df.query(
+            f"~{image}.str.contains('_FL') and ~{image}.str.contains('_2_')",
+            inplace=True,
+        )
+        # Ignore Promo Cards, they tend to be Full Art
+        df.query(f"~{image}.str.contains('_PR')", inplace=True)
+        df.query(f"~{image}.str.contains('_premium')", inplace=True)
 
     # WA: Bad Download/Image from server
-    df.query(
-        f"{image} not in ('8-080C_es.jpg', '11-138S_fr.jpg', '12-049H_fr_Premium.jpg', '13-106H_de.jpg', 'Re-001H_eg.jpg')",
-        inplace=True,
-    )
+    match image:
+        case "thumbs":
+            df.query(
+                f"thumbs not in {BAD_THUMBS}",
+                inplace=True,
+            )
+        case "images":
+            df.query(
+                f"images not in {BAD_IMAGES}",
+                inplace=True,
+            )
+        case "both":
+            df.query(
+                f"thumbs not in {BAD_THUMBS} and images not in {BAD_IMAGES}",
+                inplace=True,
+            )
 
     # Source image folder
-    df = df.copy()  # WA: for pandas modification on slice
-    if image == "images":
-        image_dir = os.path.abspath(os.path.join(DATA_DIR, "img"))
-        df.rename({"images": "filename"}, axis=1, inplace=True)
-    else:
-        image_dir = os.path.abspath(os.path.join(DATA_DIR, "thumb"))
-        df.rename({"thumbs": "filename"}, axis=1, inplace=True)
-    df["filename"] = image_dir + os.sep + df["filename"]
+    df = df.reset_index()  # WA: for pandas modification on slice
+
+    def find_image_file(row: pd.Series) -> str:
+        image_type = row["image_type"]
+        if image_type == "images":
+            return IMAGES_DIR + os.sep + row[image_type]
+        return THUMBS_DIR + os.sep + row[image_type]
+
+    match image:
+        case "images":
+            df.rename({"images": "filename"}, axis=1, inplace=True)
+            df["filename"] = IMAGES_DIR + os.sep + df["filename"]
+        case "thumbs":
+            df.rename({"thumbs": "filename"}, axis=1, inplace=True)
+            df["filename"] = THUMBS_DIR + os.sep + df["filename"]
+        case "both":
+            df["filename"] = df.swifter.progress_bar(desc="Find Image").apply(
+                find_image_file, axis=1
+            )
+
+    df["language"] = df["filename"].str.extract(".*_(de|eg|es|fr|it|jp)")
+    df["is_fullart"] = df["filename"].str.contains(
+        "_FL|_2_|_premium", regex=True, case=False
+    )
+
+    def make_simplier_df(row):
+        lang = row["language"]
+        if lang == "eg":
+            lang = "en"
+        elif lang == "jp":
+            lang = "ja"
+
+        for col in ("name", "type", "job", "text"):
+            row[col] = row[f"{col}_{lang}"]
+
+        return row
+
+    df.reset_index(drop=True, inplace=True)
+
+    df["set"] = (
+        df["set"]
+        .swifter.progress_bar(desc="Finding Set")
+        .apply(lambda x: tuple(x) if isinstance(x, list) else (x,))
+    )
+
+    if simplify_lang:
+        df = df.swifter.progress_bar(desc="Simplifying Lang").apply(
+            make_simplier_df, axis=1
+        )
+        df = df.loc[:, ~df.columns.str.endswith("_en")]
+        clear_extras = True
 
     # Remove the extra lang columns
     if clear_extras:

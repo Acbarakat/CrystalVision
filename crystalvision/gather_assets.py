@@ -30,15 +30,20 @@ import aiofiles.os as aioos
 import requests
 import pandas as pd
 from PIL import ImageFile, Image
+import swifter  # noqa
+import dask.dataframe as dd
+from dask.diagnostics import progress
 
 try:
     from .data.base import MISSING_CARDS_FILEPATH, CARD_API_FILEPATH, DATA_DIR
+    from .data.dataset import imagine_database
 except ImportError:
     from crystalvision.data.base import (
         MISSING_CARDS_FILEPATH,
         CARD_API_FILEPATH,
         DATA_DIR,
     )
+    from crystalvision.data.dataset import imagine_database
 
 
 log = logging.getLogger("gather")
@@ -113,7 +118,7 @@ async def download_image(
     fname: typing.Any = None,
     crop: typing.Any = None,
     resize: typing.Any = None,
-) -> str:
+) -> str | None:
     """
     Download image and return on-disk destination.
 
@@ -187,6 +192,7 @@ async def main(pargs) -> None:
         *[download_image(img_url) for img_url in img_urls],
         desc="full card images",
         unit="cards",
+        colour="MAGENTA",
     )
 
     thumb_urls = []
@@ -197,22 +203,29 @@ async def main(pargs) -> None:
         *[download_image(thumb_url, "thumb") for thumb_url in thumb_urls],
         desc="thumb card images",
         unit="cards",
+        colour="MAGENTA",
     )
 
     with urllib.request.urlopen(
         "http://www.square-enix-shop.com/jp/ff-tcg/card/data/list_card.txt"
     ) as f:
-        df = f.read()
+        df = f.read().decode()
+
+    if pargs.debug:
+        fpath = os.path.dirname(__file__)
+        with open(f"{fpath}/../data/list_card.txt", "w+") as f:
+            f.write(df)
 
     df = re.sub(
         r'(?:\t"&copy;[^"]*"|\t&copy;[^\r\n]*)',
         "\tplaceholder",
-        df.decode(),
+        df,
         flags=re.IGNORECASE | re.MULTILINE,
     )
     df = re.sub(
         r"\tplaceholder\t+$", "\tplacholder", df, flags=re.IGNORECASE | re.MULTILINE
     )
+
     df = BytesIO(df.encode())
 
     df = pd.read_table(
@@ -257,7 +270,11 @@ async def main(pargs) -> None:
 
         return None
 
-    df["illustrator"] = df.apply(find_illustrator, axis=1)
+    df["illustrator"] = (
+        df.swifter.progress_bar(desc="Finding Illustrator")
+        .apply(find_illustrator, axis=1)
+        .astype(str)
+    )
 
     # Special case flip
     df.replace({"code": "PR-051/11-083R"}, {"code": "11-083R/PR-051"}, inplace=True)
@@ -332,7 +349,9 @@ async def main(pargs) -> None:
     with open(CARD_API_FILEPATH, "w+") as fp:
         json.dump(data, fp, indent=4)
 
-    images = await tqdm.gather(*images, desc="JP card images", unit="cards")
+    images = await tqdm.gather(
+        *images, desc="JP card images", unit="cards", colour="MAGENTA"
+    )
 
     # Download testdata images
     df = pd.read_json(pargs.file)
@@ -340,7 +359,60 @@ async def main(pargs) -> None:
     images = [
         download_image(row["uri"], "test", f"{idx}.jpg") for idx, row in df.iterrows()
     ]
-    images = await tqdm.gather(*images, desc="testing images", unit="cards")
+    images = await tqdm.gather(
+        *images, desc="testing images", unit="cards", colour="MAGENTA"
+    )
+
+    df = imagine_database("both", ignore_fullart=False, simplify_lang=True)
+    df.drop(columns=["id", "images", "thumbs"], inplace=True, errors="ignore")
+
+    def create_image_bytes(fpath: str) -> bytes:
+        img_byte_arr = BytesIO()
+        with Image.open(fpath, formats=["JPEG"]) as img:
+            img.save(img_byte_arr, format="jpeg")
+
+        return img_byte_arr.getvalue()
+
+    def map_load_images(filenames: pd.Series) -> pd.Series:
+        return filenames.apply(create_image_bytes)
+
+    # df["image"] = df["filename"].swifter.progress_bar(desc="Loading Image").apply(create_image_bytes)
+    # df.drop(columns=["filename"], inplace=True)
+
+    df = df.astype(
+        {
+            "cost": pd.UInt8Dtype(),
+            "power": pd.UInt16Dtype(),
+            "rarity": "category",
+            "type": "category",
+            # "type_en": "category",
+            "element": "category",
+            # "element_v2": "category",
+            "illustrator": "category",
+            "language": "category",
+            # "set": "category",
+            "image_type": "category",
+        },
+        copy=False,
+    ).convert_dtypes()
+
+    ddf = dd.from_pandas(df, npartitions=(os.cpu_count() or 4) * 2)
+    ddf["image"] = ddf["filename"].map_partitions(
+        map_load_images, meta=("image", "bytes")
+    )
+    ddf = ddf.drop(columns=["filename"])
+
+    if pargs.debug:
+        print(ddf.dtypes)
+
+    with progress.ProgressBar():
+        ddf.to_parquet(
+            "fftcg_data",
+            compression="gzip",
+            write_index=False,
+            overwrite=True,
+            partition_on=["language", "image_type", "is_fullart"],
+        )
 
 
 if __name__ == "__main__":
